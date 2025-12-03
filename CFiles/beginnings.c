@@ -22,5 +22,3 @@ int main(void) {
 
     return 0;
 }
-
-// Write code for calculating from input the circ of square. & for vars. Test weird values.

@@ -3,7 +3,7 @@ cmake-build-debug/*
 CMakeLists.txt
 .idea/
 .idea/*
-hints.c
+CFiles/hints.c
 
 # Prerequisites
 *.d

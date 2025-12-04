@@ -23,6 +23,7 @@ int main(void) {
 
     int c = 0;
     const int r = rand() % WORDS;
+    int tries = 0;
 
     char strings[WORDS][20] = {"dog", "cat", "bird", "bear", "fish", "raptor", "wolf", "fox", "lynx", "snake"};
     char chosen[LEN];
@@ -31,22 +32,32 @@ int main(void) {
         abc[i] = 0;
     }
 
-    for (int i = 0; i < WORDS; i++) {
-        printf("Available: %s\n", strings[i]);
-    }
-
     for (int i = 0; i < LEN; i++) {
         chosen[i] = strings[r][i];
     }
 
-    puts(chosen);
+    int i = 0;
+    while (chosen[i] != '\0') {
+        tries++;
+        i++;
+    }
+    tries *= 2;
+    if (tries >= 10) {
+        tries = 10;
+    }
 
     puts("Simple word game, input a single character and try to guess the word.");
     // todo does not work to exit
 
     while (c != EOF) {
+        if (tries == 0) {
+            puts("You loose");
+            return 1;
+        }
+        printf("Tries: %d\n", tries);
         puts("Guess a letter:");
         c = getchar();
+        tries--;
         // Clear remaining \n
         while (getchar() != '\n') {}
 
@@ -85,7 +96,7 @@ int main(void) {
         }
         printf("\n");
         if (done) {
-            puts("Done");
+            puts("You win");
             return 0;
         }
     }

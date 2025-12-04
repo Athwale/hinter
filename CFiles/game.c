@@ -9,8 +9,13 @@
 #define WORDS 10
 #define LEN 20
 
-bool isIn(char c, ) {
-
+bool isIn(int c, int arr[]) {
+    for (int i = 0; i < 27; i++) {
+        if (c == arr[i]) {
+            return true;
+        }
+    }
+    return false;
 }
 
 int main(void) {
@@ -38,12 +43,18 @@ int main(void) {
 
     puts("Simple word game, input a single character and try to guess the word.");
     // todo does not work to exit
-    // todo limit to letters only
+
     while (c != EOF) {
         puts("Guess a letter:");
         c = getchar();
         // Clear remaining \n
         while (getchar() != '\n') {}
+
+        // Limit to letters only
+        if (c < 'a' || c > 'z') {
+            puts("Invalid input");
+            continue;
+        }
 
         // Save the new char to the first free space in abc array.
         for (int i = 0; i < 27; i++) {
@@ -62,12 +73,20 @@ int main(void) {
         puts("");
 
         int i = 0;
+        bool done = true;
         while (chosen[i] != '\0') {
-            // todo is in function?
-            printf("%c", chosen[i]);
+            if (isIn(chosen[i], abc)) {
+                printf("%c", chosen[i]);
+            } else {
+                printf("_");
+                done = false;
+            }
             i++;
         }
-
         printf("\n");
+        if (done) {
+            puts("Done");
+            return 0;
+        }
     }
 }

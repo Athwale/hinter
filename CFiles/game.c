@@ -24,17 +24,39 @@ int main(void) {
     int c = 0;
     const int r = rand() % WORDS;
     int tries = 0;
+    int hint = 0;
 
-    char strings[WORDS][20] = {"dog", "cat", "bird", "bear", "fish", "raptor", "wolf", "fox", "lynx", "snake"};
+    printf("How many hints? > ");
+    // Give it the address of the variable so it can save into it. *var accesses the value.
+    // todo implement hints.
+    // todo change getch to scanf and use " %c"
+
+    char strings[WORDS][20] = {"elephant", "tiger", "bird", "bear", "fish", "raptor", "wolf", "coyote", "lynx", "snake"};
     char chosen[LEN];
     int abc[27];
     for (int i = 0; i < 27; i++) {
         abc[i] = 0;
     }
 
+    // Get a hint.
+    scanf("%d", &hint);
+    // Clearing buffer, but it can be done with a space before the scanf format. " %d"
+    getchar();
+    if (hint > 3) {
+        puts("Nope, limiting hint to 3");
+        hint = 3;
+    }
+
+    // Select a word.
+    printf("Hint: ");
     for (int i = 0; i < LEN; i++) {
         chosen[i] = strings[r][i];
+        if (hint > 0) {
+            printf("%c", chosen[i]);
+            hint--;
+        }
     }
+    printf("\n");
 
     int i = 0;
     while (chosen[i] != '\0') {
@@ -55,7 +77,7 @@ int main(void) {
             return 1;
         }
         printf("Tries: %d\n", tries);
-        puts("Guess a letter:");
+        printf("Guess a letter: ");
         c = getchar();
         tries--;
         // Clear remaining \n

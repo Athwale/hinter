@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define WORDS 10
+#define WORDS 15
 #define LEN 20
 
 bool isIn(int c, int arr[]) {
@@ -31,7 +31,8 @@ int main(void) {
     // todo implement hints.
     // todo change getch to scanf and use " %c"
 
-    char strings[WORDS][20] = {"elephant", "tiger", "bird", "bear", "fish", "raptor", "wolf", "coyote", "lynx", "snake"};
+    char strings[WORDS][20] = {"elephant", "tiger", "bird", "bear", "fish", "raptor", "wolf", "coyote", "lynx",
+        "snake", "bull", "lizard", "dinosaur", "cheetah", "toucan" };
     char chosen[LEN];
     int abc[27];
     for (int i = 0; i < 27; i++) {

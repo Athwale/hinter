@@ -21,16 +21,13 @@ bool isIn(int c, int arr[]) {
 int main(void) {
     srand(time(NULL));
 
-    int c = 0;
+    char c = 0;
     const int r = rand() % WORDS;
     int tries = 0;
     int hint = 0;
 
     printf("How many hints? > ");
     // Give it the address of the variable so it can save into it. *var accesses the value.
-    // todo implement hints.
-    // todo change getch to scanf and use " %c"
-
     char strings[WORDS][20] = {"elephant", "tiger", "bird", "bear", "fish", "raptor", "wolf", "coyote", "lynx",
         "snake", "bull", "lizard", "dinosaur", "cheetah", "toucan" };
     char chosen[LEN];
@@ -77,12 +74,10 @@ int main(void) {
             puts("You loose");
             return 1;
         }
-        printf("Tries: %d\n", tries);
+        printf("\nTries: %d\n", tries);
         printf("Guess a letter: ");
-        c = getchar();
+        scanf(" %1c", &c);
         tries--;
-        // Clear remaining \n
-        while (getchar() != '\n') {}
 
         // Limit to letters only
         if (c < 'a' || c > 'z') {
@@ -101,6 +96,7 @@ int main(void) {
             }
         }
 
+        puts("Used letters: ");
         for (int i = 0; i < 27; i++) {
             printf("%c ", abc[i]);
         }

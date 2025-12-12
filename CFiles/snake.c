@@ -8,6 +8,8 @@ struct block {
     int posX;
     int posY;
     int type; // 0 - empty, 1 - food, 2 - body, 3 - head
+    struct block *prev;
+    struct block *next;
 };
 
 void print_field(struct block arr[SIZE_X][SIZE_Y]) {
@@ -57,6 +59,7 @@ void update_field(struct block arr[SIZE_X][SIZE_Y], char key) {
 
 int main(void) {
     // todo switch to pointers for practice?
+    // todo make a pointer linked list
 
     // Init playing field.
     struct block field[SIZE_X][SIZE_Y];

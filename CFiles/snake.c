@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <ncurses.h>
 #include <math.h>
+#include <time.h>
+#include <stdlib.h>
 
 // todo check sqrt and add if needed.
 #define SIZE 40
@@ -94,10 +96,13 @@ void update_field(char arr[SIZE][SIZE], struct block snake[], int length) {
 }
 
 int main(void) {
+    srand(time(nullptr));
     // Init playing field.
     char field[SIZE][SIZE];
     struct block snake[WIN_LENGTH];
     int length = START_LENGTH;
+    int food_x = rand() % SIZE;
+    int food_y = rand() % SIZE;
 
     // Init field.
     for (int i = 0; i < SIZE; i++) {
@@ -119,6 +124,8 @@ int main(void) {
 
     // Draw initial play area.
     update_field(field, snake, length);
+    // Place food.
+    field[food_x][food_y] = FOOD;
     print_field(field);
 
     char c = '\0';

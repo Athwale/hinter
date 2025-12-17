@@ -4,14 +4,15 @@
 #include <time.h>
 #include <stdlib.h>
 #include <poll.h>
+#include <string.h>
 #include <unistd.h>
 
 // todo check sqrt and add if needed.
 #define SIZE 40
 #define HEAD_POS 20
-#define WIN_LENGTH 10
+#define WIN_LENGTH 5
 #define START_LENGTH 3
-#define SPEED 200
+#define SPEED 150
 
 // block types:
 #define EMPTY '-'
@@ -41,9 +42,9 @@ void print_field(char arr[SIZE][SIZE]) {
 bool process_move(struct block snake[], char direction, int length, int food_x, int food_y) {
     // Update the snake array with new coordinates.
     // todo implement boundaries.
-    // todo implement inability to 180 move
     // todo implement winning
     // todo implement biting yourself.
+    // todo implement start screen tutorial.
     // Take first element, back up coords, move it, put original coord to next element.
     int prev_x = 0;
     int prev_y = 0;
@@ -103,10 +104,16 @@ void update_field(char arr[SIZE][SIZE], struct block snake[], int length, int fo
 
 char get_input(char current) {
     struct pollfd mypoll = {STDIN_FILENO, POLLIN|POLLPRI};
+    char inputs[] = "wsadqp";
     char c;
-    if( poll(&mypoll, 1, SPEED) )    {
+
+    if (poll(&mypoll, 1, SPEED))    {
         scanf("%c", &c);
-        return c;
+        for (int i = 0; i < strlen(inputs); i++) {
+            if (c == inputs[i]) {
+                return c;
+            }
+        }
     }
     return current;
 }
@@ -150,7 +157,12 @@ int main(void) {
     bool food_consumed = false;
 
     while (c != 'q') {
+
         c = get_input(c);
+        // todo implement pause and unpause.
+        if (c == 'p')
+            continue;
+
         if (c == 'w' && last_direction == 's') {
             c = 's';
         }
@@ -173,6 +185,10 @@ int main(void) {
             snake[length].type = BODY;
             length += 1;
 
+            if (length == WIN_LENGTH) {
+                break;
+            }
+
             // New food location.
             food_x = rand() % SIZE;
             food_y = rand() % SIZE;
@@ -182,8 +198,12 @@ int main(void) {
     }
 
     endwin();
-    // todo print results.
-    printf("Done, press any key");
+    if (length == WIN_LENGTH) {
+        printf("You win.\nSnake length achieved: %d\n", length);
+    } else {
+        printf("Snake length %d\n", length);
+    }
+    puts("Done, press any key");
     getchar();
 
     return 0;

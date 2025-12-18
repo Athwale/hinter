@@ -42,7 +42,6 @@ void print_field(char arr[SIZE][SIZE]) {
 bool process_move(struct block snake[], char direction, int length, int food_x, int food_y) {
     // Update the snake array with new coordinates.
     // todo implement boundaries.
-    // todo implement winning
     // todo implement biting yourself.
     // todo implement start screen tutorial.
     // Take first element, back up coords, move it, put original coord to next element.
@@ -155,13 +154,19 @@ int main(void) {
     char last_direction = 's';
     char c = 'w';
     bool food_consumed = false;
+    bool paused = false;
 
     while (c != 'q') {
 
         c = get_input(c);
-        // todo implement pause and unpause.
-        if (c == 'p')
+        if (c == 'p') {
+            paused = !paused;
+            c = last_direction;
+        }
+
+        if (paused) {
             continue;
+        }
 
         if (c == 'w' && last_direction == 's') {
             c = 's';

@@ -10,8 +10,8 @@
 // todo check sqrt and add if needed.
 #define SIZE 40
 #define HEAD_POS 20
-#define WIN_LENGTH 5
-#define START_LENGTH 3
+#define WIN_LENGTH 20
+#define START_LENGTH 10
 #define SPEED 150
 
 // block types:
@@ -30,20 +30,27 @@ struct block {
     char type;
 };
 
-void print_field(char arr[SIZE][SIZE]) {
+void print_field(char arr[SIZE][SIZE], int length);
+bool process_move(struct block snake[], char direction, int length, int food_x, int food_y);
+void update_field(char arr[SIZE][SIZE], struct block snake[], int length, int food_x, int food_y);
+char get_input(char current);
+
+void print_field(char arr[SIZE][SIZE], int length) {
     for (int i = 0; i < SIZE; i++) {
         for (int j = 0; j < SIZE; j++) {
             mvaddch(i, j, arr[i][j]);
         }
     }
+    addstr("\nMovement, WSAD, Q-Quit, P-Pause");
+    char score[40];
+    snprintf(score, sizeof(score), "\nScore: %d\n", length);
+    addstr(score);
     refresh();
 }
 
 bool process_move(struct block snake[], char direction, int length, int food_x, int food_y) {
     // Update the snake array with new coordinates.
     // todo implement boundaries.
-    // todo implement biting yourself.
-    // todo implement start screen tutorial.
     // Take first element, back up coords, move it, put original coord to next element.
     int prev_x = 0;
     int prev_y = 0;
@@ -77,6 +84,16 @@ bool process_move(struct block snake[], char direction, int length, int food_x, 
             prev_y = current_y;
         }
     }
+
+    // todo implement biting yourself.
+    for (int i = 0; i < length; i++) {
+        if (i == 1) {
+            if (snake[0].posX == snake[i].posX && snake[0].posY == snake[i].posY) {
+                printf("bit");
+            }
+        }
+    }
+
     // Check if food was consumed
     if (snake[0].posX == food_x && snake[0].posY == food_y) {
         return true;
@@ -148,16 +165,15 @@ int main(void) {
 
     // Draw initial play area.
     update_field(field, snake, length, food_x, food_y);
-    print_field(field);
+    print_field(field, length);
 
     // Main loop.
     char last_direction = 's';
     char c = 'w';
     bool food_consumed = false;
-    bool paused = false;
+    bool paused = true;
 
     while (c != 'q') {
-
         c = get_input(c);
         if (c == 'p') {
             paused = !paused;
@@ -199,7 +215,7 @@ int main(void) {
             food_y = rand() % SIZE;
         }
         update_field(field, snake, length, food_x, food_y);
-        print_field(field);
+        print_field(field, length);
     }
 
     endwin();

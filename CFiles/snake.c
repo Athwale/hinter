@@ -10,7 +10,7 @@
 // todo check sqrt and add if needed.
 #define SIZE 40
 #define HEAD_POS 20
-#define WIN_LENGTH 20
+#define WIN_LENGTH 12
 #define START_LENGTH 10
 #define SPEED 150
 
@@ -31,7 +31,7 @@ struct block {
 };
 
 void print_field(char arr[SIZE][SIZE], int length);
-bool process_move(struct block snake[], char direction, int length, int food_x, int food_y);
+int process_move(struct block snake[], char direction, int length, int food_x, int food_y);
 void update_field(char arr[SIZE][SIZE], struct block snake[], int length, int food_x, int food_y);
 char get_input(char current);
 
@@ -48,9 +48,10 @@ void print_field(char arr[SIZE][SIZE], int length) {
     refresh();
 }
 
-bool process_move(struct block snake[], char direction, int length, int food_x, int food_y) {
+int process_move(struct block snake[], char direction, int length, int food_x, int food_y) {
+    // Returns: 1 - no food, consumed, 2 - food consumed, 3 - death.
+
     // Update the snake array with new coordinates.
-    // todo implement boundaries.
     // Take first element, back up coords, move it, put original coord to next element.
     int prev_x = 0;
     int prev_y = 0;
@@ -62,15 +63,27 @@ bool process_move(struct block snake[], char direction, int length, int food_x, 
             switch (direction) {
                 case 'w':
                     snake[i].posX -= 1;
+                    if (snake[0].posX == -1) {
+                        return 3;
+                    }
                     break;
                 case 's':
                     snake[i].posX += 1;
+                    if (snake[0].posX == SIZE) {
+                        return 3;
+                    }
                     break;
                 case 'a':
                     snake[i].posY -= 1;
+                    if (snake[0].posY == -1) {
+                        return 3;
+                    }
                     break;
                 case 'd':
                     snake[i].posY += 1;
+                    if (snake[0].posY == SIZE) {
+                        return 3;
+                    }
                     break;
                 default:
                     break;
@@ -94,11 +107,16 @@ bool process_move(struct block snake[], char direction, int length, int food_x, 
         }
     }
 
+    // TODO send to funct.
+    char pos[20];
+    snprintf(pos, sizeof(pos), "\nPos: x:%d y:%d\n", snake[0].posX, snake[0].posY);
+    addstr(pos);
+
     // Check if food was consumed
     if (snake[0].posX == food_x && snake[0].posY == food_y) {
-        return true;
+        return 2;
     }
-    return false;
+    return 1;
 }
 
 void update_field(char arr[SIZE][SIZE], struct block snake[], int length, int food_x, int food_y) {
@@ -135,6 +153,7 @@ char get_input(char current) {
 }
 
 int main(void) {
+    // todo sizeof for arrays in loops?
     // Init rand function.
     srand(time(nullptr));
 
@@ -170,7 +189,7 @@ int main(void) {
     // Main loop.
     char last_direction = 's';
     char c = 'w';
-    bool food_consumed = false;
+    int result = 0;
     bool paused = true;
 
     while (c != 'q') {
@@ -198,8 +217,9 @@ int main(void) {
         }
         last_direction = c;
 
-        food_consumed = process_move(snake, c, length, food_x, food_y);
-        if (food_consumed) {
+        result = process_move(snake, c, length, food_x, food_y);
+        // 1 - no food, consumed, 2 - food consumed, 3 - death
+        if (result == 2) {
             // Grow snake. The new block will be added to the correct place on the next move.
             snake[length].posX = snake[0].posX;
             snake[length].posY = snake[0].posY;
@@ -216,14 +236,20 @@ int main(void) {
         }
         update_field(field, snake, length, food_x, food_y);
         print_field(field, length);
+
+        if (result == 3) {
+            break;
+        }
+    }
+    endwin();
+
+    if (result == 3) {
+        puts("You died.");
+    } else if (length == WIN_LENGTH) {
+        puts("You win.");
     }
 
-    endwin();
-    if (length == WIN_LENGTH) {
-        printf("You win.\nSnake length achieved: %d\n", length);
-    } else {
-        printf("Snake length %d\n", length);
-    }
+    printf("Snake length %d\n", length);
     puts("Done, press any key");
     getchar();
 

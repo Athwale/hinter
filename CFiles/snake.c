@@ -10,15 +10,16 @@
 // todo check sqrt and add if needed.
 #define SIZE 40
 #define HEAD_POS 20
-#define WIN_LENGTH 12
+#define WIN_LENGTH 15
 #define START_LENGTH 10
-#define SPEED 150
+#define SPEED 100
 
 // block types:
-#define EMPTY '-'
-#define BODY '$'
-#define FOOD '*'
+#define EMPTY '.'
+#define BODY '0'
+#define FOOD '#'
 
+// clear; cc snake.c -o snake -lncurses; ./snake
 //  y y y
 // x
 // x
@@ -30,15 +31,19 @@ struct block {
     char type;
 };
 
-void print_field(char arr[SIZE][SIZE], int length);
+bool print_field(char arr[SIZE][SIZE], int length, bool ate);
 int process_move(struct block snake[], char direction, int length, int food_x, int food_y);
 void update_field(char arr[SIZE][SIZE], struct block snake[], int length, int food_x, int food_y);
 char get_input(char current);
 
-void print_field(char arr[SIZE][SIZE], int length) {
+bool print_field(char arr[SIZE][SIZE], int length, bool ate) {
+    int body_parts = 0;
+
     for (int i = 0; i < SIZE; i++) {
         for (int j = 0; j < SIZE; j++) {
             mvaddch(i, j, arr[i][j]);
+            if (arr[i][j] == BODY)
+                body_parts++;
         }
     }
     addstr("\nMovement, WSAD, Q-Quit, P-Pause");
@@ -46,6 +51,17 @@ void print_field(char arr[SIZE][SIZE], int length) {
     snprintf(score, sizeof(score), "\nScore: %d\n", length);
     addstr(score);
     refresh();
+
+    if (length > body_parts) {
+        // We bit ourselves because there are less body parts than the length of the snake.
+        // If the snake eats the new part is added on the next move, so we have to ignore it.
+        if (ate) {
+            return false;
+        }
+        return true;
+    }
+    // Normal step, nothing happened, move on.
+    return false;
 }
 
 int process_move(struct block snake[], char direction, int length, int food_x, int food_y) {
@@ -98,18 +114,8 @@ int process_move(struct block snake[], char direction, int length, int food_x, i
         }
     }
 
-    // todo implement biting yourself.
-    for (int i = 0; i < length; i++) {
-        if (i == 1) {
-            if (snake[0].posX == snake[i].posX && snake[0].posY == snake[i].posY) {
-                printf("bit");
-            }
-        }
-    }
-
-    // TODO send to funct.
     char pos[20];
-    snprintf(pos, sizeof(pos), "\nPos: x:%d y:%d\n", snake[0].posX, snake[0].posY);
+    snprintf(pos, sizeof(pos), "\nHead pos: x:%d y:%d\n", snake[0].posX, snake[0].posY);
     addstr(pos);
 
     // Check if food was consumed
@@ -152,8 +158,20 @@ char get_input(char current) {
     return current;
 }
 
+void end_game(bool win, int length) {
+    endwin();
+    if (!win) {
+        puts("You died.");
+    } else if (length == WIN_LENGTH) {
+        puts("You win.");
+    }
+
+    printf("Snake length %d\n", length);
+    puts("Done, press any key");
+    getchar();
+}
+
 int main(void) {
-    // todo sizeof for arrays in loops?
     // Init rand function.
     srand(time(nullptr));
 
@@ -184,7 +202,7 @@ int main(void) {
 
     // Draw initial play area.
     update_field(field, snake, length, food_x, food_y);
-    print_field(field, length);
+    print_field(field, length, false);
 
     // Main loop.
     char last_direction = 's';
@@ -218,7 +236,8 @@ int main(void) {
         last_direction = c;
 
         result = process_move(snake, c, length, food_x, food_y);
-        // 1 - no food, consumed, 2 - food consumed, 3 - death
+        // 1 - normal step, 2 - food consumed, 3 - death by hitting the edge.
+
         if (result == 2) {
             // Grow snake. The new block will be added to the correct place on the next move.
             snake[length].posX = snake[0].posX;
@@ -235,23 +254,22 @@ int main(void) {
             food_y = rand() % SIZE;
         }
         update_field(field, snake, length, food_x, food_y);
-        print_field(field, length);
+        if (print_field(field, length, ((result == 2) ? true : false ))) {
+            // Returns true if the snake bit itself.
+            result = 3;
+        }
 
         if (result == 3) {
+            // Die.
             break;
         }
     }
-    endwin();
 
     if (result == 3) {
-        puts("You died.");
-    } else if (length == WIN_LENGTH) {
-        puts("You win.");
+        end_game(false, length);
+    } else {
+        end_game(true, length);
     }
-
-    printf("Snake length %d\n", length);
-    puts("Done, press any key");
-    getchar();
 
     return 0;
 }

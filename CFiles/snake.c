@@ -8,6 +8,10 @@
 #include <unistd.h>
 
 // todo check sqrt and add if needed.
+// todo write results to a file.
+// todo use an enum for some menu or something.
+// todo malloc for some array free + set to null , calloc sets allocated space to 0;
+
 #define SIZE 40
 #define HEAD_POS 20
 #define WIN_LENGTH 15

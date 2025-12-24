@@ -162,6 +162,17 @@ char get_input(char current) {
     return current;
 }
 
+bool write_results(char text[]) {
+    FILE *p_file = fopen("./results.txt", "w");
+    if (p_file == NULL) {
+        puts("results.txt failed to open");
+        return false;
+    }
+    fprintf(p_file, "%s", text);
+    fclose(p_file);
+    return true;
+}
+
 void end_game(bool win, int length) {
     endwin();
     if (!win) {
@@ -173,6 +184,12 @@ void end_game(bool win, int length) {
     printf("Snake length %d\n", length);
     puts("Done, press any key");
     getchar();
+
+    char result[20];
+    snprintf(result, sizeof(result), "Final score %d\n.", length);
+    if (write_results(result)) {
+        puts("Results written to results.txt");
+    }
 }
 
 int main(void) {

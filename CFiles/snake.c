@@ -8,8 +8,6 @@
 #include <unistd.h>
 
 // todo check sqrt and add if needed.
-// todo write results to a file.
-// todo use an enum for some menu or something.
 // todo malloc for some array free + set to null , calloc sets allocated space to 0;
 
 #define SIZE 40
@@ -182,8 +180,6 @@ void end_game(bool win, int length) {
     }
 
     printf("Snake length %d\n", length);
-    puts("Done, press any key");
-    getchar();
 
     char result[20];
     snprintf(result, sizeof(result), "Final score %d\n.", length);
@@ -215,6 +211,25 @@ int main(void) {
         snake[i].posX = HEAD_POS;
         snake[i].posY = HEAD_POS + i;
     }
+
+    char *menu[3] = {"START", "CREDITS", "QUIT"};
+    int selection = 0;
+
+    for (int i = 0; i < 3; i++) {
+        printf("%d. %s\n", i, menu[i]);
+    }
+    printf("Select option: ");
+    do {
+        scanf("%d", &selection);
+        if (strcmp("QUIT", menu[selection]) == 0) {
+            return 0;
+        }
+        if (strcmp("CREDITS", menu[selection]) == 0) {
+            puts("Ondrej Mejzlik");
+            printf("Select option: ");
+        }
+    } while (strcmp("START", menu[selection]) != 0);
+    puts("");
 
     // Init ncurses.
     initscr();

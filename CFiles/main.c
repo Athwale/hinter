@@ -1,5 +1,6 @@
 #include <gtk/gtk.h>
-#include <constants.h>
+// "" means local directory file.
+#include "constants.h"
 
 static void print_hello(GtkWidget *widget, gpointer data) {
     g_print ("Hello World\n");

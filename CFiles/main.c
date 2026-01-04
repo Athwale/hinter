@@ -2,26 +2,47 @@
 // "" means local directory file.
 #include "constants.h"
 
-static void print_hello(GtkWidget *widget, gpointer data) {
-    g_print ("Hello World\n");
+void end_program(GtkWidget *w, gpointer ptr) {
+    gtk_main_quit();
+}
+
+void b_click(GtkWidget *wid, gpointer ptr) {
+    // wid is the widget that generated the signal.
+    // ptr is an optional target passed into the function.
+    gtk_label_set_text (GTK_LABEL(ptr), "Pressed");
 }
 
 static void activate (GtkApplication *app, gpointer user_data) {
     GtkWidget *window;
     GtkWidget *button;
-    GtkWidget *button_box;
+    GtkWidget *box;
+    GtkWidget *label;
+    GtkWidget *text;
 
     window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), APP_NAME);
     gtk_window_set_default_size(GTK_WINDOW(window), 200, 200);
 
-    button_box = gtk_button_box_new(GTK_ORIENTATION_HORIZONTAL);
-    gtk_container_add(GTK_CONTAINER(window), button_box);
+    // Container.
+    box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
 
+    // Label.
+    label = gtk_label_new("Label");
+
+    // Button.
     button = gtk_button_new_with_label("Hello World");
-    g_signal_connect(button, "clicked", G_CALLBACK(print_hello), NULL);
-    g_signal_connect_swapped(button, "clicked", G_CALLBACK(gtk_widget_destroy), window);
-    gtk_container_add(GTK_CONTAINER(button_box), button);
+    // target, event, function, data.
+    g_signal_connect(button, "clicked", G_CALLBACK(b_click), label);
+
+    // Text input.
+    text = gtk_entry_new();
+
+    // Expand, fill
+    gtk_box_pack_start(GTK_BOX(box), text, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(box), label, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(box), button, FALSE, FALSE, 0);
+
+    gtk_container_add(GTK_CONTAINER(window), box);
 
     gtk_widget_show_all(window);
 }

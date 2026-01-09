@@ -4,8 +4,10 @@
 
 // Latest open file.
 char *current_file;
+GtkWidget *main_text_field;
+GtkWidget *statusbar;
 
-void destroy (GtkWidget* widget, gpointer data) {
+void destroy(GtkWidget* widget, gpointer data) {
     /**
      * @brief Kill the application.
      * @param
@@ -14,11 +16,44 @@ void destroy (GtkWidget* widget, gpointer data) {
     g_application_quit(G_APPLICATION(data));
 }
 
+void post_status_message(char *msg) {
+    /**
+     * @brief Display a status message at the bottom of the window.
+     * @param string message.
+     * @return void
+     */
+    // Every message needs to generate a unique ID.
+    const guint id = gtk_statusbar_get_context_id(GTK_STATUSBAR(statusbar), "info");
+    gtk_statusbar_remove_all(GTK_STATUSBAR(statusbar), id);
+    gtk_statusbar_push(GTK_STATUSBAR(statusbar), id, msg);
+}
+
 static void open_file(GtkWidget *btn, gpointer parent_window) {
     GtkWidget *dialog = gtk_file_chooser_dialog_new("Open file", GTK_WINDOW(parent_window), GTK_FILE_CHOOSER_ACTION_OPEN, "Cancel", 0, "OK", 1, NULL);
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == 1) {
         current_file = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-        printf("%s\n", current_file);
+        // todo load text file and insert into buffer.
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+
+        // Open text file in read only mode
+        FILE *text_file  = fopen(current_file, "r");
+        char line[1024];
+        GtkTextIter iter;
+
+        if (text_file == NULL) {
+            // If file can not be opened, show error and exit.
+            // todo show error dialog.
+            printf("Error! Could not open file\n");
+            return;
+        }
+
+        // Get iterator at the start of the buffer. Each insert will move the iterator further.
+        gtk_text_buffer_get_iter_at_offset (buffer, &iter, 0);
+        while(fgets(line, 1024, text_file)) {
+            gtk_text_buffer_insert(buffer, &iter, line, -1);
+        }
+
+        fclose(text_file);
     }
     gtk_widget_destroy(dialog);
 }
@@ -55,26 +90,32 @@ static void activate (GtkApplication *app, gpointer user_data) {
     gtk_menu_shell_append (GTK_MENU_SHELL(f_menu), quit_menu_item);
     g_signal_connect(quit_menu_item, "activate", G_CALLBACK(destroy), app);
 
-    // Text field.
-    GtkWidget *main_text_field = gtk_text_view_new();
-
     // Status bar.
-    GtkWidget *statusbar = gtk_statusbar_new();
+    statusbar = gtk_statusbar_new();
 
-    // Every message needs to generate a unique ID.
-    const guint id = gtk_statusbar_get_context_id(GTK_STATUSBAR(statusbar), "info");
-    gtk_statusbar_push(GTK_STATUSBAR(statusbar), id, STR_STATUS_INIT);
-    // Use pop to delete message from the stack.
+    // Main text field. Declared outside of function to be accessible everywhere.
+    GtkTextBuffer *buffer = gtk_text_buffer_new(nullptr);
+    main_text_field = gtk_text_view_new_with_buffer(buffer);
+    gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(main_text_field), GTK_WRAP_WORD);
+
+    GtkWidget *scrolled_window = gtk_scrolled_window_new(nullptr, nullptr);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_window), GTK_POLICY_AUTOMATIC,
+        GTK_POLICY_AUTOMATIC);
+
+    gtk_container_add (GTK_CONTAINER(scrolled_window), main_text_field);
+    gtk_container_set_border_width (GTK_CONTAINER(scrolled_window), 5);
 
     // Assembling all components into main box.
     // Add menu box to the main box.
     gtk_box_pack_start(GTK_BOX(main_box), menu_box, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(main_box), main_text_field, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(main_box), scrolled_window, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(main_box), statusbar, FALSE, FALSE, 0);
 
     gtk_container_add(GTK_CONTAINER(window), main_box);
 
     gtk_widget_show_all(window);
+
+    post_status_message(STR_STATUS_INIT);
 }
 
 int main (int argc, char **argv) {

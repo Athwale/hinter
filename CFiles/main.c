@@ -1,6 +1,13 @@
 #include <gtk/gtk.h>
+#include <string.h>
+#include <stdio.h>
+#include <libgen.h>
 // "" means local directory file.
 #include "constants.h"
+
+void post_status_message(const char *msg);
+
+// todo https://codebrowser.dev/gtk/gtk/demos/gtk-demo/textview.c.html
 
 // Latest open file.
 char *current_file;
@@ -16,7 +23,35 @@ void destroy(GtkWidget* widget, gpointer data) {
     g_application_quit(G_APPLICATION(data));
 }
 
-void post_status_message(char *msg) {
+void show_dialog(GtkWindow *parent, const gchar *title, const gchar *message) {
+    const GtkDialogFlags flags = GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL;
+
+    GtkWidget *dialog = gtk_dialog_new_with_buttons(title, parent, flags, "OK", GTK_RESPONSE_NONE, NULL);
+    const int height = 100;
+    gtk_window_set_default_size(GTK_WINDOW(dialog), 200, height);
+
+    GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    GtkWidget *label = gtk_label_new(message);
+    gtk_box_pack_start(GTK_BOX(box), label, TRUE, FALSE, height/2);
+
+    gtk_container_add(GTK_CONTAINER(content_area), box);
+
+    g_signal_connect_swapped(dialog, "response", G_CALLBACK(gtk_widget_destroy), dialog);
+    gtk_widget_show_all(dialog);
+}
+
+void update_status() {
+    char message[300] = {0};
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+    int chars = gtk_text_buffer_get_char_count(buffer);
+    int lines = gtk_text_buffer_get_line_count(buffer);
+
+    sprintf(message, "File - %s: Lines: %d, chars: %d", basename(current_file), lines, chars);
+    post_status_message(message);
+}
+
+void post_status_message(const char *msg) {
     /**
      * @brief Display a status message at the bottom of the window.
      * @param string message.
@@ -32,7 +67,6 @@ static void open_file(GtkWidget *btn, gpointer parent_window) {
     GtkWidget *dialog = gtk_file_chooser_dialog_new("Open file", GTK_WINDOW(parent_window), GTK_FILE_CHOOSER_ACTION_OPEN, "Cancel", 0, "OK", 1, NULL);
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == 1) {
         current_file = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-        // todo load text file and insert into buffer.
         GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
 
         // Open text file in read only mode
@@ -42,23 +76,23 @@ static void open_file(GtkWidget *btn, gpointer parent_window) {
 
         if (text_file == NULL) {
             // If file can not be opened, show error and exit.
-            // todo show error dialog.
-            printf("Error! Could not open file\n");
+            show_dialog(parent_window, STR_ERR, STR_FILE_OPEN_FAIL);
             return;
         }
 
         // Get iterator at the start of the buffer. Each insert will move the iterator further.
         gtk_text_buffer_get_iter_at_offset (buffer, &iter, 0);
         while(fgets(line, 1024, text_file)) {
+            // Insert until null character.
             gtk_text_buffer_insert(buffer, &iter, line, -1);
         }
-
         fclose(text_file);
     }
     gtk_widget_destroy(dialog);
+    update_status();
 }
 
-static void activate (GtkApplication *app, gpointer user_data) {
+static void activate(GtkApplication *app, gpointer user_data) {
     // Main window.
     GtkWidget *window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), APP_NAME);
@@ -115,7 +149,7 @@ static void activate (GtkApplication *app, gpointer user_data) {
 
     gtk_widget_show_all(window);
 
-    post_status_message(STR_STATUS_INIT);
+    update_status();
 }
 
 int main (int argc, char **argv) {

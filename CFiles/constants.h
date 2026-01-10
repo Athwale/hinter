@@ -10,3 +10,5 @@
 #define STR_SAVE "Save..."
 #define STR_QUIT "Quit"
 #define STR_STATUS_INIT "Init"
+#define STR_ERR "Error"
+#define STR_FILE_OPEN_FAIL "Can not open file"

@@ -96,7 +96,19 @@ static void open_file(GtkWidget *btn, gpointer parent_window) {
 }
 
 static void new_file_callback (GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
-    g_print("You clicked \"New\".\n");
+    g_print("You clicked New.\n");
+}
+
+static void save_file_callback (GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked Save.\n");
+}
+
+static void undo_file_callback (GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked Undo.\n");
+}
+
+static void redo_file_callback (GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked Redo.\n");
 }
 
 static void activate(GtkApplication *app, gpointer user_data) {
@@ -137,28 +149,30 @@ static void activate(GtkApplication *app, gpointer user_data) {
     GtkStyleContext *style_context = gtk_widget_get_style_context(toolbar);
     gtk_style_context_add_class(style_context, GTK_STYLE_CLASS_PRIMARY_TOOLBAR);
 
-    const char icon_names[] = {"document-new"};
-    const char button_labels[] = {"New"};
-    const char actions[] = {"newButtonPress"};
+    // Array of pointers. A ragged array of strings because each array of characters is of different length. String is a pointer o the start of the string.
+    // todo buttons, colorize, search, spellcheck
+    const char *icon_names[] = {"document-new", "document-save", "edit-undo", "edit-redo", "document-properties", "format-text-bold", "format-text-italic"};
+    const char *button_labels[] = {"New", "Save", "Undo", "Redo", "Setup", "", ""};
+    const char *actions[] = {"newButtonPress", "saveButtonPress", "undoButtonPress", "redoButtonPress", "setupButtonPress"};
     // Create array of function pointers Syntax: return_type (*name[])(args)
-    static void (*callbacks[])(GSimpleAction*, GVariant*, gpointer) = {new_file_callback};
+    static void (*callbacks[])(GSimpleAction*, GVariant*, gpointer) = {new_file_callback, save_file_callback, undo_file_callback, redo_file_callback};
 
-    for (int i = 0; i < 1; i++) {
-        GtkWidget *new_icon = gtk_image_new_from_icon_name(&icon_names[i], GTK_ICON_SIZE_SMALL_TOOLBAR);
-        GtkToolItem *new_button = gtk_tool_button_new(new_icon, &button_labels[i]);
+    // Sizeof work because they are pointers of equal size.
+    for (int icons = sizeof(icon_names)/sizeof(icon_names[0]) - 1; icons >= 0; icons--) {
+        GtkWidget *new_icon = gtk_image_new_from_icon_name(icon_names[icons], GTK_ICON_SIZE_SMALL_TOOLBAR);
+        GtkToolItem *new_button = gtk_tool_button_new(new_icon, button_labels[icons]);
         gtk_tool_item_set_is_important(new_button, TRUE);
         gtk_toolbar_insert(GTK_TOOLBAR(toolbar), new_button, 0);
         gtk_widget_show(GTK_WIDGET(new_button));
         // win. is needed so gtk knows which map to look into.
 
         char action_name[50] = {0};
-        // todo why &
-        sprintf(action_name, "win.%s", &actions[i]);
-        printf("%s", action_name);
+        // An array of strings is [][], sprintf expects a pointer to a string.
+        sprintf(action_name, "win.%s", actions[icons]);
 
         gtk_actionable_set_action_name(GTK_ACTIONABLE(new_button), action_name);
-        GSimpleAction *new_file_action = g_simple_action_new(&actions[i], nullptr);
-        g_signal_connect(new_file_action, "activate", G_CALLBACK(callbacks[i]), GTK_WINDOW(window));
+        GSimpleAction *new_file_action = g_simple_action_new(actions[icons], nullptr);
+        g_signal_connect(new_file_action, "activate", G_CALLBACK(callbacks[icons]), GTK_WINDOW(window));
         g_action_map_add_action(G_ACTION_MAP(window), G_ACTION(new_file_action));
     }
 

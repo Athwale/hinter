@@ -89,10 +89,18 @@ static void open_file(GtkWidget *btn, gpointer parent_window) {
         fclose(text_file);
     }
     gtk_widget_destroy(dialog);
+
+    // todo load metadata file.
+
     update_status();
 }
 
+static void new_file_callback (GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked \"New\".\n");
+}
+
 static void activate(GtkApplication *app, gpointer user_data) {
+    // todo add some tool bar.
     // Main window.
     GtkWidget *window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), APP_NAME);
@@ -124,6 +132,41 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_menu_shell_append (GTK_MENU_SHELL(f_menu), quit_menu_item);
     g_signal_connect(quit_menu_item, "activate", G_CALLBACK(destroy), app);
 
+    // Toolbar.
+    GtkWidget *toolbar = gtk_toolbar_new();
+    GtkStyleContext *style_context = gtk_widget_get_style_context(toolbar);
+    gtk_style_context_add_class(style_context, GTK_STYLE_CLASS_PRIMARY_TOOLBAR);
+
+    const char icon_names[] = {"document-new"};
+    const char button_labels[] = {"New"};
+    const char actions[] = {"newButtonPress"};
+    // Create array of function pointers Syntax: return_type (*name[])(args)
+    static void (*callbacks[])(GSimpleAction*, GVariant*, gpointer) = {new_file_callback};
+
+    for (int i = 0; i < 1; i++) {
+        GtkWidget *new_icon = gtk_image_new_from_icon_name(&icon_names[i], GTK_ICON_SIZE_SMALL_TOOLBAR);
+        GtkToolItem *new_button = gtk_tool_button_new(new_icon, &button_labels[i]);
+        gtk_tool_item_set_is_important(new_button, TRUE);
+        gtk_toolbar_insert(GTK_TOOLBAR(toolbar), new_button, 0);
+        gtk_widget_show(GTK_WIDGET(new_button));
+        // win. is needed so gtk knows which map to look into.
+
+        char action_name[50] = {0};
+        // todo why &
+        sprintf(action_name, "win.%s", &actions[i]);
+        printf("%s", action_name);
+
+        gtk_actionable_set_action_name(GTK_ACTIONABLE(new_button), action_name);
+        GSimpleAction *new_file_action = g_simple_action_new(&actions[i], nullptr);
+        g_signal_connect(new_file_action, "activate", G_CALLBACK(callbacks[i]), GTK_WINDOW(window));
+        g_action_map_add_action(G_ACTION_MAP(window), G_ACTION(new_file_action));
+    }
+
+    // todo generate toolbar buttons in a loop.
+
+    gtk_widget_set_hexpand(toolbar, TRUE);
+    gtk_widget_show(toolbar);
+
     // Status bar.
     statusbar = gtk_statusbar_new();
 
@@ -142,6 +185,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     // Assembling all components into main box.
     // Add menu box to the main box.
     gtk_box_pack_start(GTK_BOX(main_box), menu_box, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(main_box), toolbar, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(main_box), scrolled_window, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(main_box), statusbar, FALSE, FALSE, 0);
 

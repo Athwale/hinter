@@ -113,7 +113,9 @@ static void save_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
 }
 
 static void undo_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
-    g_print("You clicked Undo.\n");
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+    // todo gtk4???
+    //gtk_text_buffer_undo(buffer);
 }
 
 static void redo_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
@@ -125,7 +127,6 @@ static void setup_file_callback(GSimpleAction *simple, GVariant *parameter, gpoi
 }
 
 static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
-    // todo test and handle weird selections.
     GtkTextIter start;
     GtkTextIter end;
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
@@ -133,8 +134,14 @@ static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
         return;
     }
     // todo undo, redo how?
-    gtk_text_buffer_apply_tag_by_name(buffer, "bold", &start, &end);
-    // todo handle unclick even across bold and not bold text. gtk_text_buffer_remove_tag_by_name
+
+    GtkTextTagTable *table = gtk_text_buffer_get_tag_table(buffer);
+    GtkTextTag *tag = gtk_text_tag_table_lookup(table, "bold");
+    if (gtk_text_iter_has_tag(&start, tag)) {
+        gtk_text_buffer_remove_tag(buffer, tag, &start, &end);
+    } else {
+        gtk_text_buffer_apply_tag(buffer, tag, &start, &end);
+    }
 }
 
 static void italic_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {

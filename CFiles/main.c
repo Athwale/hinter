@@ -8,6 +8,8 @@
 void post_status_message(const char *msg);
 
 // todo https://codebrowser.dev/gtk/gtk/demos/gtk-demo/textview.c.html
+// todo walgrind check leaks?
+// todo check documentation for transfer and those have to be unrefed.
 
 // Latest open file.
 char *current_file;
@@ -47,7 +49,7 @@ void update_status() {
     int chars = gtk_text_buffer_get_char_count(buffer);
     int lines = gtk_text_buffer_get_line_count(buffer);
 
-    sprintf(message, "File - %s: Lines: %d, chars: %d", basename(current_file), lines, chars);
+    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: ", basename(current_file), lines, chars);
     post_status_message(message);
 }
 
@@ -61,6 +63,13 @@ void post_status_message(const char *msg) {
     const guint id = gtk_statusbar_get_context_id(GTK_STATUSBAR(statusbar), "info");
     gtk_statusbar_remove_all(GTK_STATUSBAR(statusbar), id);
     gtk_statusbar_push(GTK_STATUSBAR(statusbar), id, msg);
+}
+
+static void create_tags(GtkTextBuffer *buffer) {
+    // todo tag table could be separate and reused in new buffers.
+    gtk_text_buffer_create_tag(buffer, "italic", "style", PANGO_STYLE_ITALIC, NULL);
+    gtk_text_buffer_create_tag(buffer, "bold", "weight", PANGO_WEIGHT_BOLD, NULL);
+    gtk_text_buffer_create_tag(buffer, "red_background", "background", "red", NULL);
 }
 
 static void open_file(GtkWidget *btn, gpointer parent_window) {
@@ -95,24 +104,56 @@ static void open_file(GtkWidget *btn, gpointer parent_window) {
     update_status();
 }
 
-static void new_file_callback (GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+static void new_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     g_print("You clicked New.\n");
 }
 
-static void save_file_callback (GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+static void save_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     g_print("You clicked Save.\n");
 }
 
-static void undo_file_callback (GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+static void undo_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     g_print("You clicked Undo.\n");
 }
 
-static void redo_file_callback (GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+static void redo_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     g_print("You clicked Redo.\n");
 }
 
+static void setup_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked Setup.\n");
+}
+
+static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    // todo test and handle weird selections.
+    GtkTextIter start;
+    GtkTextIter end;
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+    if (!gtk_text_buffer_get_selection_bounds(buffer, &start, &end)) {
+        return;
+    }
+    // todo undo, redo how?
+    gtk_text_buffer_apply_tag_by_name(buffer, "bold", &start, &end);
+    // todo handle unclick even across bold and not bold text. gtk_text_buffer_remove_tag_by_name
+}
+
+static void italic_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked Italic.\n");
+}
+
+static void colorize_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked Colorize.\n");
+}
+
+static void spelling_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked Spelling.\n");
+}
+
+static void find_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked Find.\n");
+}
+
 static void activate(GtkApplication *app, gpointer user_data) {
-    // todo add some tool bar.
     // Main window.
     GtkWidget *window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), APP_NAME);
@@ -146,21 +187,45 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     // Toolbar.
     GtkWidget *toolbar = gtk_toolbar_new();
-    GtkStyleContext *style_context = gtk_widget_get_style_context(toolbar);
-    gtk_style_context_add_class(style_context, GTK_STYLE_CLASS_PRIMARY_TOOLBAR);
+    gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
+    gtk_toolbar_set_icon_size(GTK_TOOLBAR(toolbar), GTK_ICON_SIZE_SMALL_TOOLBAR);
 
     // Array of pointers. A ragged array of strings because each array of characters is of different length. String is a pointer o the start of the string.
-    // todo buttons, colorize, search, spellcheck
-    const char *icon_names[] = {"document-new", "document-save", "edit-undo", "edit-redo", "document-properties", "format-text-bold", "format-text-italic"};
-    const char *button_labels[] = {"New", "Save", "Undo", "Redo", "Setup", "", ""};
-    const char *actions[] = {"newButtonPress", "saveButtonPress", "undoButtonPress", "redoButtonPress", "setupButtonPress"};
+    const char *icon_names[] = {"document-new",
+                                "document-save",
+                                "edit-undo",
+                                "edit-redo",
+                                "document-properties",
+                                "format-text-bold",
+                                "format-text-italic",
+                                "gtk-color-picker",
+                                "tools-check-spelling",
+                                "edit-find"};
+    const char *actions[] = {"new_ButtonPress",
+                             "save_ButtonPress",
+                             "undo_ButtonPress",
+                             "redo_ButtonPress",
+                             "setup_ButtonPress",
+                             "bold_ButtonPress",
+                             "italic_ButtonPress",
+                             "colorize_ButtonPress",
+                             "spelling_ButtonPress",
+                             "find_ButtonPress",};
     // Create array of function pointers Syntax: return_type (*name[])(args)
-    static void (*callbacks[])(GSimpleAction*, GVariant*, gpointer) = {new_file_callback, save_file_callback, undo_file_callback, redo_file_callback};
-
+    static void (*callbacks[])(GSimpleAction*, GVariant*, gpointer) = {new_file_callback,
+                                                                       save_file_callback,
+                                                                       undo_file_callback,
+                                                                       redo_file_callback,
+                                                                       setup_file_callback,
+                                                                       bold_file_callback,
+                                                                       italic_file_callback,
+                                                                       colorize_file_callback,
+                                                                       spelling_file_callback,
+                                                                       find_file_callback};
     // Sizeof work because they are pointers of equal size.
     for (int icons = sizeof(icon_names)/sizeof(icon_names[0]) - 1; icons >= 0; icons--) {
         GtkWidget *new_icon = gtk_image_new_from_icon_name(icon_names[icons], GTK_ICON_SIZE_SMALL_TOOLBAR);
-        GtkToolItem *new_button = gtk_tool_button_new(new_icon, button_labels[icons]);
+        GtkToolItem *new_button = gtk_tool_button_new(new_icon, nullptr);
         gtk_tool_item_set_is_important(new_button, TRUE);
         gtk_toolbar_insert(GTK_TOOLBAR(toolbar), new_button, 0);
         gtk_widget_show(GTK_WIDGET(new_button));
@@ -176,17 +241,16 @@ static void activate(GtkApplication *app, gpointer user_data) {
         g_action_map_add_action(G_ACTION_MAP(window), G_ACTION(new_file_action));
     }
 
-    // todo generate toolbar buttons in a loop.
-
     gtk_widget_set_hexpand(toolbar, TRUE);
     gtk_widget_show(toolbar);
 
     // Status bar.
     statusbar = gtk_statusbar_new();
 
-    // Main text field. Declared outside of function to be accessible everywhere.
+    // Main text field is declared outside of function to be accessible everywhere.
     GtkTextBuffer *buffer = gtk_text_buffer_new(nullptr);
     main_text_field = gtk_text_view_new_with_buffer(buffer);
+    create_tags(buffer);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(main_text_field), GTK_WRAP_WORD);
 
     GtkWidget *scrolled_window = gtk_scrolled_window_new(nullptr, nullptr);
@@ -194,7 +258,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
         GTK_POLICY_AUTOMATIC);
 
     gtk_container_add (GTK_CONTAINER(scrolled_window), main_text_field);
-    gtk_container_set_border_width (GTK_CONTAINER(scrolled_window), 5);
+    gtk_container_set_border_width (GTK_CONTAINER(scrolled_window), 0);
 
     // Assembling all components into main box.
     // Add menu box to the main box.

@@ -25,84 +25,7 @@ void destroy(GtkWidget* widget, gpointer data) {
     g_application_quit(G_APPLICATION(data));
 }
 
-void show_dialog(GtkWindow *parent, const gchar *title, const gchar *message) {
-    const GtkDialogFlags flags = GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL;
-
-    GtkWidget *dialog = gtk_dialog_new_with_buttons(title, parent, flags, "OK", GTK_RESPONSE_NONE, NULL);
-    const int height = 100;
-    gtk_window_set_default_size(GTK_WINDOW(dialog), 200, height);
-
-    GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    GtkWidget *label = gtk_label_new(message);
-    gtk_box_pack_start(GTK_BOX(box), label, TRUE, FALSE, height/2);
-
-    gtk_container_add(GTK_CONTAINER(content_area), box);
-
-    g_signal_connect_swapped(dialog, "response", G_CALLBACK(gtk_widget_destroy), dialog);
-    gtk_widget_show_all(dialog);
-}
-
-void update_status() {
-    char message[300] = {0};
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
-    int chars = gtk_text_buffer_get_char_count(buffer);
-    int lines = gtk_text_buffer_get_line_count(buffer);
-
-    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: ", basename(current_file), lines, chars);
-    post_status_message(message);
-}
-
-void post_status_message(const char *msg) {
-    /**
-     * @brief Display a status message at the bottom of the window.
-     * @param string message.
-     * @return void
-     */
-    // Every message needs to generate a unique ID.
-    const guint id = gtk_statusbar_get_context_id(GTK_STATUSBAR(statusbar), "info");
-    gtk_statusbar_remove_all(GTK_STATUSBAR(statusbar), id);
-    gtk_statusbar_push(GTK_STATUSBAR(statusbar), id, msg);
-}
-
-static void create_tags(GtkTextBuffer *buffer) {
-    // todo tag table could be separate and reused in new buffers.
-    gtk_text_buffer_create_tag(buffer, "italic", "style", PANGO_STYLE_ITALIC, NULL);
-    gtk_text_buffer_create_tag(buffer, "bold", "weight", PANGO_WEIGHT_BOLD, NULL);
-    gtk_text_buffer_create_tag(buffer, "red_background", "background", "red", NULL);
-}
-
-static void open_file(GtkWidget *btn, gpointer parent_window) {
-    GtkWidget *dialog = gtk_file_chooser_dialog_new("Open file", GTK_WINDOW(parent_window), GTK_FILE_CHOOSER_ACTION_OPEN, "Cancel", 0, "OK", 1, NULL);
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == 1) {
-        current_file = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
-
-        // Open text file in read only mode
-        FILE *text_file  = fopen(current_file, "r");
-        char line[1024];
-        GtkTextIter iter;
-
-        if (text_file == NULL) {
-            // If file can not be opened, show error and exit.
-            show_dialog(parent_window, STR_ERR, STR_FILE_OPEN_FAIL);
-            return;
-        }
-
-        // Get iterator at the start of the buffer. Each insert will move the iterator further.
-        gtk_text_buffer_get_iter_at_offset (buffer, &iter, 0);
-        while(fgets(line, 1024, text_file)) {
-            // Insert until null character.
-            gtk_text_buffer_insert(buffer, &iter, line, -1);
-        }
-        fclose(text_file);
-    }
-    gtk_widget_destroy(dialog);
-
-    // todo load metadata file.
-
-    update_status();
-}
+// todo paste back
 
 static void new_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     g_print("You clicked New.\n");
@@ -168,13 +91,17 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     // Single main container. Window can only have one widget, rest has to be inside.
     GtkWidget *main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    //gtk_box_set_homogeneous(GTK_BOX(main_box), TRUE);
 
     // Menu bar. Is a separate vertical box,
-    GtkWidget *menu_bar = gtk_menu_bar_new ();
-    GtkWidget *menu_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    gtk_box_pack_start(GTK_BOX(menu_box), menu_bar, TRUE, TRUE, 0);
+    // todo once inserted, menu item is copied into the menu and should be freed.
+    GMenu *menu = g_menu_new();
 
     // Main menu bar button.
+    GMenuItem *menu_item_quit = g_menu_item_new ("Quit", "app.quit");
+    g_menu_append_item (menu, menu_item_quit);
+    g_object_unref (menu_item_quit);
+
     GtkWidget *file_menu_item = gtk_menu_item_new_with_label(STR_FILE);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), file_menu_item);
 
@@ -182,14 +109,14 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_menu_item), f_menu);
 
     GtkWidget *open_menu_item = gtk_menu_item_new_with_label(STR_OPEN);
-    gtk_menu_shell_append (GTK_MENU_SHELL(f_menu), open_menu_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(f_menu), open_menu_item);
     g_signal_connect(open_menu_item, "activate", G_CALLBACK(open_file), window);
 
     GtkWidget *save_menu_item = gtk_menu_item_new_with_label(STR_SAVE);
-    gtk_menu_shell_append (GTK_MENU_SHELL(f_menu), save_menu_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(f_menu), save_menu_item);
 
     GtkWidget *quit_menu_item = gtk_menu_item_new_with_label(STR_QUIT);
-    gtk_menu_shell_append (GTK_MENU_SHELL(f_menu), quit_menu_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(f_menu), quit_menu_item);
     g_signal_connect(quit_menu_item, "activate", G_CALLBACK(destroy), app);
 
     // Toolbar.
@@ -257,34 +184,35 @@ static void activate(GtkApplication *app, gpointer user_data) {
     // Main text field is declared outside of function to be accessible everywhere.
     GtkTextBuffer *buffer = gtk_text_buffer_new(nullptr);
     main_text_field = gtk_text_view_new_with_buffer(buffer);
-    create_tags(buffer);
+    //todo create_tags(buffer);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(main_text_field), GTK_WRAP_WORD);
 
-    GtkWidget *scrolled_window = gtk_scrolled_window_new(nullptr, nullptr);
+    GtkWidget *scrolled_window = gtk_scrolled_window_new();
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_window), GTK_POLICY_AUTOMATIC,
         GTK_POLICY_AUTOMATIC);
 
-    gtk_container_add (GTK_CONTAINER(scrolled_window), main_text_field);
-    gtk_container_set_border_width (GTK_CONTAINER(scrolled_window), 0);
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), main_text_field);
 
     // Assembling all components into main box.
     // Add menu box to the main box.
-    gtk_box_pack_start(GTK_BOX(main_box), menu_box, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(main_box), toolbar, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(main_box), scrolled_window, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(main_box), statusbar, FALSE, FALSE, 0);
+    gtk_box_append(GTK_BOX(main_box), toolbar);
+    gtk_box_append(GTK_BOX(main_box), scrolled_window);
+    gtk_box_append(GTK_BOX(main_box), statusbar);
 
-    gtk_container_add(GTK_CONTAINER(window), main_box);
+    gtk_window_set_child(GTK_WINDOW(window), main_box);
 
-    gtk_widget_show_all(window);
+    // GTK4 by default shows all widgets, but the top level one needs to be presented manually. Present moves it up to
+    // the front of all windows.
+    gtk_window_present(GTK_WINDOW(window));
 
-    update_status();
+    //todo update_status();
 }
 
 int main (int argc, char **argv) {
     int status = 0;
 
     GtkApplication *app = gtk_application_new(APP_INTERNAL_NAME, G_APPLICATION_DEFAULT_FLAGS);
+    // Call activate handler when the application starts.
     g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
     status = g_application_run(G_APPLICATION(app), argc, argv);
     g_object_unref(app);

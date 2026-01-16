@@ -8,7 +8,7 @@
 void post_status_message(const char *msg);
 
 // todo https://codebrowser.dev/gtk/gtk/demos/gtk-demo/textview.c.html
-// todo walgrind check leaks?
+// todo valgrind check leaks?
 // todo check documentation for transfer and those have to be unrefed.
 
 // Latest open file.
@@ -37,7 +37,6 @@ static void save_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
 
 static void undo_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
-    // todo gtk4???
     //gtk_text_buffer_undo(buffer);
 }
 
@@ -83,9 +82,30 @@ static void find_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
     g_print("You clicked Find.\n");
 }
 
+void post_status_message(const char *msg) {
+    /**
+     * @brief Display a status message at the bottom of the window.
+     * @param string message.
+     * @return void
+     */
+    // Every message needs to generate a unique ID.
+    const guint id = gtk_statusbar_get_context_id(GTK_STATUSBAR(statusbar), "info");
+    gtk_statusbar_remove_all(GTK_STATUSBAR(statusbar), id);
+    gtk_statusbar_push(GTK_STATUSBAR(statusbar), id, msg);
+}
+
+void update_status() {
+    char message[300] = {0};
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+    int chars = gtk_text_buffer_get_char_count(buffer);
+    int lines = gtk_text_buffer_get_line_count(buffer);
+
+    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: ", basename(current_file), lines, chars);
+    post_status_message(message);
+}
+
 static void startup(GApplication *application) {
-    // todo once inserted, menu item is copied into the menu and should be freed.
-    // todo should be called in startup handler because that is called only once.
+    // Called in startup handler because that is called only once.
     GtkApplication *app = GTK_APPLICATION(application);
 
     // todo quit???
@@ -112,8 +132,11 @@ static void startup(GApplication *application) {
     // Add File button on menubar.
     g_menu_append_item(menubar, main_menu_file);
 
+    // Once inserted, menu item is copied into the menu and should be freed.
     g_object_unref(file_menu);
     g_object_unref(menu_item_quit);
+    g_object_unref(menu_item_open);
+    g_object_unref(menu_item_save);
     g_object_unref(main_menu_file);
 
     gtk_application_set_menubar(GTK_APPLICATION(app), G_MENU_MODEL(menubar));
@@ -130,9 +153,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     //gtk_box_set_homogeneous(GTK_BOX(main_box), TRUE);
 
     // Toolbar.
-    GtkWidget *toolbar = gtk_toolbar_new();
-    gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
-    gtk_toolbar_set_icon_size(GTK_TOOLBAR(toolbar), GTK_ICON_SIZE_SMALL_TOOLBAR);
+    // todo Toolbars were using outdated concepts such as requiring special toolitem widgets. Toolbars should be replaced by using a GtkBox with regular widgets instead and the “toolbar” style class.
 
     // Array of pointers. A ragged array of strings because each array of characters is of different length. String is a pointer o the start of the string.
     const char *icon_names[] = {
@@ -147,18 +168,6 @@ static void activate(GtkApplication *app, gpointer user_data) {
         "tools-check-spelling",
         "edit-find"
     };
-    const char *actions[] = {
-        "new_ButtonPress",
-        "save_ButtonPress",
-        "undo_ButtonPress",
-        "redo_ButtonPress",
-        "setup_ButtonPress",
-        "bold_ButtonPress",
-        "italic_ButtonPress",
-        "colorize_ButtonPress",
-        "spelling_ButtonPress",
-        "find_ButtonPress",
-    };
     // Create array of function pointers Syntax: return_type (*name[])(args)
     static void (*callbacks[])(GSimpleAction *, GVariant *, gpointer) = {
         new_file_callback,
@@ -172,29 +181,17 @@ static void activate(GtkApplication *app, gpointer user_data) {
         spelling_file_callback,
         find_file_callback
     };
+    // TODO add icons instead of text.
+    GtkWidget *toolbar_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
     // Sizeof work because they are pointers of equal size.
     for (int icons = sizeof(icon_names) / sizeof(icon_names[0]) - 1; icons >= 0; icons--) {
-        GtkWidget *new_icon = gtk_image_new_from_icon_name(icon_names[icons], GTK_ICON_SIZE_SMALL_TOOLBAR);
-        GtkToolItem *new_button = gtk_tool_button_new(new_icon, nullptr);
-        gtk_tool_item_set_is_important(new_button, TRUE);
-        gtk_toolbar_insert(GTK_TOOLBAR(toolbar), new_button, 0);
-        gtk_widget_show(GTK_WIDGET(new_button));
-        // win. is needed so gtk knows which map to look into.
-
-        char action_name[50] = {0};
-        // An array of strings is [][], sprintf expects a pointer to a string.
-        sprintf(action_name, "win.%s", actions[icons]);
-
-        gtk_actionable_set_action_name(GTK_ACTIONABLE(new_button), action_name);
-        GSimpleAction *new_file_action = g_simple_action_new(actions[icons], nullptr);
-        g_signal_connect(new_file_action, "activate", G_CALLBACK(callbacks[icons]), GTK_WINDOW(window));
-        g_action_map_add_action(G_ACTION_MAP(window), G_ACTION(new_file_action));
+        GtkWidget *button = gtk_button_new_with_label(icon_names[icons]);
+        g_signal_connect(button, "clicked", G_CALLBACK(callbacks[icons]), NULL);
+        gtk_box_append(GTK_BOX(toolbar_box), button);
     }
 
-    gtk_widget_set_hexpand(toolbar, TRUE);
-    gtk_widget_show(toolbar);
-
     // Status bar.
+    // todo fix these.
     statusbar = gtk_statusbar_new();
 
     // Main text field is declared outside of function to be accessible everywhere.
@@ -210,8 +207,16 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), main_text_field);
 
     // Assembling all components into main box.
-    // Add menu box to the main box.
-    gtk_box_append(GTK_BOX(main_box), toolbar);
+    gtk_widget_set_hexpand(toolbar_box, TRUE);
+    gtk_widget_set_halign(toolbar_box, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(toolbar_box, GTK_ALIGN_FILL);
+
+    gtk_widget_set_hexpand(main_text_field, TRUE);
+    gtk_widget_set_vexpand(main_text_field, TRUE);
+    gtk_widget_set_halign(main_text_field, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(main_text_field, GTK_ALIGN_FILL);
+
+    gtk_box_append(GTK_BOX(main_box), toolbar_box);
     gtk_box_append(GTK_BOX(main_box), scrolled_window);
     gtk_box_append(GTK_BOX(main_box), statusbar);
 
@@ -221,7 +226,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     // the front of all windows.
     gtk_window_present(GTK_WINDOW(window));
 
-    //todo update_status();
+    update_status();
 }
 
 int main(int argc, char **argv) {

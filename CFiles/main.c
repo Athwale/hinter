@@ -13,22 +13,93 @@ void post_status_message(const char *msg);
 
 // Latest open file.
 char *current_file;
+GtkWidget *status_message;
 GtkWidget *main_text_field;
-GtkWidget *statusbar;
+GtkWidget *window;
 
-void destroy(GtkWidget *widget, gpointer data) {
-    /**
-     * @brief Kill the application.
-     * @param
-     * @return void
-     */
-    g_application_quit(G_APPLICATION(data));
+static void destroy(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    g_application_quit(G_APPLICATION(user_data));
 }
 
-// todo paste back
+void on_choose (GObject *source_object, GAsyncResult *res, gpointer user_data) {
+    GtkAlertDialog *dialog = GTK_ALERT_DIALOG (source_object);
+    GError *err = nullptr;
+
+    int button = gtk_alert_dialog_choose_finish (dialog, res, &err);
+
+    if (err) {
+        g_print("An error occurred!\n");
+        g_print("Error Message: %s\n", err->message);
+        return;
+    }
+
+    if (button == 0)
+        g_print("Cancelled!\n");
+    else if (button == 1)
+        g_print("Proceed with whatever!\n");
+    else
+        g_assert_not_reached();
+}
+
+void show_dialog(GtkWidget *parent, const gchar *title, const gchar *message) {
+    GtkAlertDialog *dialog = gtk_alert_dialog_new(title);
+    const char *buttons[] = {STR_OK, nullptr};
+    gtk_alert_dialog_set_detail(dialog, message);
+    gtk_alert_dialog_set_buttons(dialog, buttons);
+    gtk_alert_dialog_set_cancel_button(dialog, 0);
+    gtk_alert_dialog_set_default_button(dialog, 0);
+    gtk_alert_dialog_choose(dialog, GTK_WINDOW(parent), nullptr, on_choose, NULL);
+}
+
+static void create_tags(GtkTextBuffer *buffer) {
+    // todo tag table could be separate and reused in new buffers on new file load.
+    gtk_text_buffer_create_tag(buffer, "italic", "style", PANGO_STYLE_ITALIC, NULL);
+    gtk_text_buffer_create_tag(buffer, "bold", "weight", PANGO_WEIGHT_BOLD, NULL);
+    gtk_text_buffer_create_tag(buffer, "red_background", "background", "red", NULL);
+}
+
+static void open_file(GtkWidget *btn, gpointer data) {
+    show_dialog(window, STR_ERR, STR_FILE_OPEN_FAIL);
+
+    // GtkWidget *dialog = gtk_file_chooser_dialog_new("Open file", GTK_WINDOW(parent_window), GTK_FILE_CHOOSER_ACTION_OPEN, "Cancel", 0, "OK", 1, NULL);
+    // if (gtk_dialog_run(GTK_DIALOG(dialog)) == 1) {
+    //     current_file = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+    //     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+    //
+    //     // Open text file in read only mode
+    //     FILE *text_file  = fopen(current_file, "r");
+    //     char line[1024];
+    //     GtkTextIter iter;
+    //
+    //     if (text_file == NULL) {
+    //         // If file can not be opened, show error and exit.
+    //         show_dialog(parent_window, STR_ERR, STR_FILE_OPEN_FAIL);
+    //         return;
+    //     }
+    //
+    //     // Get iterator at the start of the buffer. Each insert will move the iterator further.
+    //     gtk_text_buffer_get_iter_at_offset (buffer, &iter, 0);
+    //     while(fgets(line, 1024, text_file)) {
+    //         // Insert until null character.
+    //         gtk_text_buffer_insert(buffer, &iter, line, -1);
+    //     }
+    //     fclose(text_file);
+    // }
+    // gtk_widget_destroy(dialog);
+    //
+    // // todo load metadata file.
+    // // todo update title with file name
+    //
+    // update_status();
+}
 
 static void new_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     g_print("You clicked New.\n");
+}
+
+static void open_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    g_print("You clicked Open.\n");
+    open_file(nullptr, user_data);
 }
 
 static void save_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
@@ -89,9 +160,7 @@ void post_status_message(const char *msg) {
      * @return void
      */
     // Every message needs to generate a unique ID.
-    const guint id = gtk_statusbar_get_context_id(GTK_STATUSBAR(statusbar), "info");
-    gtk_statusbar_remove_all(GTK_STATUSBAR(statusbar), id);
-    gtk_statusbar_push(GTK_STATUSBAR(statusbar), id, msg);
+    gtk_label_set_text(GTK_LABEL(status_message), msg);
 }
 
 void update_status() {
@@ -99,8 +168,10 @@ void update_status() {
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
     int chars = gtk_text_buffer_get_char_count(buffer);
     int lines = gtk_text_buffer_get_line_count(buffer);
+    // todo count unique colors
+    int colors = 0;
 
-    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: ", basename(current_file), lines, chars);
+    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: %d", basename(current_file), lines, chars, colors);
     post_status_message(message);
 }
 
@@ -108,10 +179,15 @@ static void startup(GApplication *application) {
     // Called in startup handler because that is called only once.
     GtkApplication *app = GTK_APPLICATION(application);
 
-    // todo quit???
+    // todo generate menu in a loop from arrays.
+
     GSimpleAction *act_quit = g_simple_action_new("quit", nullptr);
     g_action_map_add_action(G_ACTION_MAP(app), G_ACTION(act_quit));
-    g_signal_connect(act_quit, "activate", G_CALLBACK(destroy), application);
+    g_signal_connect(act_quit, "activate", G_CALLBACK(destroy), NULL);
+
+    GSimpleAction *act_open = g_simple_action_new("open", nullptr);
+    g_action_map_add_action(G_ACTION_MAP(app), G_ACTION(act_open));
+    g_signal_connect(act_open, "activate", G_CALLBACK(open_file), NULL);
 
     GMenu *menubar = g_menu_new();
 
@@ -121,11 +197,14 @@ static void startup(GApplication *application) {
     // Menu that goes under File.
     GMenu *file_menu = g_menu_new();
     // Add button into menu.
+    // app. is an action map identifier where gtk will look for new...
+    GMenuItem *menu_item_new = g_menu_item_new(STR_NEW, "app.new");
+    g_menu_append_item(file_menu, menu_item_new);
     GMenuItem *menu_item_open = g_menu_item_new(STR_OPEN, "app.open");
     g_menu_append_item(file_menu, menu_item_open);
-    GMenuItem *menu_item_save = g_menu_item_new(STR_OPEN, "app.open");
+    GMenuItem *menu_item_save = g_menu_item_new(STR_SAVE, "app.save");
     g_menu_append_item(file_menu, menu_item_save);
-    GMenuItem *menu_item_quit = g_menu_item_new(STR_OPEN, "app.open");
+    GMenuItem *menu_item_quit = g_menu_item_new(STR_QUIT, "app.quit");
     g_menu_append_item(file_menu, menu_item_quit);
     // Add file menu under File button.
     g_menu_item_set_submenu(main_menu_file, G_MENU_MODEL(file_menu));
@@ -144,7 +223,7 @@ static void startup(GApplication *application) {
 
 static void activate(GtkApplication *app, gpointer user_data) {
     // Main window.
-    GtkWidget *window = gtk_application_window_new(app);
+    window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), APP_NAME);
     gtk_window_set_default_size(GTK_WINDOW(window), SIZE_W, SIZE_H);
 
@@ -157,6 +236,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     // https://gitlab.gnome.org/World/design/icon-library/-/tree/master/data/resources/icon-dev-kit
     const char *icon_names[] = {
         "document-new",
+        "document-open",
         "document-save",
         "edit-undo",
         "edit-redo",
@@ -170,6 +250,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     // Create array of function pointers Syntax: return_type (*name[])(args)
     static void (*callbacks[])(GSimpleAction *, GVariant *, gpointer) = {
         new_file_callback,
+        open_file_callback,
         save_file_callback,
         undo_file_callback,
         redo_file_callback,
@@ -184,18 +265,20 @@ static void activate(GtkApplication *app, gpointer user_data) {
     // Sizeof work because they are pointers of equal size.
     for (int icons = 0; icons < sizeof(icon_names) / sizeof(icon_names[0]); icons++) {
         GtkWidget *button = gtk_button_new_from_icon_name(icon_names[icons]);
+        // user_data will be window.
         g_signal_connect(button, "clicked", G_CALLBACK(callbacks[icons]), NULL);
         gtk_box_append(GTK_BOX(toolbar_box), button);
     }
 
     // Status bar.
-    // todo fix these.
-    statusbar = gtk_statusbar_new();
+    GtkWidget *status_bar = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
+    status_message = gtk_label_new(STR_STATUS_INIT);
+    gtk_box_append(GTK_BOX(status_bar), status_message);
 
     // Main text field is declared outside of function to be accessible everywhere.
     GtkTextBuffer *buffer = gtk_text_buffer_new(nullptr);
     main_text_field = gtk_text_view_new_with_buffer(buffer);
-    //todo create_tags(buffer);
+    create_tags(buffer);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(main_text_field), GTK_WRAP_WORD);
 
     GtkWidget *scrolled_window = gtk_scrolled_window_new();
@@ -206,6 +289,8 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     // Assembling all components into main box.
     gtk_widget_set_hexpand(toolbar_box, TRUE);
+    gtk_widget_set_hexpand(status_bar, TRUE);
+    gtk_widget_set_halign(status_message, GTK_ALIGN_START);
     gtk_widget_set_halign(toolbar_box, GTK_ALIGN_FILL);
     gtk_widget_set_valign(toolbar_box, GTK_ALIGN_FILL);
 
@@ -216,10 +301,11 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     gtk_box_append(GTK_BOX(main_box), toolbar_box);
     gtk_box_append(GTK_BOX(main_box), scrolled_window);
-    gtk_box_append(GTK_BOX(main_box), statusbar);
+    gtk_box_append(GTK_BOX(main_box), status_bar);
 
     gtk_window_set_child(GTK_WINDOW(window), main_box);
 
+    gtk_application_window_set_show_menubar(GTK_APPLICATION_WINDOW(window), TRUE);
     // GTK4 by default shows all widgets, but the top level one needs to be presented manually. Present moves it up to
     // the front of all windows.
     gtk_window_present(GTK_WINDOW(window));

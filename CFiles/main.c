@@ -153,9 +153,8 @@ static void activate(GtkApplication *app, gpointer user_data) {
     //gtk_box_set_homogeneous(GTK_BOX(main_box), TRUE);
 
     // Toolbar.
-    // todo Toolbars were using outdated concepts such as requiring special toolitem widgets. Toolbars should be replaced by using a GtkBox with regular widgets instead and the “toolbar” style class.
-
     // Array of pointers. A ragged array of strings because each array of characters is of different length. String is a pointer o the start of the string.
+    // https://gitlab.gnome.org/World/design/icon-library/-/tree/master/data/resources/icon-dev-kit
     const char *icon_names[] = {
         "document-new",
         "document-save",
@@ -164,7 +163,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
         "document-properties",
         "format-text-bold",
         "format-text-italic",
-        "gtk-color-picker",
+        "applications-graphics",
         "tools-check-spelling",
         "edit-find"
     };
@@ -181,11 +180,10 @@ static void activate(GtkApplication *app, gpointer user_data) {
         spelling_file_callback,
         find_file_callback
     };
-    // TODO add icons instead of text.
-    GtkWidget *toolbar_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+    GtkWidget *toolbar_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
     // Sizeof work because they are pointers of equal size.
     for (int icons = sizeof(icon_names) / sizeof(icon_names[0]) - 1; icons >= 0; icons--) {
-        GtkWidget *button = gtk_button_new_with_label(icon_names[icons]);
+        GtkWidget *button = gtk_button_new_from_icon_name(icon_names[icons]);
         g_signal_connect(button, "clicked", G_CALLBACK(callbacks[icons]), NULL);
         gtk_box_append(GTK_BOX(toolbar_box), button);
     }

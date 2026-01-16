@@ -37,11 +37,12 @@ static void save_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
 
 static void undo_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
-    //gtk_text_buffer_undo(buffer);
+    gtk_text_buffer_undo(buffer);
 }
 
 static void redo_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
-    g_print("You clicked Redo.\n");
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+    gtk_text_buffer_redo(buffer);
 }
 
 static void setup_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
@@ -55,7 +56,6 @@ static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
     if (!gtk_text_buffer_get_selection_bounds(buffer, &start, &end)) {
         return;
     }
-    // todo undo, redo how?
 
     GtkTextTagTable *table = gtk_text_buffer_get_tag_table(buffer);
     GtkTextTag *tag = gtk_text_tag_table_lookup(table, "bold");
@@ -182,7 +182,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     };
     GtkWidget *toolbar_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
     // Sizeof work because they are pointers of equal size.
-    for (int icons = sizeof(icon_names) / sizeof(icon_names[0]) - 1; icons >= 0; icons--) {
+    for (int icons = 0; icons < sizeof(icon_names) / sizeof(icon_names[0]); icons++) {
         GtkWidget *button = gtk_button_new_from_icon_name(icon_names[icons]);
         g_signal_connect(button, "clicked", G_CALLBACK(callbacks[icons]), NULL);
         gtk_box_append(GTK_BOX(toolbar_box), button);

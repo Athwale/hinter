@@ -14,3 +14,4 @@
 #define STR_ERR "Error"
 #define STR_OK "OK"
 #define STR_FILE_OPEN_FAIL "Can not open file"
+#define STR_METADATA_SUF ".met"

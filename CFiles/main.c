@@ -12,7 +12,7 @@ void post_status_message(const char *msg);
 // todo check documentation for transfer and those have to be unrefed.
 
 // Latest open file.
-char *current_file;
+char *current_file_path;
 GtkWidget *status_message;
 GtkWidget *main_text_field;
 GtkWidget *window;
@@ -39,7 +39,7 @@ void update_status() {
     // todo count unique colors
     int colors = 0;
 
-    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: %d", basename(current_file), lines, chars, colors);
+    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: %d", basename(current_file_path), lines, chars, colors);
     post_status_message(message);
 }
 
@@ -60,17 +60,31 @@ static void create_tags(GtkTextBuffer *buffer) {
     gtk_text_buffer_create_tag(buffer, "red_background", "background", "red", NULL);
 }
 
+static void construct_metadata_filename(const char *file_path, char *output, const char *suffix) {
+    unsigned long i = strlen(file_path)-1;
+    for (; i > 0; i--) {
+        if (file_path[i] == '.') {
+            break;
+        }
+    }
+    // Var 'i' now has the index of the last . separating the suffix. Copy to output and add new suffix.
+    strncat(output, file_path, i);
+    strcat(output, suffix);
+}
+
 static void on_file_open(GObject *source_object, GAsyncResult *result, gpointer user_data) {
     GtkFileDialog *dialog = GTK_FILE_DIALOG(source_object);
     GError *error = nullptr;
 
     GFile *file = gtk_file_dialog_open_finish(dialog, result, &error);
     if (file != NULL) {
-        current_file = g_file_get_path(file);
+        current_file_path = g_file_get_path(file);
         GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+        // Clear any text in the buffer.
+        gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field)), "", 1);
 
         // Open text file in read only mode
-        FILE *text_file  = fopen(current_file, "r");
+        FILE *text_file  = fopen(current_file_path, "r");
         char line[1024];
         GtkTextIter iter;
 
@@ -88,9 +102,22 @@ static void on_file_open(GObject *source_object, GAsyncResult *result, gpointer 
         }
         fclose(text_file);
         g_object_unref(file);
+
+        // Metadata file. The path will be of the same length, just different suffix.
+        // /home/omejzlik/CLionProjects/hinter/HINTS.txt
+        unsigned long len = strlen(current_file_path)+1;
+        char meta_file[len];
+        strcpy(meta_file, "\0");
+        construct_metadata_filename(current_file_path, meta_file, STR_METADATA_SUF);
+        // todo open metadata file too if it has the same name, otherwise warn.
+        puts(meta_file);
+
+
     } else {
-        // Error or Cancellation
-        // If the user cancelled, error->code will be GTK_DIALOG_ERROR_DISMISSED
+        // Error or Cancel.
+        if (error->code == GTK_DIALOG_ERROR_DISMISSED) {
+            return;
+        }
         show_dialog(window, STR_ERR, STR_FILE_OPEN_FAIL);
         g_error_free(error);
     }

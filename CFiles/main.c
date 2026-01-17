@@ -21,24 +21,26 @@ static void destroy(GSimpleAction *action, GVariant *parameter, gpointer user_da
     g_application_quit(G_APPLICATION(user_data));
 }
 
-void on_choose (GObject *source_object, GAsyncResult *res, gpointer user_data) {
-    GtkAlertDialog *dialog = GTK_ALERT_DIALOG (source_object);
-    GError *err = nullptr;
+void post_status_message(const char *msg) {
+    /**
+     * @brief Display a status message at the bottom of the window.
+     * @param string message.
+     * @return void
+     */
+    // Every message needs to generate a unique ID.
+    gtk_label_set_text(GTK_LABEL(status_message), msg);
+}
 
-    int button = gtk_alert_dialog_choose_finish (dialog, res, &err);
+void update_status() {
+    char message[300] = {0};
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+    int chars = gtk_text_buffer_get_char_count(buffer);
+    int lines = gtk_text_buffer_get_line_count(buffer);
+    // todo count unique colors
+    int colors = 0;
 
-    if (err) {
-        g_print("An error occurred!\n");
-        g_print("Error Message: %s\n", err->message);
-        return;
-    }
-
-    if (button == 0)
-        g_print("Cancelled!\n");
-    else if (button == 1)
-        g_print("Proceed with whatever!\n");
-    else
-        g_assert_not_reached();
+    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: %d", basename(current_file), lines, chars, colors);
+    post_status_message(message);
 }
 
 void show_dialog(GtkWidget *parent, const gchar *title, const gchar *message) {
@@ -48,7 +50,7 @@ void show_dialog(GtkWidget *parent, const gchar *title, const gchar *message) {
     gtk_alert_dialog_set_buttons(dialog, buttons);
     gtk_alert_dialog_set_cancel_button(dialog, 0);
     gtk_alert_dialog_set_default_button(dialog, 0);
-    gtk_alert_dialog_choose(dialog, GTK_WINDOW(parent), nullptr, on_choose, NULL);
+    gtk_alert_dialog_choose(dialog, GTK_WINDOW(parent), nullptr, nullptr, NULL);
 }
 
 static void create_tags(GtkTextBuffer *buffer) {
@@ -58,39 +60,58 @@ static void create_tags(GtkTextBuffer *buffer) {
     gtk_text_buffer_create_tag(buffer, "red_background", "background", "red", NULL);
 }
 
-static void open_file(GtkWidget *btn, gpointer data) {
-    show_dialog(window, STR_ERR, STR_FILE_OPEN_FAIL);
+static void on_file_open(GObject *source_object, GAsyncResult *result, gpointer user_data) {
+    GtkFileDialog *dialog = GTK_FILE_DIALOG(source_object);
+    GError *error = nullptr;
 
-    // GtkWidget *dialog = gtk_file_chooser_dialog_new("Open file", GTK_WINDOW(parent_window), GTK_FILE_CHOOSER_ACTION_OPEN, "Cancel", 0, "OK", 1, NULL);
-    // if (gtk_dialog_run(GTK_DIALOG(dialog)) == 1) {
-    //     current_file = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-    //     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
-    //
-    //     // Open text file in read only mode
-    //     FILE *text_file  = fopen(current_file, "r");
-    //     char line[1024];
-    //     GtkTextIter iter;
-    //
-    //     if (text_file == NULL) {
-    //         // If file can not be opened, show error and exit.
-    //         show_dialog(parent_window, STR_ERR, STR_FILE_OPEN_FAIL);
-    //         return;
-    //     }
-    //
-    //     // Get iterator at the start of the buffer. Each insert will move the iterator further.
-    //     gtk_text_buffer_get_iter_at_offset (buffer, &iter, 0);
-    //     while(fgets(line, 1024, text_file)) {
-    //         // Insert until null character.
-    //         gtk_text_buffer_insert(buffer, &iter, line, -1);
-    //     }
-    //     fclose(text_file);
-    // }
-    // gtk_widget_destroy(dialog);
-    //
-    // // todo load metadata file.
-    // // todo update title with file name
-    //
-    // update_status();
+    GFile *file = gtk_file_dialog_open_finish(dialog, result, &error);
+    if (file != NULL) {
+        current_file = g_file_get_path(file);
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
+
+        // Open text file in read only mode
+        FILE *text_file  = fopen(current_file, "r");
+        char line[1024];
+        GtkTextIter iter;
+
+        if (text_file == NULL) {
+            // If file can not be opened, show error and exit.
+            show_dialog(window, STR_ERR, STR_FILE_OPEN_FAIL);
+            return;
+        }
+
+        // Get iterator at the start of the buffer. Each insert will move the iterator further.
+        gtk_text_buffer_get_iter_at_offset (buffer, &iter, 0);
+        while(fgets(line, 1024, text_file)) {
+            // Insert until null character.
+            gtk_text_buffer_insert(buffer, &iter, line, -1);
+        }
+        fclose(text_file);
+        g_object_unref(file);
+    } else {
+        // Error or Cancellation
+        // If the user cancelled, error->code will be GTK_DIALOG_ERROR_DISMISSED
+        show_dialog(window, STR_ERR, STR_FILE_OPEN_FAIL);
+        g_error_free(error);
+    }
+}
+
+static void show_file_chooser_dialog(GtkButton *btn, gpointer user_data) {
+    GtkFileDialog *dialog = gtk_file_dialog_new();
+    gtk_file_dialog_set_title(dialog, "Open Text File");
+
+    GtkFileFilter *filter = gtk_file_filter_new();
+    gtk_file_filter_set_name(filter, "Text Files");
+    gtk_file_filter_add_pattern(filter, "*.txt");
+
+    GListStore *filters = g_list_store_new(GTK_TYPE_FILE_FILTER);
+    g_list_store_append(filters, filter);
+    gtk_file_dialog_set_filters(dialog, G_LIST_MODEL(filters));
+    g_object_unref(filters);
+    g_object_unref(filter);
+
+    gtk_file_dialog_open(dialog, GTK_WINDOW(window), nullptr, on_file_open, NULL);
+    g_object_unref(dialog);
 }
 
 static void new_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
@@ -98,8 +119,7 @@ static void new_file_callback(GSimpleAction *simple, GVariant *parameter, gpoint
 }
 
 static void open_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
-    g_print("You clicked Open.\n");
-    open_file(nullptr, user_data);
+    show_file_chooser_dialog(nullptr, user_data);
 }
 
 static void save_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
@@ -153,33 +173,9 @@ static void find_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
     g_print("You clicked Find.\n");
 }
 
-void post_status_message(const char *msg) {
-    /**
-     * @brief Display a status message at the bottom of the window.
-     * @param string message.
-     * @return void
-     */
-    // Every message needs to generate a unique ID.
-    gtk_label_set_text(GTK_LABEL(status_message), msg);
-}
-
-void update_status() {
-    char message[300] = {0};
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
-    int chars = gtk_text_buffer_get_char_count(buffer);
-    int lines = gtk_text_buffer_get_line_count(buffer);
-    // todo count unique colors
-    int colors = 0;
-
-    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: %d", basename(current_file), lines, chars, colors);
-    post_status_message(message);
-}
-
 static void startup(GApplication *application) {
     // Called in startup handler because that is called only once.
     GtkApplication *app = GTK_APPLICATION(application);
-
-    // todo generate menu in a loop from arrays.
 
     GSimpleAction *act_quit = g_simple_action_new("quit", nullptr);
     g_action_map_add_action(G_ACTION_MAP(app), G_ACTION(act_quit));
@@ -187,7 +183,7 @@ static void startup(GApplication *application) {
 
     GSimpleAction *act_open = g_simple_action_new("open", nullptr);
     g_action_map_add_action(G_ACTION_MAP(app), G_ACTION(act_open));
-    g_signal_connect(act_open, "activate", G_CALLBACK(open_file), NULL);
+    g_signal_connect(act_open, "activate", G_CALLBACK(show_file_chooser_dialog), NULL);
 
     GMenu *menubar = g_menu_new();
 
@@ -263,10 +259,10 @@ static void activate(GtkApplication *app, gpointer user_data) {
     };
     GtkWidget *toolbar_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
     // Sizeof work because they are pointers of equal size.
-    for (int icons = 0; icons < sizeof(icon_names) / sizeof(icon_names[0]); icons++) {
-        GtkWidget *button = gtk_button_new_from_icon_name(icon_names[icons]);
+    for (int i = 0; i < sizeof(icon_names) / sizeof(icon_names[0]); i++) {
+        GtkWidget *button = gtk_button_new_from_icon_name(icon_names[i]);
         // user_data will be window.
-        g_signal_connect(button, "clicked", G_CALLBACK(callbacks[icons]), NULL);
+        g_signal_connect(button, "clicked", G_CALLBACK(callbacks[i]), NULL);
         gtk_box_append(GTK_BOX(toolbar_box), button);
     }
 

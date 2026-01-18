@@ -10,6 +10,7 @@ CMakeLists.txt
 hints.c
 hints.txt
 HINTS.txt
+*.met
 
 # Prerequisites
 *.d

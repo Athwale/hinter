@@ -100,6 +100,7 @@ static void on_file_open(GObject *source_object, GAsyncResult *result, gpointer 
         }
 
         // Get iterator at the start of the buffer. Each insert will move the iterator further.
+        gtk_text_buffer_begin_irreversible_action(buffer);
         gtk_text_buffer_get_iter_at_offset (buffer, &iter, 0);
         while(fgets(line, 1024, text_file)) {
             // Insert until null character.
@@ -132,6 +133,7 @@ static void on_file_open(GObject *source_object, GAsyncResult *result, gpointer 
         }
         // todo apply meta file. Parse format.
 
+        gtk_text_buffer_end_irreversible_action(buffer);
         fclose(meta_file);
 
     } else {
@@ -189,6 +191,7 @@ static void setup_file_callback(GSimpleAction *simple, GVariant *parameter, gpoi
 }
 
 static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    // todo undo on this does not work?
     GtkTextIter start;
     GtkTextIter end;
     if (!gtk_text_buffer_get_selection_bounds(buffer, &start, &end)) {
@@ -205,11 +208,24 @@ static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
 }
 
 static void italic_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
-    g_print("You clicked Italic.\n");
+    GtkTextIter start;
+    GtkTextIter end;
+    if (!gtk_text_buffer_get_selection_bounds(buffer, &start, &end)) {
+        return;
+    }
+
+    GtkTextTagTable *table = gtk_text_buffer_get_tag_table(buffer);
+    GtkTextTag *tag = gtk_text_tag_table_lookup(table, "italic");
+    if (gtk_text_iter_has_tag(&start, tag)) {
+        gtk_text_buffer_remove_tag(buffer, tag, &start, &end);
+    } else {
+        gtk_text_buffer_apply_tag(buffer, tag, &start, &end);
+    }
 }
 
 static void colorize_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     g_print("You clicked Colorize.\n");
+    // todo colorization does not need metadata, run from scratch every time
 }
 
 static void spelling_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {

@@ -12,9 +12,11 @@ void post_status_message(const char *msg);
 // todo check documentation for transfer and those have to be unrefed.
 
 // Latest open file.
-char *current_file_path;
+char *current_file_path = nullptr;
+// todo meta must be freed.
+char *current_meta_file_path = nullptr;
 GtkWidget *status_message;
-GtkWidget *main_text_field;
+GtkTextBuffer *buffer;
 GtkWidget *window;
 
 static void destroy(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
@@ -33,13 +35,17 @@ void post_status_message(const char *msg) {
 
 void update_status() {
     char message[300] = {0};
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
     int chars = gtk_text_buffer_get_char_count(buffer);
     int lines = gtk_text_buffer_get_line_count(buffer);
     // todo count unique colors
     int colors = 0;
 
-    sprintf(message, "File - %s: Lines: %d, chars: %d, colors: %d", basename(current_file_path), lines, chars, colors);
+    if (current_file_path == nullptr) {
+        sprintf(message, STR_STATUS_INIT);
+    } else {
+        sprintf(message, "File - %s: Lines: %d, Chars: %d, Colors: %d, Metafile: %s",
+        basename(current_file_path), lines, chars, colors, basename(current_meta_file_path));
+    }
     post_status_message(message);
 }
 
@@ -53,7 +59,7 @@ void show_dialog(GtkWidget *parent, const gchar *title, const gchar *message) {
     gtk_alert_dialog_choose(dialog, GTK_WINDOW(parent), nullptr, nullptr, NULL);
 }
 
-static void create_tags(GtkTextBuffer *buffer) {
+static void create_tags() {
     // todo tag table could be separate and reused in new buffers on new file load.
     gtk_text_buffer_create_tag(buffer, "italic", "style", PANGO_STYLE_ITALIC, NULL);
     gtk_text_buffer_create_tag(buffer, "bold", "weight", PANGO_WEIGHT_BOLD, NULL);
@@ -79,9 +85,8 @@ static void on_file_open(GObject *source_object, GAsyncResult *result, gpointer 
     GFile *file = gtk_file_dialog_open_finish(dialog, result, &error);
     if (file != NULL) {
         current_file_path = g_file_get_path(file);
-        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
         // Clear any text in the buffer.
-        gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field)), "", 1);
+        gtk_text_buffer_set_text(buffer, "", 1);
 
         // Open text file in read only mode
         FILE *text_file  = fopen(current_file_path, "r");
@@ -105,13 +110,29 @@ static void on_file_open(GObject *source_object, GAsyncResult *result, gpointer 
 
         // Metadata file. The path will be of the same length, just different suffix.
         // /home/omejzlik/CLionProjects/hinter/HINTS.txt
-        unsigned long len = strlen(current_file_path)+1;
-        char meta_file[len];
-        strcpy(meta_file, "\0");
-        construct_metadata_filename(current_file_path, meta_file, STR_METADATA_SUF);
-        // todo open metadata file too if it has the same name, otherwise warn.
-        puts(meta_file);
+        current_meta_file_path = malloc(strlen(current_file_path)+1 * sizeof(char));
+        if (current_meta_file_path == NULL) {
+            show_dialog(window, STR_ERR, STR_FILE_OPEN_FAIL);
+            return;
+        }
+        strcpy(current_meta_file_path, "\0");
+        construct_metadata_filename(current_file_path, current_meta_file_path, STR_METADATA_SUF);
+        // Open metadata file in read only mode
+        FILE *meta_file  = fopen(current_meta_file_path, "r");
+        if (meta_file == NULL) {
+            meta_file  = fopen(current_meta_file_path, "w");
+            if (meta_file == NULL) {
+                show_dialog(window, STR_ERR, STR_META_FILE_OPEN_FAIL);
+                return;
+            }
+            show_dialog(window, STR_WARN, STR_META_FILE_OPEN_FAIL_CREATED);
+            // Close the file we had for writing, there is nothing in it, so we do not need to read it.
+            fclose(meta_file);
+            return;
+        }
+        // todo apply meta file. Parse format.
 
+        fclose(meta_file);
 
     } else {
         // Error or Cancel.
@@ -121,11 +142,13 @@ static void on_file_open(GObject *source_object, GAsyncResult *result, gpointer 
         show_dialog(window, STR_ERR, STR_FILE_OPEN_FAIL);
         g_error_free(error);
     }
+
+    update_status();
 }
 
 static void show_file_chooser_dialog(GtkButton *btn, gpointer user_data) {
     GtkFileDialog *dialog = gtk_file_dialog_new();
-    gtk_file_dialog_set_title(dialog, "Open Text File");
+    gtk_file_dialog_set_title(dialog, STR_FILE_DIALOG_NAME);
 
     GtkFileFilter *filter = gtk_file_filter_new();
     gtk_file_filter_set_name(filter, "Text Files");
@@ -154,12 +177,10 @@ static void save_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
 }
 
 static void undo_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
     gtk_text_buffer_undo(buffer);
 }
 
 static void redo_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
     gtk_text_buffer_redo(buffer);
 }
 
@@ -170,7 +191,6 @@ static void setup_file_callback(GSimpleAction *simple, GVariant *parameter, gpoi
 static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
     GtkTextIter start;
     GtkTextIter end;
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(main_text_field));
     if (!gtk_text_buffer_get_selection_bounds(buffer, &start, &end)) {
         return;
     }
@@ -299,9 +319,9 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_box_append(GTK_BOX(status_bar), status_message);
 
     // Main text field is declared outside of function to be accessible everywhere.
-    GtkTextBuffer *buffer = gtk_text_buffer_new(nullptr);
-    main_text_field = gtk_text_view_new_with_buffer(buffer);
-    create_tags(buffer);
+    buffer = gtk_text_buffer_new(nullptr);
+    GtkWidget *main_text_field = gtk_text_view_new_with_buffer(buffer);
+    create_tags();
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(main_text_field), GTK_WRAP_WORD);
 
     GtkWidget *scrolled_window = gtk_scrolled_window_new();

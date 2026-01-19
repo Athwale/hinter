@@ -208,6 +208,7 @@ static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
 }
 
 static void italic_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
+    // todo Record your own undo counter with a structure of get text marks which are updated + blank records for undo without tags?
     GtkTextIter start;
     GtkTextIter end;
     if (!gtk_text_buffer_get_selection_bounds(buffer, &start, &end)) {
@@ -336,6 +337,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     // Main text field is declared outside of function to be accessible everywhere.
     buffer = gtk_text_buffer_new(nullptr);
+    gtk_text_buffer_set_enable_undo(buffer, TRUE);
     GtkWidget *main_text_field = gtk_text_view_new_with_buffer(buffer);
     create_tags();
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(main_text_field), GTK_WRAP_WORD);

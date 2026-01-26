@@ -5,6 +5,8 @@
 #define SIZE_H 800
 #define SIZE_W 1000
 
+#define UNDO_COUNT 200
+
 #define STR_ERR "Error"
 #define STR_WARN "Warning"
 

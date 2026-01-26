@@ -207,13 +207,37 @@ static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
     }
 }
 
+static void get_id(char id[], const char *word) {
+    // Letters fom 65-90.
+    int num = rand() % 26;
+    const char a = 65 + num;
+    num = rand() % 26;
+    const char b = 65 + num;
+    num = rand() % 26;
+    const char c = 65 + num;
+
+    time_t seconds = time(nullptr);
+    sprintf(id, "%s_%c%c%c_%ld", word, a, b, c, seconds);
+}
+
 static void italic_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
-    // todo Record your own undo counter with a structure of get text marks which are updated + blank records for undo without tags?
     GtkTextIter start;
     GtkTextIter end;
     if (!gtk_text_buffer_get_selection_bounds(buffer, &start, &end)) {
         return;
     }
+
+    // todo Record your own undo counter with a structure of get text marks which are updated + blank records for undo without tags?
+    // todo generate id for marks so we can find them and undo them? Use the selected word + timestamp + ramdom letter
+    // todo what if the length is too long? Shorten it, we need start and end mark, add chars to the end.
+    char id[30] = {};
+    char *selection = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+    get_id(id, selection);
+    puts(id);
+    g_free(selection);
+
+    gtk_text_buffer_create_mark(buffer, id, &start, FALSE);
+    gtk_text_buffer_create_mark(buffer, id, &end, FALSE);
 
     GtkTextTagTable *table = gtk_text_buffer_get_tag_table(buffer);
     GtkTextTag *tag = gtk_text_tag_table_lookup(table, "italic");
@@ -376,6 +400,8 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
 int main(int argc, char **argv) {
     int status = 0;
+    // Init random number generator.
+    srand(time(nullptr));
 
     GtkApplication *app = gtk_application_new(APP_INTERNAL_NAME, G_APPLICATION_DEFAULT_FLAGS);
     // Call activate handler when the application starts.

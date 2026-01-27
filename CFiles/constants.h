@@ -6,6 +6,7 @@
 #define SIZE_W 1000
 
 #define UNDO_COUNT 200
+#define ID_LEN 64
 
 #define STR_ERR "Error"
 #define STR_WARN "Warning"

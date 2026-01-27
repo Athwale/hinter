@@ -11,6 +11,8 @@ void post_status_message(const char *msg);
 // todo valgrind check leaks?
 // todo check documentation for transfer and those have to be unrefed.
 
+// todo undo/redo is too complicated to implement. Rewrite in python with wxwidgets.
+
 // Latest open file.
 char *current_file_path = nullptr;
 // todo meta must be freed.
@@ -18,6 +20,8 @@ char *current_meta_file_path = nullptr;
 GtkWidget *status_message;
 GtkTextBuffer *buffer;
 GtkWidget *window;
+
+long unsigned int id = 0;
 
 static void destroy(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
     g_application_quit(G_APPLICATION(user_data));
@@ -207,17 +211,11 @@ static void bold_file_callback(GSimpleAction *simple, GVariant *parameter, gpoin
     }
 }
 
-static void get_id(char id[], const char *word) {
-    // Letters fom 65-90.
-    int num = rand() % 26;
-    const char a = 65 + num;
-    num = rand() % 26;
-    const char b = 65 + num;
-    num = rand() % 26;
-    const char c = 65 + num;
-
+static void get_id(char *id_start, char *id_end) {
     time_t seconds = time(nullptr);
-    sprintf(id, "%s_%c%c%c_%ld", word, a, b, c, seconds);
+    snprintf(id_start, ID_LEN, "%ld_%ld_s", id, seconds);
+    snprintf(id_end, ID_LEN, "%ld_%ld_e", id, seconds);
+    id++;
 }
 
 static void italic_file_callback(GSimpleAction *simple, GVariant *parameter, gpointer user_data) {
@@ -227,17 +225,18 @@ static void italic_file_callback(GSimpleAction *simple, GVariant *parameter, gpo
         return;
     }
 
-    // todo Record your own undo counter with a structure of get text marks which are updated + blank records for undo without tags?
-    // todo generate id for marks so we can find them and undo them? Use the selected word + timestamp + ramdom letter
-    // todo what if the length is too long? Shorten it, we need start and end mark, add chars to the end.
-    char id[30] = {};
-    char *selection = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
-    get_id(id, selection);
-    puts(id);
-    g_free(selection);
+    char id_start[ID_LEN];
+    char id_end[ID_LEN];
 
-    gtk_text_buffer_create_mark(buffer, id, &start, FALSE);
-    gtk_text_buffer_create_mark(buffer, id, &end, FALSE);
+    get_id(id_start, id_end);
+    puts(id_start);
+    puts(id_end);
+
+    gtk_text_buffer_create_mark(buffer, id_start, &start, FALSE);
+    gtk_text_buffer_create_mark(buffer, id_end, &end, FALSE);
+
+    // todo record blank undos for those gtk can handle
+    // todo record format changes in my own struct.
 
     GtkTextTagTable *table = gtk_text_buffer_get_tag_table(buffer);
     GtkTextTag *tag = gtk_text_tag_table_lookup(table, "italic");
@@ -303,6 +302,15 @@ static void startup(GApplication *application) {
     g_object_unref(main_menu_file);
 
     gtk_application_set_menubar(GTK_APPLICATION(app), G_MENU_MODEL(menubar));
+}
+
+void test (GtkTextBuffer *textbuffer,
+               GtkTextIter   *location,
+               char          *text,
+               int            len,
+               gpointer       user_data) {
+    puts("test");
+    // todo how to tell if something was added to the undo stack?
 }
 
 static void activate(GtkApplication *app, gpointer user_data) {
@@ -372,6 +380,8 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), main_text_field);
 
+    g_signal_connect(buffer, "end-user-action", G_CALLBACK(test), NULL);
+
     // Assembling all components into main box.
     gtk_widget_set_hexpand(toolbar_box, TRUE);
     gtk_widget_set_hexpand(status_bar, TRUE);
@@ -400,13 +410,11 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
 int main(int argc, char **argv) {
     int status = 0;
-    // Init random number generator.
-    srand(time(nullptr));
 
     GtkApplication *app = gtk_application_new(APP_INTERNAL_NAME, G_APPLICATION_DEFAULT_FLAGS);
     // Call activate handler when the application starts.
     g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
-    g_signal_connect (app, "startup", G_CALLBACK(startup), NULL);
+    g_signal_connect(app, "startup", G_CALLBACK(startup), NULL);
     status = g_application_run(G_APPLICATION(app), argc, argv);
     g_object_unref(app);
 

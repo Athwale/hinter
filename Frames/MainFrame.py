@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import wx
 import wx.richtext
 from wx import richtext
@@ -11,17 +13,20 @@ class MainFrame(wx.Frame):
         super(MainFrame, self).__init__(None, title=Strings.app_title, size=Constants.main_window_size)
 
         self._main_text_field = None
+        self._current_file = None
+        self._status_bar = None
 
         self._init_menu_bar()
         self._init_tool_bar()
         self._init_layout()
+        self._init_status_bar()
 
     def _init_menu_bar(self):
         # Init menu bar.
         menubar = wx.MenuBar()
 
         # todo bind handlers.
-        # todo open simple text file handler.
+        # todo open simple text file handler. Open in background eventually.
 
         # File menu:
         file_menu = wx.Menu()
@@ -94,8 +99,35 @@ class MainFrame(wx.Frame):
 
         self.SetSizer(main_horizontal_box)
 
+    def _init_status_bar(self) -> None:
+        """
+        Set up status bar for the frame.
+        :return: None
+        """
+        # Create a status bar with 3 fields
+        self._status_bar = self.CreateStatusBar(3)
+        self._status_bar.SetStatusWidths([-6, -7, -2])
+        # Initialize status bar
+        self._set_status_text('', 0)
+        self._set_status_text('', 1)
+
+    def _set_status_text(self, text: str, position=0) -> None:
+        """
+        Set a text into a position in status bar and prepend a separator.
+        :param text: Text to set.
+        :param position: Where to set the text, 0 is default
+        :return: None
+        """
+        to_set = f'| {text}'
+        self._status_bar.SetStatusText(to_set, position)
+
     def _open_file(self, e):
-        print(type(e))
+        dialog = wx.FileDialog(self, "Open", "", "", "Text files (*.txt)|*.txt",
+                               wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
+        result = dialog.ShowModal()
+        if result == wx.ID_OK:
+            self._current_file = Path(dialog.GetPath())
+            self._set_status_text(self._current_file.name, 1)
 
     def _quit(self, _):
         self.Close()

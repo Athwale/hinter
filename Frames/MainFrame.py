@@ -1,19 +1,28 @@
 from pathlib import Path
 
 import wx
-import wx.richtext
 from wx import richtext
 
 from Constants import Constants
 from Constants import Strings
+from Containers.Document import Document
+
+# todo spell check
+# todo ai integration
 
 class MainFrame(wx.Frame):
+    """
+    Main user interface class.
+    """
 
     def __init__(self):
+        """
+        User interface constructor.
+        """
         super(MainFrame, self).__init__(None, title=Strings.app_title, size=Constants.main_window_size)
 
-        self._main_text_field = None
-        self._current_file = None
+        self._main_text_field: richtext.RichTextCtrl = None
+        self._current_document = None
         self._status_bar = None
 
         self._init_menu_bar()
@@ -21,12 +30,15 @@ class MainFrame(wx.Frame):
         self._init_layout()
         self._init_status_bar()
 
-    def _init_menu_bar(self):
+    def _init_menu_bar(self) -> None:
+        """
+        Menu bar initialization.
+        :return: None
+        """
         # Init menu bar.
         menubar = wx.MenuBar()
 
         # todo bind handlers.
-        # todo open simple text file handler. Open in background eventually.
 
         # File menu:
         file_menu = wx.Menu()
@@ -55,13 +67,17 @@ class MainFrame(wx.Frame):
         # Bind menu item handlers.
         self.Bind(wx.EVT_MENU, self._quit, file_menu_item_quit)
         self.Bind(wx.EVT_MENU, self._open_file, file_menu_item_open)
+        self.Bind(wx.EVT_MENU, self._save_file, file_menu_item_save)
 
         self.SetMenuBar(menubar)
 
-    def _init_tool_bar(self):
+    def _init_tool_bar(self) -> None:
+        """
+        Toolbar initialization.
+        :return: None
+        """
         toolbar = self.CreateToolBar(style=wx.TB_DEFAULT_STYLE)
 
-        # todo do not use none, it shows as too hint
         new_tool = wx.ToolBarToolBase = toolbar.AddTool(wx.ID_NEW, Strings.menu_item_new,
                                                               wx.ArtProvider.GetBitmap(wx.ART_NEW),
                                                               Strings.menu_item_new)
@@ -84,10 +100,14 @@ class MainFrame(wx.Frame):
 
         toolbar.Realize()
 
-        # todo bind handlers
+        # todo bind handlers for unusual functions.
         #self.Bind(wx.EVT_TOOL, self.quit, open_file_tool)
 
     def _init_layout(self):
+        """
+        Main layout initialization.
+        :return:
+        """
         self._main_text_field = richtext.RichTextCtrl(self, style=wx.VSCROLL | wx.NO_BORDER)
         right_panel = wx.Panel(self)
 
@@ -121,13 +141,62 @@ class MainFrame(wx.Frame):
         to_set = f'| {text}'
         self._status_bar.SetStatusText(to_set, position)
 
-    def _open_file(self, e):
+    def _open_file(self, event: wx.CommandEvent) -> None:
+        """
+        Open existing file for editing.
+        :param event: Not used
+        :return: None
+        """
         dialog = wx.FileDialog(self, "Open", "", "", "Text files (*.txt)|*.txt",
                                wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         result = dialog.ShowModal()
         if result == wx.ID_OK:
-            self._current_file = Path(dialog.GetPath())
-            self._set_status_text(self._current_file.name, 1)
+            self._load_document(Path(dialog.GetPath()))
 
-    def _quit(self, _):
+    def _load_document(self, path: Path) -> None:
+        """
+        Load document into editor. Rtf can not be used by richtextctrl yet.
+        :param path: Document path.
+        :return: None
+        """
+        self._current_document = Document(path)
+        self._current_document.read_document()
+        self._set_status_text(self._current_document.get_path().name, 1)
+
+        # todo Open in background eventually and disable the editor in the meanwhile.
+        # todo handle combination of italic and bold at the same time.
+        self._main_text_field.Freeze()
+        self._main_text_field.BeginSuppressUndo()
+
+        for c in self._current_document.get_raw_text():
+            if c == Constants.mark_bold:
+                print("bold")
+            if c == Constants.mark_italic:
+                print("italic")
+            else:
+                print("text")
+
+        # todo go through document and add it by parts.
+        self._main_text_field.Thaw()
+        self._main_text_field.EndSuppressUndo()
+
+    def _save_file(self, event: wx.CommandEvent) -> None:
+        """
+        Save file.
+        :param event: Not used
+        :return: None
+        """
+        # todo only plain text works, save metadata in a separate file or save in a special format.
+        # todo handle combination of italic and bold at the same time.
+        self._main_text_field.Freeze()
+        # todo open save dialog if new file.
+        self._main_text_field.SaveFile("./test1.txt", wx.richtext.RICHTEXT_TYPE_TEXT)
+        self._main_text_field.Thaw()
+
+    def _quit(self, _) -> None:
+        """
+        Quit the program.
+        :param _: Unused
+        :return: None
+        """
         self.Close()

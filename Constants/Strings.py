@@ -17,7 +17,16 @@ menu_item_undo: str = "Undo"
 menu_item_undo_hint: str = "Undo"
 menu_item_redo: str = "Redo"
 menu_item_redo_hint: str = "Redo"
+menu_item_bold: str = "Bold"
+menu_item_bold_hint: str = "Make text bold"
+menu_item_italic: str = "Italic"
+menu_item_italic_hint: str = "Make text italic"
+
 
 menu_about: str = "&About"
 menu_item_about: str = "About..."
 menu_item_about_hint: str = "About editor"
+
+err_file_format: str = "File formatting mismatch"
+
+exception_resource_not_found: str = "Resource file not found"

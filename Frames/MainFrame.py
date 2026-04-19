@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from sys import path
 from typing import List
 
 import wx
@@ -28,6 +29,8 @@ class MainFrame(wx.Frame):
         super(MainFrame, self).__init__(None, title=Strings.app_title, size=Constants.main_window_size)
 
         self._main_text_field: richtext.RichTextCtrl = None
+        self._html_handler = richtext.RichTextHTMLHandler()
+
         self._current_document: Document = None
         self._status_bar: StatusBar = None
         self._toolbar: ToolBar = None
@@ -118,7 +121,6 @@ class MainFrame(wx.Frame):
                                                          Strings.menu_item_redo)
         self._tools.append(redo_tool)
 
-        # todo fix these icons.
         bold_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_BOLD, Strings.menu_item_bold,
                                                          self._scale_icon('bold.svg', Constants.icon_tool_width,
                                                                           Constants.icon_tool_height),
@@ -226,8 +228,7 @@ class MainFrame(wx.Frame):
                                wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         result = dialog.ShowModal()
         if result == wx.ID_OK:
-            self._main_text_field.LoadFile(dialog.GetPath())
-            #self._load_document(Path(dialog.GetPath()))
+            self._load_document(Path(dialog.GetPath()))
 
     def _make_bold(self, event: wx.CommandEvent) -> None:
         """
@@ -251,35 +252,15 @@ class MainFrame(wx.Frame):
         :param path: Document path.
         :return: None
         """
-        self._current_document = Document(path)
-        # todo handle exceptions from read document.
-        self._current_document.read_document()
-        self._set_status_text(self._current_document.get_path().name, 1)
-
-        # todo Open in background eventually and disable the editor in the meanwhile.
         self._main_text_field.Freeze()
         self._main_text_field.BeginSuppressUndo()
 
-        bold_active: bool = False
-        italic_active: bool = False
-
-        for c in self._current_document.get_raw_text():
-            if c == Constants.mark_bold:
-                if bold_active:
-                    bold_active = False
-                    self._main_text_field.EndBold()
-                else:
-                    bold_active = True
-                    self._main_text_field.BeginBold()
-            elif c == Constants.mark_italic:
-                if italic_active:
-                    italic_active = False
-                    self._main_text_field.EndItalic()
-                else:
-                    italic_active = True
-                    self._main_text_field.BeginItalic()
-            else:
-                self._main_text_field.WriteText(c)
+        self._current_document = Document(path)
+        # todo handle exceptions from read document.
+        self._current_document.read_document(self._main_text_field.GetBuffer())
+        self._set_status_text(self._current_document.get_path().name, 1)
+        self._main_text_field.Refresh()
+        # todo Open in background eventually and disable the editor in the meanwhile.
 
         self._main_text_field.Thaw()
         self._main_text_field.EndSuppressUndo()
@@ -292,10 +273,13 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo save in background eventually. Autosave on timer.
-        # todo handle combination of italic and bold at the same time.
         self._main_text_field.Freeze()
         # todo open save dialog if new file.
-        self._main_text_field.SaveFile("./test1.txt", wx.richtext.RICHTEXT_TYPE_TEXT)
+        # todo save as variant.
+        if self._current_document.save_document(self._html_handler, self._main_text_field.GetBuffer()):
+            print("ok")
+        else:
+            print("no ok")
         self._main_text_field.Thaw()
 
     def _quit(self, _) -> None:

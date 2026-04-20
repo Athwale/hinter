@@ -257,8 +257,28 @@ class MainFrame(wx.Frame):
 
         self._current_document = Document(path)
         # todo handle exceptions from read document.
-        self._current_document.read_document(self._main_text_field.GetBuffer())
+        self._current_document.read_document()
         self._set_status_text(self._current_document.get_path().name, 1)
+        parsed_text = self._current_document.get_parsed_text()
+        for p in parsed_text:
+            if not p:
+                # <p></p>
+                self._main_text_field.LineBreak()
+            elif len(p) > 0:
+                for style, content in p:
+                    if style == 'bold':
+                        self._main_text_field.BeginBold()
+                        self._main_text_field.WriteText(content)
+                        self._main_text_field.EndBold()
+                    elif style == 'italic':
+                        self._main_text_field.BeginItalic()
+                        self._main_text_field.WriteText(content)
+                        self._main_text_field.EndItalic()
+                    elif style == 'text':
+                        self._main_text_field.WriteText(content)
+                    elif style == 'break':
+                        self._main_text_field.LineBreak()
+                self._main_text_field.LineBreak()
         self._main_text_field.Refresh()
         # todo Open in background eventually and disable the editor in the meanwhile.
 

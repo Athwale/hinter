@@ -1,3 +1,5 @@
+from typing import List
+
 import bs4
 from bs4 import Tag, NavigableString
 from wx import richtext
@@ -7,6 +9,7 @@ from pathlib import Path
 class Document:
     """
     Carrier class for currently loaded document file.
+    # todo add the metadata to a div? Same file.
     """
 
     def __init__(self, path: Path):
@@ -16,6 +19,7 @@ class Document:
         """
         self._path: Path = path
         self._text: str = ""
+        self._converted: List = []
 
     def get_path(self) -> Path:
         """
@@ -31,17 +35,22 @@ class Document:
         """
         return self._text
 
-    def read_document(self, buffer: richtext.RichTextBuffer) -> None:
+    def get_parsed_text(self) -> List:
+        """
+        Return the parsed text prepared for richtextctrl.
+        :return: The parsed text prepared for richtextctrl.
+        """
+        return self._converted
+
+    def read_document(self) -> None:
         """
         Parse document and fill internal variables and the rich text buffer.
         # todo read meta file too.
-        :param buffer buffer to fill with the data.
         :return: None
         :raises PermissionError if file is not accessible
         :raises FormatError if formatting marks are not evenly matched.
         """
         # todo handle exceptions.
-        # todo switch to wxpython's HTML which can be opened in OpenOffice and keep formatting
         try:
             if self._path.exists() and self._path.is_file():
                 with open(self._path, "r", encoding="utf-8") as f:
@@ -52,10 +61,24 @@ class Document:
         soup = bs4.BeautifulSoup(self._text, features="html.parser")
         body = soup.find(name="body")
         for ch in body.children:
+            # todo combination of italic and bold
             if isinstance(ch, Tag):
                 # These can also be NavigableString and those are leftover \n.
+                par: List = []
                 for element in ch.children:
-                    print(type(element))
+                    if isinstance(element, NavigableString):
+                        par.append(("text", element.text))
+                    elif isinstance(element, Tag):
+                        if element.name == "b":
+                            par.append(("bold", element.text))
+                        if element.name == "i":
+                            par.append(("italic", element.text))
+                        if element.name == "br":
+                            par.append(("break", ""))
+                    else:
+                        # todo handle exception
+                        print(element)
+                self._converted.append(par)
 
     def save_document(self, handler: richtext.RichTextHTMLHandler, buffer: richtext.RichTextBuffer) -> bool:
         """

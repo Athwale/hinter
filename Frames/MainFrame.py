@@ -263,7 +263,7 @@ class MainFrame(wx.Frame):
         for p in parsed_text:
             if not p:
                 # <p></p>
-                self._main_text_field.LineBreak()
+                self._main_text_field.Newline()
             elif len(p) > 0:
                 for style, content in p:
                     if style == 'bold':
@@ -274,11 +274,17 @@ class MainFrame(wx.Frame):
                         self._main_text_field.BeginItalic()
                         self._main_text_field.WriteText(content)
                         self._main_text_field.EndItalic()
+                    elif style == ('bold_italic'):
+                        self._main_text_field.BeginBold()
+                        self._main_text_field.BeginItalic()
+                        self._main_text_field.WriteText(content)
+                        self._main_text_field.EndItalic()
+                        self._main_text_field.EndBold()
                     elif style == 'text':
                         self._main_text_field.WriteText(content)
                     elif style == 'break':
                         self._main_text_field.LineBreak()
-                self._main_text_field.LineBreak()
+                self._main_text_field.Newline()
         self._main_text_field.Refresh()
         # todo Open in background eventually and disable the editor in the meanwhile.
 

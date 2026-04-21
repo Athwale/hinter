@@ -61,7 +61,6 @@ class Document:
         soup = bs4.BeautifulSoup(self._text, features="html.parser")
         body = soup.find(name="body")
         for ch in body.children:
-            # todo combination of italic and bold
             if isinstance(ch, Tag):
                 # These can also be NavigableString and those are leftover \n.
                 par: List = []
@@ -70,7 +69,10 @@ class Document:
                         par.append(("text", element.text))
                     elif isinstance(element, Tag):
                         if element.name == "b":
-                            par.append(("bold", element.text))
+                            style = "bold"
+                            if element.next_element.name == "i":
+                                style = "bold_italic"
+                            par.append((style, element.text))
                         if element.name == "i":
                             par.append(("italic", element.text))
                         if element.name == "br":

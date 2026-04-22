@@ -12,14 +12,19 @@ class Document:
     # todo add the metadata to a div? Same file.
     """
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, buffer: richtext.RichTextBuffer, handler: richtext.RichTextHTMLHandler):
         """
         Document constructor.
         :param path: Path to the document.
+        :param buffer: richtext Buffer of the rich text control.
+        :param handler richtext HTML handler of the rich text control.
         """
+        self._buffer: richtext.RichTextBuffer = buffer
+        self._handler: richtext.RichTextHTMLHandler = handler
         self._path: Path = path
         self._text: str = ""
         self._converted: List = []
+        self._new: bool = True
 
     def get_path(self) -> Path:
         """
@@ -42,10 +47,17 @@ class Document:
         """
         return self._converted
 
+    def is_new(self) -> bool:
+        """
+        Return True if this document was never saved.
+        :return: True if this document was never saved.
+        """
+        return self._new
+
     def read_document(self) -> None:
         """
         Parse document and fill internal variables and the rich text buffer.
-        # todo read meta file too.
+        # todo read metadata from the file too.
         :return: None
         :raises PermissionError if file is not accessible
         :raises FormatError if formatting marks are not evenly matched.
@@ -81,13 +93,15 @@ class Document:
                         # todo handle exception
                         print(element)
                 self._converted.append(par)
+        self._new = False
 
-    def save_document(self, handler: richtext.RichTextHTMLHandler, buffer: richtext.RichTextBuffer) -> bool:
+    def save_document(self) -> bool:
         """
 
         :return: True if saved successfully.
         """
-        if handler.SaveFile(buffer, str(self._path)):
+        # TODO test exceptions.
+        if self._handler.SaveFile(self._buffer, str(self._path)):
             soup = None
             with open(self._path, "r", encoding="utf-8") as html:
                 soup = bs4.BeautifulSoup(html, features="html.parser")
@@ -98,6 +112,7 @@ class Document:
             if soup:
                 with open(self._path, "w", encoding="utf-8") as html:
                     html.write(str(soup))
+                    self._new = False
                     return True
             else:
                 return False

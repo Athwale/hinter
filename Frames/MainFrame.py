@@ -1,6 +1,5 @@
 import sys
 from pathlib import Path
-from sys import path
 from typing import List
 
 import wx
@@ -11,6 +10,7 @@ from wx.svg import SVGimage
 from Constants import Constants
 from Constants import Strings
 from Containers.Document import Document
+from Dialogs.AboutDialog import AboutDialog
 from Resources.Fetch import Fetch
 
 
@@ -35,6 +35,7 @@ class MainFrame(wx.Frame):
         self._status_bar: StatusBar = None
         self._toolbar: ToolBar = None
         self._tools: List[wx.ToolBarToolBase] = []
+        self._menu_items: List[wx.MenuItem] = []
 
         self._init_menu_bar()
         self._init_tool_bar()
@@ -57,23 +58,33 @@ class MainFrame(wx.Frame):
         # Standard id will automatically add an icon and a shortcut.
         # Last parameter defines the short help string that is displayed on the statusbar.
         file_menu_item_new = file_menu.Append(wx.ID_NEW, Strings.menu_item_new, Strings.menu_item_new_hint)
+        self._menu_items.append(file_menu_item_new)
         file_menu_item_open = file_menu.Append(wx.ID_OPEN, Strings.menu_item_open, Strings.menu_item_open_hint)
+        self._menu_items.append(file_menu_item_open)
         file_menu_item_save = file_menu.Append(wx.ID_SAVE, Strings.menu_item_save, Strings.menu_item_save_hint)
+        self._menu_items.append(file_menu_item_save)
         file_menu_item_save_as = file_menu.Append(wx.ID_SAVEAS, Strings.menu_item_save_as, Strings.menu_item_save_as_hint)
+        self._menu_items.append(file_menu_item_save_as)
         file_menu.AppendSeparator()
         file_menu_item_quit = file_menu.Append(wx.ID_EXIT, Strings.menu_item_quit, Strings.menu_item_quit_hint)
+        self._menu_items.append(file_menu_item_quit)
 
         # Edit menu:
         edit_menu = wx.Menu()
         edit_menu_item_undo = edit_menu.Append(wx.ID_UNDO, Strings.menu_item_undo, Strings.menu_item_undo_hint)
+        self._menu_items.append(edit_menu_item_undo)
         edit_menu_item_redo = edit_menu.Append(wx.ID_REDO, Strings.menu_item_redo, Strings.menu_item_redo_hint)
+        self._menu_items.append(edit_menu_item_redo)
         edit_menu.AppendSeparator()
         edit_menu_item_bold = edit_menu.Append(wx.ID_BOLD, Strings.menu_item_bold, Strings.menu_item_bold_hint)
+        self._menu_items.append(edit_menu_item_bold)
         edit_menu_item_italic = edit_menu.Append(wx.ID_ITALIC, Strings.menu_item_italic, Strings.menu_item_italic_hint)
+        self._menu_items.append(edit_menu_item_italic)
 
         # About menu:
         about_menu = wx.Menu()
         about_menu_item_about = about_menu.Append(wx.ID_ABOUT, Strings.menu_item_about, Strings.menu_item_about_hint)
+        self._menu_items.append(about_menu_item_about)
 
         menubar.Append(file_menu, Strings.menu_file)
         menubar.Append(edit_menu, Strings.menu_edit)
@@ -82,10 +93,12 @@ class MainFrame(wx.Frame):
         # Bind menu item handlers.
         self.Bind(wx.EVT_MENU, self._quit, file_menu_item_quit)
         self.Bind(wx.EVT_MENU, self._open_file, file_menu_item_open)
-        self.Bind(wx.EVT_MENU, self._save_file, file_menu_item_save)
+        self.Bind(wx.EVT_MENU, self._save_file_handler, file_menu_item_save)
+        self.Bind(wx.EVT_MENU, self._save_as_file_handler, file_menu_item_save_as)
         self.Bind(wx.EVT_MENU, self._make_bold, edit_menu_item_bold)
         self.Bind(wx.EVT_MENU, self._make_italic, edit_menu_item_italic)
         self.Bind(wx.EVT_MENU, self._new_file, file_menu_item_new)
+        self.Bind(wx.EVT_MENU, self._about, about_menu_item_about)
 
         self.SetMenuBar(menubar)
 
@@ -147,8 +160,8 @@ class MainFrame(wx.Frame):
         :param height: Desired icon height.
         :return: The icon bitmap
         """
-        path = Fetch.get_resource_path(name)
-        svg_image = SVGimage.CreateFromFile(path)
+        resource_path = Fetch.get_resource_path(name)
+        svg_image = SVGimage.CreateFromFile(resource_path)
         return svg_image.ConvertToScaledBitmap(wx.Size(width, height))
 
     def _init_layout(self):
@@ -209,14 +222,39 @@ class MainFrame(wx.Frame):
         for t in self._tools:
             self._toolbar.EnableTool(t.GetId(), True)
 
+    def _open_save_dialog(self) -> str:
+        """
+        Return path to the new file location or empty string.
+        :return: Path to the new file location or empty string.
+        """
+        with wx.FileDialog(self, Strings.dialog_save, wildcard=Constants.html_wildcard,
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return ""
+            return fileDialog.GetPath()
+
+    def _show_error_dialog(self, error: str) -> None:
+        """
+        Display an error dialog with the error text. Set error state into the status bar.
+        :param error: The error to display in the dialog.
+        :return: None
+        """
+        wx.MessageBox(error, Strings.status_warning, wx.OK | wx.ICON_WARNING)
+        self._set_status_text(Strings.status_warning, 1)
+
     def _new_file(self, event: wx.CommandEvent) -> None:
         """
         Create a new empty file.
         :param event: Not used.
         :return: None
         """
-        # todo open file dialog to select a new file location.
-        print("not done")
+        if self._current_document:
+            self._show_error_dialog(Strings.warn_file_not_saved)
+            self._save_file()
+
+        location = self._open_save_dialog()
+        if location:
+            print(location)
 
     def _open_file(self, event: wx.CommandEvent) -> None:
         """
@@ -224,7 +262,7 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        dialog = wx.FileDialog(self, "Open", "", "", "Text files (*.html)|*.html",
+        dialog = wx.FileDialog(self, Strings.dialog_open, "", "", Constants.html_wildcard,
                                wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         result = dialog.ShowModal()
         if result == wx.ID_OK:
@@ -246,16 +284,16 @@ class MainFrame(wx.Frame):
         """
         self._main_text_field.ApplyItalicToSelection()
 
-    def _load_document(self, path: Path) -> None:
+    def _load_document(self, file_path: Path) -> None:
         """
         Load document into editor. Rtf can not be used by richtextctrl yet.
-        :param path: Document path.
+        :param file_path: Document path.
         :return: None
         """
         self._main_text_field.Freeze()
         self._main_text_field.BeginSuppressUndo()
 
-        self._current_document = Document(path)
+        self._current_document = Document(file_path, self._main_text_field.GetBuffer(), self._html_handler)
         # todo handle exceptions from read document.
         self._current_document.read_document()
         self._set_status_text(self._current_document.get_path().name, 1)
@@ -292,21 +330,42 @@ class MainFrame(wx.Frame):
         self._main_text_field.EndSuppressUndo()
         self._enable_editor()
 
-    def _save_file(self, event: wx.CommandEvent) -> None:
+    def _save_file(self, save_as: bool = False) -> None:
+        """
+        Save current file and optionally show a save as dialog.
+        :param save_as: True to show dialog.
+        :return: None
+        """
+        # todo save in background eventually. Autosave on timer.
+        self._main_text_field.Freeze()
+        if self._current_document.is_new() or save_as:
+            # todo use the dialog function and set the new location
+            destination = self._open_save_dialog()
+            if destination:
+
+        else:
+            if self._current_document.save_document():
+                # todo show something on the status bar.
+                print("ok")
+            else:
+                print("no ok")
+        self._main_text_field.Thaw()
+
+    def _save_file_handler(self, event: wx.CommandEvent) -> None:
         """
         Save file.
         :param event: Not used
         :return: None
         """
-        # todo save in background eventually. Autosave on timer.
-        self._main_text_field.Freeze()
-        # todo open save dialog if new file.
-        # todo save as variant.
-        if self._current_document.save_document(self._html_handler, self._main_text_field.GetBuffer()):
-            print("ok")
-        else:
-            print("no ok")
-        self._main_text_field.Thaw()
+        self._save_file()
+
+    def _save_as_file_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Save file.
+        :param event: Not used
+        :return: None
+        """
+        self._save_file(save_as=True)
 
     def _quit(self, _) -> None:
         """
@@ -315,3 +374,11 @@ class MainFrame(wx.Frame):
         :return: None
         """
         self.Close()
+
+    def _about(self, event: wx.CommandEvent) -> None:
+        """
+        Show the About dialog.
+        :param event: Not used.
+        :return: None
+        """
+        AboutDialog(self)

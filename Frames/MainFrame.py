@@ -1,3 +1,4 @@
+import shutil
 import sys
 from pathlib import Path
 from typing import List
@@ -16,6 +17,7 @@ from Resources.Fetch import Fetch
 
 # todo spell check
 # todo ai integration
+# todo ask for save on exit
 
 class MainFrame(wx.Frame):
     """
@@ -26,7 +28,8 @@ class MainFrame(wx.Frame):
         """
         User interface constructor.
         """
-        super(MainFrame, self).__init__(None, title=Strings.app_title, size=Constants.main_window_size)
+        super(MainFrame, self).__init__(None, title=Strings.app_title.format(Strings.status_no_document),
+                                        size=Constants.main_window_size)
 
         self._main_text_field: richtext.RichTextCtrl = None
         self._html_handler = richtext.RichTextHTMLHandler()
@@ -42,6 +45,8 @@ class MainFrame(wx.Frame):
         self._init_layout()
         self._init_status_bar()
         self._disable_editor()
+        self._set_status_text(Strings.status_ready, 0)
+        self._set_status_text(Strings.status_no_document, 1)
 
     def _init_menu_bar(self) -> None:
         """
@@ -207,11 +212,13 @@ class MainFrame(wx.Frame):
         Disable all features.
         :return: None
         """
-        # Todo disable until a document is loaded.
         self._main_text_field.Disable()
         for t in self._tools:
             if t.GetId() not in [wx.ID_NEW, wx.ID_OPEN]:
                 self._toolbar.EnableTool(t.GetId(), False)
+        for i in self._menu_items:
+            if i.GetId() not in [wx.ID_NEW, wx.ID_OPEN, wx.ID_EXIT,  wx.ID_ABOUT]:
+                i.Enable(False)
 
     def _enable_editor(self) -> None:
         """
@@ -221,6 +228,8 @@ class MainFrame(wx.Frame):
         self._main_text_field.Enable()
         for t in self._tools:
             self._toolbar.EnableTool(t.GetId(), True)
+        for i in self._menu_items:
+            i.Enable(True)
 
     def _open_save_dialog(self) -> str:
         """
@@ -249,12 +258,20 @@ class MainFrame(wx.Frame):
         :return: None
         """
         if self._current_document:
-            self._show_error_dialog(Strings.warn_file_not_saved)
+            self._show_error_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name))
             self._save_file()
 
         location = self._open_save_dialog()
         if location:
-            print(location)
+            # Replace the current document with a new one.
+            self._main_text_field.Clear()
+            if not location.endswith(".html"):
+                location = f"{location}.html"
+            shutil.copy(Path(Fetch.get_resource_path('template.html')), location)
+            self._load_document(Path(location))
+        else:
+            # todo new file dialog canceled anything to do here?`
+            pass
 
     def _open_file(self, event: wx.CommandEvent) -> None:
         """
@@ -312,7 +329,7 @@ class MainFrame(wx.Frame):
                         self._main_text_field.BeginItalic()
                         self._main_text_field.WriteText(content)
                         self._main_text_field.EndItalic()
-                    elif style == ('bold_italic'):
+                    elif style == 'bold_italic':
                         self._main_text_field.BeginBold()
                         self._main_text_field.BeginItalic()
                         self._main_text_field.WriteText(content)
@@ -328,6 +345,7 @@ class MainFrame(wx.Frame):
 
         self._main_text_field.Thaw()
         self._main_text_field.EndSuppressUndo()
+        self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._enable_editor()
 
     def _save_file(self, save_as: bool = False) -> None:
@@ -337,18 +355,27 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo save in background eventually. Autosave on timer.
+        # todo the current document must be effectively switched to the save as new file.
+        # todo indicate changes to file in window title.
         self._main_text_field.Freeze()
         if self._current_document.is_new() or save_as:
-            # todo use the dialog function and set the new location
             destination = self._open_save_dialog()
             if destination:
-
+                self._current_document.set_path(Path(destination))
+                if self._current_document.save_document():
+                    self._set_status_text(Strings.status_saved, 0)
+                    self._set_status_text(self._current_document.get_path().name, 1)
+                else:
+                    self._set_status_text(Strings.status_not_saved, 0)
+            else:
+                # Canceled dialog.
+                self._set_status_text(Strings.status_not_saved, 0)
+                return
         else:
             if self._current_document.save_document():
-                # todo show something on the status bar.
-                print("ok")
+                self._set_status_text(Strings.status_saved, 0)
             else:
-                print("no ok")
+                self._set_status_text(Strings.status_not_saved, 0)
         self._main_text_field.Thaw()
 
     def _save_file_handler(self, event: wx.CommandEvent) -> None:

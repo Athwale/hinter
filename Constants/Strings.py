@@ -1,4 +1,4 @@
-app_title: str = "Writer"
+app_title: str = "Writer: {}"
 
 menu_file: str = "&File"
 menu_item_new: str = "New..."
@@ -33,8 +33,12 @@ dialog_about: str = "About"
 button_close: str = "Close"
 
 status_warning: str = "Warning"
+status_saved: str = "Saved"
+status_not_saved: str = "Not saved"
+status_ready: str = "Ready"
+status_no_document: str = "No document"
 
-warn_file_not_saved: str = "Current file saved"
+warn_file_not_saved: str = "Current file saved: {}"
 
 err_file_format: str = "File formatting mismatch"
 

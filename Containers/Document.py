@@ -33,6 +33,14 @@ class Document:
         """
         return self._path
 
+    def set_path(self, path: Path) -> None:
+        """
+        Set new file path.
+        :param path: New file path.
+        :return: None
+        """
+        self._path = path
+
     def get_raw_text(self) -> str:
         """
         Return current document text.

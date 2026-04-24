@@ -1,10 +1,9 @@
 import shutil
-import sys
 from pathlib import Path
 from typing import List
 
 import wx
-from wx import richtext
+import wx.stc as stc
 from wx._core import StatusBar, ToolBar
 from wx.svg import SVGimage
 
@@ -31,20 +30,24 @@ class MainFrame(wx.Frame):
         super(MainFrame, self).__init__(None, title=Strings.app_title.format(Strings.status_no_document),
                                         size=Constants.main_window_size)
 
-        self._main_text_field: richtext.RichTextCtrl = None
+        self._main_text_field: stc.StyledTextCtrl = None
         self._side_text_field: wx.TextCtrl = None
-        self._html_handler = richtext.RichTextHTMLHandler()
 
         self._current_document: Document = None
         self._status_bar: StatusBar = None
         self._toolbar: ToolBar = None
         self._tools: List[wx.ToolBarToolBase] = []
         self._menu_items: List[wx.MenuItem] = []
+        self._style_map = {'default': 0,
+                           'bold': 1,
+                           'italic': 2,
+                           'bold_italic': 3}
 
         self._init_menu_bar()
         self._init_tool_bar()
         self._init_layout()
         self._init_status_bar()
+        self._set_styles()
         self._disable_editor()
         self._set_status_text(Strings.status_ready, 0)
         self._set_status_text(Strings.status_no_document, 1)
@@ -162,6 +165,27 @@ class MainFrame(wx.Frame):
         # todo bind handlers for unusual functions.
         #self.Bind(wx.EVT_TOOL, self.quit, open_file_tool)
 
+    def _set_styles(self) -> None:
+        """
+        Set stc styles.
+        :return: None
+        """
+        self._main_text_field.StyleSetFaceName(stc.STC_STYLE_DEFAULT, "Courier New")
+        self._main_text_field.StyleSetSize(stc.STC_STYLE_DEFAULT, 10)
+        self._main_text_field.StyleSetForeground(stc.STC_STYLE_DEFAULT, wx.Colour(0, 0, 0))
+        self._main_text_field.StyleSetBackground(stc.STC_STYLE_DEFAULT, wx.Colour(255, 255, 255))
+        self._main_text_field.StyleSetBold(stc.STC_STYLE_DEFAULT, False)
+        self._main_text_field.StyleSetItalic(stc.STC_STYLE_DEFAULT, False)
+
+        # Apply style.
+        self._main_text_field.StyleClearAll()
+
+        self._main_text_field.StyleSetSpec(1, "bold")
+        self._main_text_field.StyleSetSpec(2, "italic")
+        self._main_text_field.StyleSetSpec(3, "italic,bold")
+
+        # todo styles for background colors.
+
     @staticmethod
     def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:
         """
@@ -181,7 +205,8 @@ class MainFrame(wx.Frame):
         :return:
         """
         # todo switch to scintilla
-        self._main_text_field = richtext.RichTextCtrl(self, style=wx.VSCROLL | wx.NO_BORDER)
+        self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
+        self._main_text_field.SetWrapMode(1)
         self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
                                                         wx.TE_WORDWRAP)
 
@@ -295,7 +320,7 @@ class MainFrame(wx.Frame):
         location = self._open_save_dialog()
         if location:
             # Replace the current document with a new one.
-            self._main_text_field.Clear()
+            self._clear_editor()
             if not location.endswith(".html"):
                 location = f"{location}.html"
             shutil.copy(Path(Fetch.get_resource_path('template.html')), location)
@@ -304,16 +329,29 @@ class MainFrame(wx.Frame):
             # todo new file dialog canceled anything to do here?`
             pass
 
+    def _clear_editor(self) -> None:
+        """
+        Clear the gui to default state.
+        :return: None
+        """
+        self._main_text_field.ClearAll()
+
     def _open_file(self, event: wx.CommandEvent) -> None:
         """
         Open existing file for editing.
         :param event: Not used
         :return: None
         """
+        # todo if a file is already loaded, save it and clear
+        if self._current_document:
+            self._show_error_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name))
+            self._save_file()
+
         dialog = wx.FileDialog(self, Strings.dialog_open, "", "", Constants.html_wildcard,
                                wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         result = dialog.ShowModal()
         if result == wx.ID_OK:
+            self._clear_editor()
             self._load_document(Path(dialog.GetPath()))
 
     def _make_bold(self, event: wx.CommandEvent) -> None:
@@ -322,6 +360,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        # todo fix these
         self._main_text_field.ApplyBoldToSelection()
 
     def _make_italic(self, event: wx.CommandEvent) -> None:
@@ -332,6 +371,18 @@ class MainFrame(wx.Frame):
         """
         self._main_text_field.ApplyItalicToSelection()
 
+    def _append_styled_text(self, text: str, style: str) -> None:
+        """
+        Add text to text area with style.
+        :param text: The text to add.
+        :param style: Style name.
+        :return: None
+        """
+        start_pos = self._main_text_field.GetLength()
+        self._main_text_field.AppendText(text)
+        self._main_text_field.StartStyling(start_pos)
+        self._main_text_field.SetStyling(len(text), self._style_map[style])
+
     def _load_document(self, file_path: Path) -> None:
         """
         Load document into editor. Rtf can not be used by richtextctrl yet.
@@ -339,9 +390,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         self._main_text_field.Freeze()
-        self._main_text_field.BeginSuppressUndo()
-
-        self._current_document = Document(file_path, self._main_text_field.GetBuffer(), self._html_handler)
+        self._current_document = Document(file_path)
         # todo handle exceptions from read document.
         self._current_document.read_document()
         self._set_status_text(self._current_document.get_path().name, 1)
@@ -349,33 +398,24 @@ class MainFrame(wx.Frame):
         for p in parsed_text:
             if not p:
                 # <p></p>
-                self._main_text_field.Newline()
+                self._main_text_field.AppendText('\n')
             elif len(p) > 0:
                 for style, content in p:
                     if style == 'bold':
-                        self._main_text_field.BeginBold()
-                        self._main_text_field.WriteText(content)
-                        self._main_text_field.EndBold()
+                        self._append_styled_text(content, style)
                     elif style == 'italic':
-                        self._main_text_field.BeginItalic()
-                        self._main_text_field.WriteText(content)
-                        self._main_text_field.EndItalic()
+                        self._append_styled_text(content, style)
                     elif style == 'bold_italic':
-                        self._main_text_field.BeginBold()
-                        self._main_text_field.BeginItalic()
-                        self._main_text_field.WriteText(content)
-                        self._main_text_field.EndItalic()
-                        self._main_text_field.EndBold()
+                        self._append_styled_text(content, style)
                     elif style == 'text':
-                        self._main_text_field.WriteText(content)
+                        self._append_styled_text(content, 'default')
                     elif style == 'break':
-                        self._main_text_field.LineBreak()
-                self._main_text_field.Newline()
+                        self._main_text_field.AppendText('\n')
+                self._main_text_field.AppendText('\n')
         self._main_text_field.Refresh()
         # todo Open in background eventually and disable the editor in the meanwhile.
 
         self._main_text_field.Thaw()
-        self._main_text_field.EndSuppressUndo()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._enable_editor()
 

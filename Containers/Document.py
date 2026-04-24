@@ -12,15 +12,11 @@ class Document:
     # todo add the metadata to a div? Same file.
     """
 
-    def __init__(self, path: Path, buffer: richtext.RichTextBuffer, handler: richtext.RichTextHTMLHandler):
+    def __init__(self, path: Path):
         """
         Document constructor.
         :param path: Path to the document.
-        :param buffer: richtext Buffer of the rich text control.
-        :param handler richtext HTML handler of the rich text control.
         """
-        self._buffer: richtext.RichTextBuffer = buffer
-        self._handler: richtext.RichTextHTMLHandler = handler
         self._path: Path = path
         self._text: str = ""
         self._converted: List = []
@@ -109,23 +105,8 @@ class Document:
         :return: True if saved successfully.
         """
         # TODO test exceptions.
-        if self._handler.SaveFile(self._buffer, str(self._path)):
-            soup = None
-            with open(self._path, "r", encoding="utf-8") as html:
-                soup = bs4.BeautifulSoup(html, features="html.parser")
-                for font in soup.find_all(name="font"):
-                    font.unwrap()
-                for p in soup.find_all(name="p"):
-                    p.attrs = {}
-            if soup:
-                with open(self._path, "w", encoding="utf-8") as html:
-                    html.write(str(soup))
-                    self._new = False
-                    return True
-            else:
-                return False
-        else:
-            return False
+        # TODO reimplement for stc
+        pass
 
     def __str__(self):
      return f"Path: {self._path}\nText: {self._text}"

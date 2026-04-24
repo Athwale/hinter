@@ -7,6 +7,24 @@ class XmlSTC(stc.StyledTextCtrl):
         stc.StyledTextCtrl.__init__(self, parent)
 
         self.SetLexer(stc.STC_LEX_XML)
+        self.StyleSetSpec(stc.STC_STYLE_DEFAULT,
+                          "size:10,face:Courier New")
+        faces = { 'mono' : 'Courier New',
+                  'helv' : 'Arial',
+                  'size' : 10,
+                  }
+
+        # XML styles
+        # Default
+        self.StyleSetSpec(stc.STC_H_DEFAULT, "fore:#000000,face:%(helv)s,size:%(size)d" % faces)
+
+        # Number
+        self.StyleSetSpec(stc.STC_H_NUMBER, "fore:#007F7F,size:%(size)d" % faces)
+        # Tag
+        self.StyleSetSpec(stc.STC_H_TAG, "fore:#007F7F,bold,size:%(size)d" % faces)
+        # Value
+        self.StyleSetSpec(stc.STC_H_VALUE, "fore:#7F0000,size:%(size)d" % faces)
+
         text = "fobj.read()"
 
         self.SetText(text)

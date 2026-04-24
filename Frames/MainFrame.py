@@ -32,6 +32,7 @@ class MainFrame(wx.Frame):
                                         size=Constants.main_window_size)
 
         self._main_text_field: richtext.RichTextCtrl = None
+        self._side_text_field: wx.TextCtrl = None
         self._html_handler = richtext.RichTextHTMLHandler()
 
         self._current_document: Document = None
@@ -104,6 +105,11 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._make_italic, edit_menu_item_italic)
         self.Bind(wx.EVT_MENU, self._new_file, file_menu_item_new)
         self.Bind(wx.EVT_MENU, self._about, about_menu_item_about)
+        self.Bind(wx.EVT_MENU, self._undo, edit_menu_item_undo)
+        self.Bind(wx.EVT_MENU, self._redo, edit_menu_item_redo)
+
+        # Special events
+        self.Bind(wx.EVT_TEXT, self._text_changed, self._main_text_field)
 
         self.SetMenuBar(menubar)
 
@@ -174,14 +180,14 @@ class MainFrame(wx.Frame):
         Main layout initialization.
         :return:
         """
+        # todo switch to scintilla
         self._main_text_field = richtext.RichTextCtrl(self, style=wx.VSCROLL | wx.NO_BORDER)
-        right_panel = wx.Panel(self)
-
-        right_panel.SetBackgroundColour('#4f5048')
+        self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
+                                                        wx.TE_WORDWRAP)
 
         main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
         main_horizontal_box.Add(self._main_text_field, 3, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
-        main_horizontal_box.Add(right_panel, 1, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT, Constants.default_border)
+        main_horizontal_box.Add(self._side_text_field, 1, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT, Constants.default_border)
 
         self.SetSizer(main_horizontal_box)
 
@@ -250,6 +256,31 @@ class MainFrame(wx.Frame):
         """
         wx.MessageBox(error, Strings.status_warning, wx.OK | wx.ICON_WARNING)
         self._set_status_text(Strings.status_warning, 1)
+
+    def _text_changed(self, event: wx.CommandEvent) -> None:
+        """
+        Undo last change.
+        :param event: Not used.
+        :return: None
+        """
+        # todo the text ctrl is very slow with lots of text, use styledtextctrl?
+        print(self._main_text_field.NumberOfLines)
+
+    def _undo(self, event: wx.CommandEvent) -> None:
+        """
+        Undo last change.
+        :param event: Not used.
+        :return: None
+        """
+        self._main_text_field.Undo()
+
+    def _redo(self, event: wx.CommandEvent) -> None:
+        """
+        Redo last change.
+        :param event: Not used.
+        :return: None
+        """
+        self._main_text_field.Redo()
 
     def _new_file(self, event: wx.CommandEvent) -> None:
         """

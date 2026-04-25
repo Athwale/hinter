@@ -1,7 +1,9 @@
 import shutil
 from pathlib import Path
+from pprint import pprint
 from typing import List
 
+import html
 import wx
 import wx.stc as stc
 from wx._core import StatusBar, ToolBar
@@ -38,10 +40,10 @@ class MainFrame(wx.Frame):
         self._toolbar: ToolBar = None
         self._tools: List[wx.ToolBarToolBase] = []
         self._menu_items: List[wx.MenuItem] = []
-        self._style_map = {'default': 0,
-                           'bold': 1,
-                           'italic': 2,
-                           'bold_italic': 3}
+        self._style_map = {Constants.style_default: 0,
+                           Constants.style_bold: 1,
+                           Constants.style_italic: 2,
+                           Constants.style_bold_italic: 3}
 
         self._init_menu_bar()
         self._init_tool_bar()
@@ -180,9 +182,9 @@ class MainFrame(wx.Frame):
         # Apply style.
         self._main_text_field.StyleClearAll()
 
-        self._main_text_field.StyleSetSpec(1, "bold")
-        self._main_text_field.StyleSetSpec(2, "italic")
-        self._main_text_field.StyleSetSpec(3, "italic,bold")
+        self._main_text_field.StyleSetSpec(1, Constants.style_bold)
+        self._main_text_field.StyleSetSpec(2, Constants.style_italic)
+        self._main_text_field.StyleSetSpec(3, Constants.style_bold_italic)
 
         # todo styles for background colors.
 
@@ -204,9 +206,12 @@ class MainFrame(wx.Frame):
         Main layout initialization.
         :return:
         """
-        # todo switch to scintilla
+        # todo GetLineCount show in bar, GetTextLength
         self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
+        self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
+        self._main_text_field.SetMarginMask(1, 0)
+        self._main_text_field.SetMarginWidth(1, 20)
         self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
                                                         wx.TE_WORDWRAP)
 
@@ -395,23 +400,11 @@ class MainFrame(wx.Frame):
         self._current_document.read_document()
         self._set_status_text(self._current_document.get_path().name, 1)
         parsed_text = self._current_document.get_parsed_text()
-        for p in parsed_text:
-            if not p:
-                # <p></p>
+        for style, content in parsed_text:
+            if style == 'break':
                 self._main_text_field.AppendText('\n')
-            elif len(p) > 0:
-                for style, content in p:
-                    if style == 'bold':
-                        self._append_styled_text(content, style)
-                    elif style == 'italic':
-                        self._append_styled_text(content, style)
-                    elif style == 'bold_italic':
-                        self._append_styled_text(content, style)
-                    elif style == 'text':
-                        self._append_styled_text(content, 'default')
-                    elif style == 'break':
-                        self._main_text_field.AppendText('\n')
-                self._main_text_field.AppendText('\n')
+            else:
+                self._append_styled_text(content, style)
         self._main_text_field.Refresh()
         # todo Open in background eventually and disable the editor in the meanwhile.
 
@@ -428,11 +421,14 @@ class MainFrame(wx.Frame):
         # todo save in background eventually. Autosave on timer.
         # todo the current document must be effectively switched to the save as new file.
         # todo indicate changes to file in window title.
+
         self._main_text_field.Freeze()
         if self._current_document.is_new() or save_as:
             destination = self._open_save_dialog()
             if destination:
                 self._current_document.set_path(Path(destination))
+                # todo test odd corner cases.
+                self._current_document.set_converted(self._convert_document())
                 if self._current_document.save_document():
                     self._set_status_text(Strings.status_saved, 0)
                     self._set_status_text(self._current_document.get_path().name, 1)
@@ -443,11 +439,48 @@ class MainFrame(wx.Frame):
                 self._set_status_text(Strings.status_not_saved, 0)
                 return
         else:
+            self._current_document.set_converted(self._convert_document())
             if self._current_document.save_document():
+                # todo SetSavePoint() in stc
                 self._set_status_text(Strings.status_saved, 0)
             else:
                 self._set_status_text(Strings.status_not_saved, 0)
         self._main_text_field.Thaw()
+
+    def _convert_document(self) -> List:
+        """
+        Extracts text and styling into the simple dictionary format and stores it in the Document class.
+        :return: List of tuples with style and text information.
+        """
+        converted = []
+
+        length = self._main_text_field.GetTextLength()
+        if length == 0:
+            return converted
+
+        current_style: int = self._main_text_field.GetStyleAt(0)
+        chunk_start: int = 0
+        for pos in range(length):
+            style_at_pos = self._main_text_field.GetStyleAt(pos)
+
+            # When the style changes, save the previous chunk.
+            if style_at_pos != current_style:
+                text_chunk = self._main_text_field.GetTextRange(chunk_start, pos)
+                # Escape HTML characters (<, >, &, etc.)
+                escaped_text = html.escape(text_chunk)
+
+                for style, style_id in self._style_map.items():
+                    if style_id == current_style:
+                        converted.append((style, escaped_text))
+
+                current_style = style_at_pos
+                chunk_start = pos
+        # Save last chunk where the style does not change.
+        text_chunk = self._main_text_field.GetTextRange(chunk_start, length)
+        for style, style_id in self._style_map.items():
+            if style_id == current_style:
+                converted.append((style, html.escape(text_chunk)))
+        return converted
 
     def _save_file_handler(self, event: wx.CommandEvent) -> None:
         """

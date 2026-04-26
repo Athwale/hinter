@@ -91,6 +91,8 @@ class MainFrame(wx.Frame):
         self._menu_items.append(edit_menu_item_bold)
         edit_menu_item_italic = edit_menu.Append(wx.ID_ITALIC, Strings.menu_item_italic, Strings.menu_item_italic_hint)
         self._menu_items.append(edit_menu_item_italic)
+        edit_menu_item_remove_styles = edit_menu.Append(wx.ID_CLEAR, Strings.menu_item_clear, Strings.menu_item_clear_hint)
+        self._menu_items.append(edit_menu_item_remove_styles)
 
         # About menu:
         about_menu = wx.Menu()
@@ -112,6 +114,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._about, about_menu_item_about)
         self.Bind(wx.EVT_MENU, self._undo, edit_menu_item_undo)
         self.Bind(wx.EVT_MENU, self._redo, edit_menu_item_redo)
+        self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
 
         # Special events
         self.Bind(wx.EVT_TEXT, self._text_changed, self._main_text_field)
@@ -365,8 +368,22 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # todo fix these
-        self._main_text_field.ApplyBoldToSelection()
+        # todo does not work with undo/redo
+        start_pos, end_pos = self._main_text_field.GetSelection()
+        style = self._main_text_field.GetStyleAt(start_pos)
+        self._main_text_field.StartStyling(start_pos)
+        if style == self._style_map[Constants.style_bold]:
+            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
+                                             self._style_map[Constants.style_default])
+        elif style == self._style_map[Constants.style_italic]:
+            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
+                                             self._style_map[Constants.style_bold_italic])
+        elif style == self._style_map[Constants.style_bold_italic]:
+            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
+                                             self._style_map[Constants.style_italic])
+        else:
+            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
+                                             self._style_map[Constants.style_bold])
 
     def _make_italic(self, event: wx.CommandEvent) -> None:
         """
@@ -374,7 +391,32 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        self._main_text_field.ApplyItalicToSelection()
+        start_pos, end_pos = self._main_text_field.GetSelection()
+        style = self._main_text_field.GetStyleAt(start_pos)
+        self._main_text_field.StartStyling(start_pos)
+        if style == self._style_map[Constants.style_italic]:
+            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
+                                             self._style_map[Constants.style_default])
+        elif style == self._style_map[Constants.style_bold]:
+            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
+                                             self._style_map[Constants.style_bold_italic])
+        elif style == self._style_map[Constants.style_bold_italic]:
+            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
+                                             self._style_map[Constants.style_bold])
+        else:
+            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
+                                             self._style_map[Constants.style_italic])
+
+    def _clear_styles(self, event: wx.CommandEvent) -> None:
+        """
+        Change text to default style.
+        :param event: Not used.
+        :return: None
+        """
+        start_pos, end_pos = self._main_text_field.GetSelection()
+        self._main_text_field.StartStyling(start_pos)
+        self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
+                                             self._style_map[Constants.style_default])
 
     def _append_styled_text(self, text: str, style: str) -> None:
         """
@@ -398,6 +440,7 @@ class MainFrame(wx.Frame):
         self._current_document = Document(file_path)
         # todo handle exceptions from read document.
         self._current_document.read_document()
+        # todo get errors and process them
         self._set_status_text(self._current_document.get_path().name, 1)
         parsed_text = self._current_document.get_parsed_text()
         for style, content in parsed_text:
@@ -405,7 +448,6 @@ class MainFrame(wx.Frame):
                 self._main_text_field.AppendText('\n')
             else:
                 self._append_styled_text(content, style)
-        self._main_text_field.Refresh()
         # todo Open in background eventually and disable the editor in the meanwhile.
 
         self._main_text_field.Thaw()

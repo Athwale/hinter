@@ -1,6 +1,7 @@
 from typing import List
 
 import bs4
+import htmlmin
 from bs4 import Tag, NavigableString
 from wx import richtext
 from pathlib import Path
@@ -23,6 +24,7 @@ class Document:
         self._path: Path = path
         self._raw_html_text: str = ""
         self._converted: List = []
+        self._errors: List[str] = []
         self._new: bool = True
 
     def get_path(self) -> Path:
@@ -31,6 +33,13 @@ class Document:
         :return: Current document path.
         """
         return self._path
+
+    def get_errors(self) -> List[str]:
+        """
+        Return a list of errors from loading the document.
+        :return: A list of errors from loading the document.
+        """
+        return self._errors
 
     def get_raw_text(self) -> str:
         """
@@ -80,15 +89,20 @@ class Document:
         :raises FormatError if formatting marks are not evenly matched.
         """
         # todo handle exceptions.
-        # todo adapt to the new list format. This must ignore line breaks and only use br?
+        self._errors = []
         try:
             if self._path.exists() and self._path.is_file():
                 with open(self._path, "r", encoding="utf-8") as f:
                     self._raw_html_text = f.read()
+                    # Odd behavior where <br/>\n is converted to an empty space at the start of the next line.
+                    self._raw_html_text = self._raw_html_text.replace('<br/>\n', '<br/>')
+                    # Help solve odd formating from OpenOffice.
+                    self._raw_html_text = htmlmin.minify(self._raw_html_text,
+                                                         remove_comments=True,
+                                                         remove_empty_space=True)
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 
-        # todo ignore \n only use br. Remove \n from strings, this allows OpenOffice html to be loaded.
         soup = bs4.BeautifulSoup(self._raw_html_text, features="html.parser")
         body = soup.find(name="body")
         for ch in body.children:
@@ -98,19 +112,24 @@ class Document:
                     if isinstance(element, NavigableString):
                         self._converted.append((Constants.style_default, element.text))
                     elif isinstance(element, Tag):
-                        # todo handle even the other way around
                         if element.name == "b":
                             style = Constants.style_bold
                             if element.next_element.name == "i":
                                 style = Constants.style_bold_italic
                             self._converted.append((style, element.text))
-                        if element.name == "i":
-                            self._converted.append((Constants.style_italic, element.text))
-                        if element.name == "br":
+                        elif element.name == "i":
+                            style = Constants.style_italic
+                            if element.next_element.name == "b":
+                                style = Constants.style_bold_italic
+                            self._converted.append((style, element.text))
+                        elif element.name == "br":
                             self._converted.append((Constants.style_break, ""))
+                        else:
+                            self._errors.append(str(element))
                     else:
-                        # todo handle exception
-                        print(element)
+                        self._errors.append(str(element))
+            else:
+                self._errors.append(str(ch))
         self._new = False
 
     def save_document(self) -> bool:
@@ -120,7 +139,6 @@ class Document:
         :return: True if saved successfully.
         """
         # Create a new html file to fill up from the template.
-
         with open(Fetch.get_resource_path('template.html'), "r", encoding="utf-8") as f:
             self._raw_html_text = f.read()
 

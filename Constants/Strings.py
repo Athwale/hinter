@@ -21,6 +21,8 @@ menu_item_bold: str = "Bold"
 menu_item_bold_hint: str = "Make text bold"
 menu_item_italic: str = "Italic"
 menu_item_italic_hint: str = "Make text italic"
+menu_item_clear: str = "Clear styles"
+menu_item_clear_hint: str = "Clear styles"
 
 menu_about: str = "&About"
 menu_item_about: str = "About..."

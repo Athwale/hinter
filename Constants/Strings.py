@@ -41,6 +41,7 @@ status_ready: str = "Ready"
 status_no_document: str = "No document"
 
 warn_file_not_saved: str = "Current file saved: {}"
+warn_errors: str = "Errors found in HTML:\n\n {}\nCan not continue\nAllowed text tags: <b>, <i>"
 
 err_file_format: str = "File formatting mismatch"
 

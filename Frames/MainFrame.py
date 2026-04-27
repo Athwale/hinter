@@ -44,6 +44,9 @@ class MainFrame(wx.Frame):
                            Constants.style_bold: 1,
                            Constants.style_italic: 2,
                            Constants.style_bold_italic: 3}
+        # Used for undo.
+        self.style_history = {}
+        self.action_token = 0
 
         self._init_menu_bar()
         self._init_tool_bar()
@@ -61,8 +64,6 @@ class MainFrame(wx.Frame):
         """
         # Init menu bar.
         menubar = wx.MenuBar()
-
-        # todo bind handlers.
 
         # File menu:
         file_menu = wx.Menu()
@@ -116,8 +117,8 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._redo, edit_menu_item_redo)
         self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
 
-        # Special events
-        self.Bind(wx.EVT_TEXT, self._text_changed, self._main_text_field)
+
+        self.Bind(stc.EVT_STC_MODIFIED, self.on_modified)
 
         self.SetMenuBar(menubar)
 
@@ -167,9 +168,6 @@ class MainFrame(wx.Frame):
 
         self._toolbar.Realize()
 
-        # todo bind handlers for unusual functions.
-        #self.Bind(wx.EVT_TOOL, self.quit, open_file_tool)
-
     def _set_styles(self) -> None:
         """
         Set stc styles.
@@ -209,7 +207,7 @@ class MainFrame(wx.Frame):
         Main layout initialization.
         :return:
         """
-        # todo GetLineCount show in bar, GetTextLength
+        # todo GetLineCount show in bar, GetTextLength, can we get word count?
         self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
         self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
@@ -296,7 +294,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # todo the text ctrl is very slow with lots of text, use styledtextctrl?
+        # todo use this
         print(self._main_text_field.NumberOfLines)
 
     def _undo(self, event: wx.CommandEvent) -> None:
@@ -350,7 +348,6 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        # todo if a file is already loaded, save it and clear
         if self._current_document:
             self._show_error_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name))
             self._save_file()
@@ -362,28 +359,54 @@ class MainFrame(wx.Frame):
             self._clear_editor()
             self._load_document(Path(dialog.GetPath()))
 
+    def _apply_style_with_undo(self, start, length, new_style_id) -> None:
+        """
+        Applies a style to a range of text and records it in the native undo stack.
+        :param start:
+        :param length:
+        :param new_style_id:
+        :return:
+        """
+        if length <= 0:
+            return
+        old_styles = [self._main_text_field.GetStyleAt(start + i) for i in range(length)]
+        self.action_token += 1
+        token = self.action_token
+
+        self.style_history[token] = {
+            'start': start,
+            'length': length,
+            'old_styles': old_styles,
+            'new_style_id': new_style_id
+        }
+
+        self._main_text_field.BeginUndoAction()
+        self._main_text_field.StartStyling(start)
+        self._main_text_field.SetStyling(length, new_style_id)
+        # 0 means this action cannot be (merged) with adjacent text typing
+        self._main_text_field.AddUndoAction(token, 0)
+        self._main_text_field.EndUndoAction()
+
     def _make_bold(self, event: wx.CommandEvent) -> None:
         """
         Change text to bold.
         :param event: Not used.
         :return: None
         """
-        # todo does not work with undo/redo
-        start_pos, end_pos = self._main_text_field.GetSelection()
+        start_pos = self._main_text_field.GetSelectionStart()
         style = self._main_text_field.GetStyleAt(start_pos)
-        self._main_text_field.StartStyling(start_pos)
         if style == self._style_map[Constants.style_bold]:
-            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                             self._style_map[Constants.style_default])
+            self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
+                                        self._style_map[Constants.style_default])
         elif style == self._style_map[Constants.style_italic]:
-            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                             self._style_map[Constants.style_bold_italic])
+            self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
+                                        self._style_map[Constants.style_italic])
         elif style == self._style_map[Constants.style_bold_italic]:
-            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                             self._style_map[Constants.style_italic])
+            self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
+                                        self._style_map[Constants.style_italic])
         else:
-            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                             self._style_map[Constants.style_bold])
+            self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
+                                        self._style_map[Constants.style_bold])
 
     def _make_italic(self, event: wx.CommandEvent) -> None:
         """
@@ -391,21 +414,50 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        start_pos, end_pos = self._main_text_field.GetSelection()
+        start_pos = self._main_text_field.GetSelectionStart()
         style = self._main_text_field.GetStyleAt(start_pos)
-        self._main_text_field.StartStyling(start_pos)
         if style == self._style_map[Constants.style_italic]:
-            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                             self._style_map[Constants.style_default])
+            self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
+                                        self._style_map[Constants.style_default])
         elif style == self._style_map[Constants.style_bold]:
-            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                             self._style_map[Constants.style_bold_italic])
+            self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
+                                        self._style_map[Constants.style_italic])
         elif style == self._style_map[Constants.style_bold_italic]:
-            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                             self._style_map[Constants.style_bold])
+            self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
+                                        self._style_map[Constants.style_bold])
         else:
-            self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                             self._style_map[Constants.style_italic])
+            self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
+                                        self._style_map[Constants.style_italic])
+
+    def on_modified(self, event: wx.CommandEvent):
+        """
+        # todo update this.
+        Catches Scintilla modifications and handles custom undo/redo events.
+        """
+        mod_type = event.GetModificationType()
+
+        # 5. Check if the event is returning our custom container action token
+        if mod_type & stc.STC_MOD_CONTAINER:
+            token = event.GetToken()
+            action = self.style_history.get(token)
+
+            if not action:
+                return
+
+            start = action['start']
+            length = action['length']
+
+            # 6. Handle Undo: Revert back to the old styles
+            if mod_type & stc.STC_PERFORMED_UNDO:
+                # Re-apply character by character to restore mixed formatting accurately
+                for i, old_style_byte in enumerate(action['old_styles']):
+                    self._main_text_field.StartStyling(start + i)
+                    self._main_text_field.SetStyling(1, old_style_byte)
+
+            # 7. Handle Redo: Re-apply the new style
+            elif mod_type & stc.STC_PERFORMED_REDO:
+                self._main_text_field.StartStyling(start)
+                self._main_text_field.SetStyling(length, action['new_style_id'])
 
     def _clear_styles(self, event: wx.CommandEvent) -> None:
         """
@@ -413,7 +465,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        start_pos, end_pos = self._main_text_field.GetSelection()
+        start_pos = self._main_text_field.GetSelectionStart()
         self._main_text_field.StartStyling(start_pos)
         self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
                                              self._style_map[Constants.style_default])
@@ -440,7 +492,14 @@ class MainFrame(wx.Frame):
         self._current_document = Document(file_path)
         # todo handle exceptions from read document.
         self._current_document.read_document()
-        # todo get errors and process them
+        errors = self._current_document.get_errors()
+        if errors:
+            formatted = ''
+            for e in errors:
+                formatted += f"{e}\n"
+            self._show_error_dialog(Strings.warn_errors.format(formatted))
+            return
+
         self._set_status_text(self._current_document.get_path().name, 1)
         parsed_text = self._current_document.get_parsed_text()
         for style, content in parsed_text:
@@ -450,6 +509,7 @@ class MainFrame(wx.Frame):
                 self._append_styled_text(content, style)
         # todo Open in background eventually and disable the editor in the meanwhile.
 
+        self._main_text_field.EmptyUndoBuffer()
         self._main_text_field.Thaw()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._enable_editor()
@@ -483,10 +543,10 @@ class MainFrame(wx.Frame):
         else:
             self._current_document.set_converted(self._convert_document())
             if self._current_document.save_document():
-                # todo SetSavePoint() in stc
                 self._set_status_text(Strings.status_saved, 0)
             else:
                 self._set_status_text(Strings.status_not_saved, 0)
+        self._main_text_field.SetSavePoint()
         self._main_text_field.Thaw()
 
     def _convert_document(self) -> List:

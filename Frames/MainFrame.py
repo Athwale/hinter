@@ -1,6 +1,5 @@
 import shutil
 from pathlib import Path
-from pprint import pprint
 from typing import List
 
 import html
@@ -117,8 +116,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._redo, edit_menu_item_redo)
         self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
 
-
-        self.Bind(stc.EVT_STC_MODIFIED, self.on_modified)
+        #self.Bind(stc.EVT_STC_MODIFIED, self.on_modified)
 
         self.SetMenuBar(menubar)
 
@@ -304,6 +302,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         self._main_text_field.Undo()
+        self._main_text_field.Refresh()
 
     def _redo(self, event: wx.CommandEvent) -> None:
         """
@@ -312,6 +311,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         self._main_text_field.Redo()
+        self._main_text_field.Refresh()
 
     def _new_file(self, event: wx.CommandEvent) -> None:
         """
@@ -393,6 +393,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        # todo combining styles does not work
         start_pos = self._main_text_field.GetSelectionStart()
         style = self._main_text_field.GetStyleAt(start_pos)
         if style == self._style_map[Constants.style_bold]:
@@ -400,7 +401,7 @@ class MainFrame(wx.Frame):
                                         self._style_map[Constants.style_default])
         elif style == self._style_map[Constants.style_italic]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_italic])
+                                        self._style_map[Constants.style_bold_italic])
         elif style == self._style_map[Constants.style_bold_italic]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
                                         self._style_map[Constants.style_italic])
@@ -421,7 +422,7 @@ class MainFrame(wx.Frame):
                                         self._style_map[Constants.style_default])
         elif style == self._style_map[Constants.style_bold]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_italic])
+                                        self._style_map[Constants.style_bold_italic])
         elif style == self._style_map[Constants.style_bold_italic]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
                                         self._style_map[Constants.style_bold])
@@ -429,32 +430,27 @@ class MainFrame(wx.Frame):
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
                                         self._style_map[Constants.style_italic])
 
-    def on_modified(self, event: wx.CommandEvent):
+    def on_modified(self, event: wx._stc.StyledTextEvent) -> None:
         """
-        # todo update this.
-        Catches Scintilla modifications and handles custom undo/redo events.
+        Catches modifications and handles custom undo/redo events.
+        :param event: Used to get modification data.
+        :return: None
         """
-        mod_type = event.GetModificationType()
+        # The even contains a bit mask of what happened, we need to compare it with &.
+        mod_type: int = event.GetModificationType()
 
-        # 5. Check if the event is returning our custom container action token
         if mod_type & stc.STC_MOD_CONTAINER:
             token = event.GetToken()
             action = self.style_history.get(token)
-
             if not action:
                 return
 
             start = action['start']
             length = action['length']
-
-            # 6. Handle Undo: Revert back to the old styles
             if mod_type & stc.STC_PERFORMED_UNDO:
-                # Re-apply character by character to restore mixed formatting accurately
                 for i, old_style_byte in enumerate(action['old_styles']):
                     self._main_text_field.StartStyling(start + i)
                     self._main_text_field.SetStyling(1, old_style_byte)
-
-            # 7. Handle Redo: Re-apply the new style
             elif mod_type & stc.STC_PERFORMED_REDO:
                 self._main_text_field.StartStyling(start)
                 self._main_text_field.SetStyling(length, action['new_style_id'])

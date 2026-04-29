@@ -39,6 +39,7 @@ status_saved: str = "Saved"
 status_not_saved: str = "Not saved"
 status_ready: str = "Ready"
 status_no_document: str = "No document"
+status_doc_info: str = "Lines: {}"
 
 warn_file_not_saved: str = "Current file saved: {}"
 warn_errors: str = "Errors found in HTML:\n\n {}\nCan not continue\nAllowed text tags: <b>, <i>"

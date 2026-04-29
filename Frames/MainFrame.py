@@ -205,7 +205,6 @@ class MainFrame(wx.Frame):
         Main layout initialization.
         :return:
         """
-        # todo GetLineCount show in bar, GetTextLength, can we get word count?
         self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
         self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
@@ -285,15 +284,6 @@ class MainFrame(wx.Frame):
         """
         wx.MessageBox(error, Strings.status_warning, wx.OK | wx.ICON_WARNING)
         self._set_status_text(Strings.status_warning, 1)
-
-    def _text_changed(self, event: wx.CommandEvent) -> None:
-        """
-        Undo last change.
-        :param event: Not used.
-        :return: None
-        """
-        # todo use this
-        print(self._main_text_field.NumberOfLines)
 
     def _undo(self, event: wx.CommandEvent) -> None:
         """
@@ -393,7 +383,6 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # todo combining styles does not work
         start_pos = self._main_text_field.GetSelectionStart()
         style = self._main_text_field.GetStyleAt(start_pos)
         if style == self._style_map[Constants.style_bold]:
@@ -436,6 +425,9 @@ class MainFrame(wx.Frame):
         :param event: Used to get modification data.
         :return: None
         """
+        lines = self._main_text_field.NumberOfLines
+        self._set_status_text(Strings.status_doc_info.format(lines), 0)
+
         # The even contains a bit mask of what happened, we need to compare it with &.
         mod_type: int = event.GetModificationType()
         if not self.GetTitle().startswith('*'):
@@ -486,6 +478,7 @@ class MainFrame(wx.Frame):
         :param file_path: Document path.
         :return: None
         """
+        # todo Open in background eventually and disable the editor in the meanwhile.
         self._main_text_field.Freeze()
         self._current_document = Document(file_path)
         # todo handle exceptions from read document.
@@ -505,7 +498,6 @@ class MainFrame(wx.Frame):
                 self._main_text_field.AppendText('\n')
             else:
                 self._append_styled_text(content, style)
-        # todo Open in background eventually and disable the editor in the meanwhile.
 
         self._main_text_field.EmptyUndoBuffer()
         self._main_text_field.Thaw()
@@ -520,8 +512,6 @@ class MainFrame(wx.Frame):
         """
         # todo save in background eventually. Autosave on timer.
         # todo the current document must be effectively switched to the save as new file.
-        # todo indicate changes to file in window title.
-
         self._main_text_field.Freeze()
         if self._current_document.is_new() or save_as:
             destination = self._open_save_dialog()

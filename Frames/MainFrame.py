@@ -116,7 +116,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._redo, edit_menu_item_redo)
         self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
 
-        #self.Bind(stc.EVT_STC_MODIFIED, self.on_modified)
+        self.Bind(stc.EVT_STC_MODIFIED, self.on_modified)
 
         self.SetMenuBar(menubar)
 
@@ -438,6 +438,8 @@ class MainFrame(wx.Frame):
         """
         # The even contains a bit mask of what happened, we need to compare it with &.
         mod_type: int = event.GetModificationType()
+        if not self.GetTitle().startswith('*'):
+            self.SetTitle(f"* {self.GetTitle()}")
 
         if mod_type & stc.STC_MOD_CONTAINER:
             token = event.GetToken()
@@ -543,6 +545,7 @@ class MainFrame(wx.Frame):
             else:
                 self._set_status_text(Strings.status_not_saved, 0)
         self._main_text_field.SetSavePoint()
+        self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._main_text_field.Thaw()
 
     def _convert_document(self) -> List:

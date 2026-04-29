@@ -41,10 +41,12 @@ status_ready: str = "Ready"
 status_no_document: str = "No document"
 status_doc_info: str = "Lines: {}"
 
-warn_file_not_saved: str = "Current file saved: {}"
+warn_file_not_saved: str = "Save current file: {}?"
 warn_errors: str = "Errors found in HTML:\n\n {}\nCan not continue\nAllowed text tags: <b>, <i>"
 
 err_file_format: str = "File formatting mismatch"
+err_file_permissions: str = "Can not read file"
+err_file_permissions_save: str = "Permission error, can not save"
 
 exception_resource_not_found: str = "Resource file not found"
 

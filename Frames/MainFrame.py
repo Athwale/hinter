@@ -117,6 +117,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
 
         self.Bind(stc.EVT_STC_MODIFIED, self.on_modified)
+        self.Bind(wx.EVT_CLOSE, self._on_exit)
 
         self.SetMenuBar(menubar)
 
@@ -276,7 +277,7 @@ class MainFrame(wx.Frame):
                 return ""
             return fileDialog.GetPath()
 
-    def _show_error_dialog(self, error: str) -> None:
+    def _show_error_ok_dialog(self, error: str) -> None:
         """
         Display an error dialog with the error text. Set error state into the status bar.
         :param error: The error to display in the dialog.
@@ -284,6 +285,17 @@ class MainFrame(wx.Frame):
         """
         wx.MessageBox(error, Strings.status_warning, wx.OK | wx.ICON_WARNING)
         self._set_status_text(Strings.status_warning, 1)
+
+    def _show_yes_no_dialog(self, message: str) -> bool:
+        """
+        Display a dialog with message and yes/no buttons.
+        :param message: The message to display in the dialog.
+        :return: User choice. True if yes.
+        """
+        dialog = wx.MessageDialog(self, message, Strings.status_warning, wx.YES_NO | wx.ICON_ASTERISK)
+        if dialog.ShowModal() == wx.ID_YES:
+            return True
+        return False
 
     def _undo(self, event: wx.CommandEvent) -> None:
         """
@@ -310,8 +322,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         if self._current_document:
-            self._show_error_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name))
-            self._save_file()
+            self._emergency_save()
 
         location = self._open_save_dialog()
         if location:
@@ -321,9 +332,6 @@ class MainFrame(wx.Frame):
                 location = f"{location}.html"
             shutil.copy(Path(Fetch.get_resource_path('template.html')), location)
             self._load_document(Path(location))
-        else:
-            # todo new file dialog canceled anything to do here?`
-            pass
 
     def _clear_editor(self) -> None:
         """
@@ -339,8 +347,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         if self._current_document:
-            self._show_error_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name))
-            self._save_file()
+            self._emergency_save()
 
         dialog = wx.FileDialog(self, Strings.dialog_open, "", "", Constants.html_wildcard,
                                wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
@@ -481,14 +488,17 @@ class MainFrame(wx.Frame):
         # todo Open in background eventually and disable the editor in the meanwhile.
         self._main_text_field.Freeze()
         self._current_document = Document(file_path)
-        # todo handle exceptions from read document.
-        self._current_document.read_document()
+        try:
+            self._current_document.read_document()
+        except PermissionError as _:
+            self._show_error_ok_dialog(Strings.err_file_permissions)
+            return
         errors = self._current_document.get_errors()
         if errors:
             formatted = ''
             for e in errors:
                 formatted += f"{e}\n"
-            self._show_error_dialog(Strings.warn_errors.format(formatted))
+            self._show_error_ok_dialog(Strings.warn_errors.format(formatted))
             return
 
         self._set_status_text(self._current_document.get_path().name, 1)
@@ -511,32 +521,32 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo save in background eventually. Autosave on timer.
-        # todo the current document must be effectively switched to the save as new file.
+        # todo metadata raw text editor/parser-checker?
         self._main_text_field.Freeze()
+        destination = self._current_document.get_path()
         if self._current_document.is_new() or save_as:
             destination = self._open_save_dialog()
-            if destination:
-                self._current_document.set_path(Path(destination))
-                # todo test odd corner cases.
-                self._current_document.set_converted(self._convert_document())
+
+        if destination:
+            self._current_document.set_path(Path(destination))
+            self._current_document.set_converted(self._convert_document())
+            try:
                 if self._current_document.save_document():
                     self._set_status_text(Strings.status_saved, 0)
                     self._set_status_text(self._current_document.get_path().name, 1)
+                    self._main_text_field.SetSavePoint()
+                    self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
+                    self._main_text_field.Thaw()
                 else:
                     self._set_status_text(Strings.status_not_saved, 0)
-            else:
-                # Canceled dialog.
+            except PermissionError as _:
+                self._show_error_ok_dialog(Strings.err_file_permissions_save)
                 self._set_status_text(Strings.status_not_saved, 0)
-                return
         else:
-            self._current_document.set_converted(self._convert_document())
-            if self._current_document.save_document():
-                self._set_status_text(Strings.status_saved, 0)
-            else:
-                self._set_status_text(Strings.status_not_saved, 0)
-        self._main_text_field.SetSavePoint()
-        self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
-        self._main_text_field.Thaw()
+            # Canceled dialog.
+            self._set_status_text(Strings.status_not_saved, 0)
+            self._main_text_field.Thaw()
+            return
 
     def _convert_document(self) -> List:
         """
@@ -589,13 +599,33 @@ class MainFrame(wx.Frame):
         """
         self._save_file(save_as=True)
 
+    def _emergency_save(self) -> None:
+        """
+        User is performing an action that could destroy the document, ask for save.
+        :return: None
+        """
+        if self._show_yes_no_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name)):
+            self._save_file()
+
     def _quit(self, _) -> None:
         """
         Quit the program.
         :param _: Unused
         :return: None
         """
+        if self._current_document:
+            self._emergency_save()
         self.Close()
+
+    def _on_exit(self, event: wx.CommandEvent) -> None:
+        """
+        Closing the window with X.
+        :param event: Not used.
+        :return: None
+        """
+        if self._current_document:
+            self._emergency_save()
+        self.Destroy()
 
     def _about(self, event: wx.CommandEvent) -> None:
         """

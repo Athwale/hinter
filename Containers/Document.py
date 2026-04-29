@@ -88,7 +88,6 @@ class Document:
         :raises PermissionError if file is not accessible
         :raises FormatError if formatting marks are not evenly matched.
         """
-        # todo handle exceptions.
         self._errors = []
         try:
             if self._path.exists() and self._path.is_file():
@@ -135,7 +134,6 @@ class Document:
     def save_document(self) -> bool:
         """
         Create a new HTML from the document.
-        # TODO test exceptions.
         :return: True if saved successfully.
         """
         # Create a new html file to fill up from the template.
@@ -177,6 +175,7 @@ class Document:
                 with open(self._path, "w", encoding="utf-8") as f:
                     f.write(str(soup))
                     return True
+            return False
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 

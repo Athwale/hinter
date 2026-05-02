@@ -186,7 +186,63 @@ class MainFrame(wx.Frame):
         self._main_text_field.StyleSetSpec(2, Constants.style_italic)
         self._main_text_field.StyleSetSpec(3, Constants.style_bold_italic)
 
-        # todo styles for background colors.
+        # todo styles for text background colors.
+        style_number = 4
+        colors = [
+            wx.Colour(255, 0, 0),  # Red
+            wx.Colour(0, 0, 255), # Blue
+            wx.Colour(0, 128, 0), # Green
+            wx.Colour(255, 127, 0), # Orange
+            wx.Colour(128, 0, 128), # Purple
+            wx.Colour(139, 69, 19), # Brown
+            wx.Colour(255, 0, 255), # Magenta
+            wx.Colour(0, 128, 128),  # Teal
+            wx.Colour(128, 0, 0), # Maroon
+            wx.Colour(0, 0, 128), # Navy
+            wx.Colour(75, 0, 130), # Indigo
+            wx.Colour(220, 20, 60), # Crimson
+            wx.Colour(255, 140, 0), # Dark Orange
+            wx.Colour(34, 139, 34), # Forest Green
+            wx.Colour(72, 61, 139), # Dark Slate Blue
+            wx.Colour(184, 134, 11), # Dark Goldenrod
+            wx.Colour(0, 100, 0), # Dark Green
+            wx.Colour(139, 0, 139), # Dark Magenta
+            wx.Colour(205, 92, 92), # Indian Red
+            wx.Colour(210, 105, 30), # Chocolate
+            wx.Colour(178, 34, 34), # Firebrick
+            wx.Colour(199, 21, 133), # Medium Violet Red
+            wx.Colour(0, 139, 139), # Dark Cyan
+            wx.Colour(25, 25, 112), # Midnight Blue
+            wx.Colour(138, 43, 226), # Blue Violet
+            wx.Colour(85, 107, 47), # Dark Olive Green
+            wx.Colour(165, 42, 42), # Brown (darker)
+            wx.Colour(218, 112, 214), # Orchid
+            wx.Colour(160, 82, 45), # Sienna
+            wx.Colour(106, 90, 205), # Slate Blue
+            wx.Colour(255, 20, 147), # Deep Pink
+            wx.Colour(70, 130, 180), # Steel Blue
+            wx.Colour(188, 143, 143), # Rosy Brown
+            wx.Colour(107, 142, 35), # Olive Drab
+            wx.Colour(153, 50, 204), # Dark Orchid
+            wx.Colour(0, 191, 255), # Deep Sky Blue
+            wx.Colour(148, 0, 211), # Dark Violet
+            wx.Colour(123, 104, 238), # Medium Slate Blue
+            wx.Colour(46, 139, 87), # Sea Green
+            wx.Colour(255, 69, 0), # Red Orange
+            wx.Colour(186, 85, 211), # Medium Orchid
+            wx.Colour(100, 149, 237), # Cornflower Blue
+            wx.Colour(30, 144, 255), # Dodger Blue
+            wx.Colour(47, 79, 79), # Dark Slate Gray
+            wx.Colour(143, 188, 143), # Dark Sea Green
+            wx.Colour(218, 165, 32), # Goldenrod
+            wx.Colour(205, 133, 63), # Peru
+            wx.Colour(65, 105, 225), # Royal Blue
+            wx.Colour(255, 105, 180), # Hot Pink
+            wx.Colour(32, 178, 170), # Light Sea Green
+        ]
+        for color in colors:
+            self._main_text_field.StyleSetBackground(style_number, color)
+            style_number += 1
 
     @staticmethod
     def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:

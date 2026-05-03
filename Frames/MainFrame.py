@@ -165,6 +165,15 @@ class MainFrame(wx.Frame):
                                                          Strings.menu_item_italic)
         self._tools.append(italic_tool)
 
+        colorize_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_APPLY, Strings.menu_item_italic,
+                                                                    self._scale_icon('colorize.svg',
+                                                                                     Constants.icon_tool_width,
+                                                                                     Constants.icon_tool_height),
+                                                                    Strings.menu_item_italic)
+        self._tools.append(colorize_tool)
+
+        self.Bind(wx.EVT_MENU, self._apply_indicator, colorize_tool)
+
         self._toolbar.Realize()
 
     def _set_styles(self) -> None:
@@ -173,11 +182,12 @@ class MainFrame(wx.Frame):
         :return: None
         """
         self._main_text_field.StyleSetFaceName(stc.STC_STYLE_DEFAULT, "Courier New")
-        self._main_text_field.StyleSetSize(stc.STC_STYLE_DEFAULT, 10)
+        self._main_text_field.StyleSetSize(stc.STC_STYLE_DEFAULT, 12)
         self._main_text_field.StyleSetForeground(stc.STC_STYLE_DEFAULT, wx.Colour(0, 0, 0))
         self._main_text_field.StyleSetBackground(stc.STC_STYLE_DEFAULT, wx.Colour(255, 255, 255))
         self._main_text_field.StyleSetBold(stc.STC_STYLE_DEFAULT, False)
         self._main_text_field.StyleSetItalic(stc.STC_STYLE_DEFAULT, False)
+
 
         # Apply style.
         self._main_text_field.StyleClearAll()
@@ -186,63 +196,43 @@ class MainFrame(wx.Frame):
         self._main_text_field.StyleSetSpec(2, Constants.style_italic)
         self._main_text_field.StyleSetSpec(3, Constants.style_bold_italic)
 
-        # todo styles for text background colors.
-        style_number = 4
-        colors = [
-            wx.Colour(255, 0, 0),  # Red
-            wx.Colour(0, 0, 255), # Blue
-            wx.Colour(0, 128, 0), # Green
-            wx.Colour(255, 127, 0), # Orange
-            wx.Colour(128, 0, 128), # Purple
-            wx.Colour(139, 69, 19), # Brown
-            wx.Colour(255, 0, 255), # Magenta
-            wx.Colour(0, 128, 128),  # Teal
-            wx.Colour(128, 0, 0), # Maroon
-            wx.Colour(0, 0, 128), # Navy
-            wx.Colour(75, 0, 130), # Indigo
-            wx.Colour(220, 20, 60), # Crimson
-            wx.Colour(255, 140, 0), # Dark Orange
-            wx.Colour(34, 139, 34), # Forest Green
-            wx.Colour(72, 61, 139), # Dark Slate Blue
-            wx.Colour(184, 134, 11), # Dark Goldenrod
-            wx.Colour(0, 100, 0), # Dark Green
-            wx.Colour(139, 0, 139), # Dark Magenta
-            wx.Colour(205, 92, 92), # Indian Red
-            wx.Colour(210, 105, 30), # Chocolate
-            wx.Colour(178, 34, 34), # Firebrick
-            wx.Colour(199, 21, 133), # Medium Violet Red
-            wx.Colour(0, 139, 139), # Dark Cyan
-            wx.Colour(25, 25, 112), # Midnight Blue
-            wx.Colour(138, 43, 226), # Blue Violet
-            wx.Colour(85, 107, 47), # Dark Olive Green
-            wx.Colour(165, 42, 42), # Brown (darker)
-            wx.Colour(218, 112, 214), # Orchid
-            wx.Colour(160, 82, 45), # Sienna
-            wx.Colour(106, 90, 205), # Slate Blue
-            wx.Colour(255, 20, 147), # Deep Pink
-            wx.Colour(70, 130, 180), # Steel Blue
-            wx.Colour(188, 143, 143), # Rosy Brown
-            wx.Colour(107, 142, 35), # Olive Drab
-            wx.Colour(153, 50, 204), # Dark Orchid
-            wx.Colour(0, 191, 255), # Deep Sky Blue
-            wx.Colour(148, 0, 211), # Dark Violet
-            wx.Colour(123, 104, 238), # Medium Slate Blue
-            wx.Colour(46, 139, 87), # Sea Green
-            wx.Colour(255, 69, 0), # Red Orange
-            wx.Colour(186, 85, 211), # Medium Orchid
-            wx.Colour(100, 149, 237), # Cornflower Blue
-            wx.Colour(30, 144, 255), # Dodger Blue
-            wx.Colour(47, 79, 79), # Dark Slate Gray
-            wx.Colour(143, 188, 143), # Dark Sea Green
-            wx.Colour(218, 165, 32), # Goldenrod
-            wx.Colour(205, 133, 63), # Peru
-            wx.Colour(65, 105, 225), # Royal Blue
-            wx.Colour(255, 105, 180), # Hot Pink
-            wx.Colour(32, 178, 170), # Light Sea Green
-        ]
-        for color in colors:
-            self._main_text_field.StyleSetBackground(style_number, color)
-            style_number += 1
+        # todo use one with wx.stc.STC_INDIC_SQUIGGLE for spellcheck
+        indicator = 0
+        alpha = {1:60, 2:150}
+        colors = {
+            1: wx.Colour(255, 0, 0), # Red
+            2: wx.Colour(0, 0, 255), # Blue
+            3: wx.Colour(0, 128, 0), # Green
+            4: wx.Colour(255, 127, 0), # Orange
+            5: wx.Colour(128, 0, 128), # Purple
+            6: wx.Colour(139, 69, 19), # Brown
+            7: wx.Colour(255, 0, 255), # Magenta
+            8: wx.Colour(0, 128, 128), # Teal
+            9: wx.Colour(93, 89, 94),
+            10: wx.Colour(50, 84, 54),
+            11: wx.Colour(0, 239, 247),
+        }
+        for a, a_val in alpha.items():
+            for c, c_val  in colors.items():
+                if (a, c) in [(1, 10)]:
+                    # Skip combinations that are not distinct enough.
+                    continue
+                self._main_text_field.IndicatorSetStyle(indicator, wx.stc.STC_INDIC_FULLBOX)
+                self._main_text_field.IndicatorSetForeground(indicator, c_val)
+                self._main_text_field.IndicatorSetAlpha(indicator, a_val)
+                self._main_text_field.IndicatorSetOutlineAlpha(indicator, a_val)
+                indicator += 1
+        for c, c_val  in colors.items():
+            if c in (9, 10):
+                continue
+            # Possibly wx.stc.STC_INDIC_COMPOSITIONTHICK
+            self._main_text_field.IndicatorSetStyle(indicator, wx.stc.STC_INDIC_TEXTFORE)
+            self._main_text_field.IndicatorSetForeground(indicator, c_val)
+            self._main_text_field.IndicatorSetAlpha(indicator, 255)
+            self._main_text_field.IndicatorSetOutlineAlpha(indicator, 255)
+            indicator += 1
+
+        print(indicator)
 
     @staticmethod
     def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:
@@ -266,7 +256,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.SetWrapMode(1)
         self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
         self._main_text_field.SetMarginMask(1, 0)
-        self._main_text_field.SetMarginWidth(1, 20)
+        self._main_text_field.SetMarginWidth(1, 30)
         self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
                                                         wx.TE_WORDWRAP)
 
@@ -411,6 +401,20 @@ class MainFrame(wx.Frame):
         if result == wx.ID_OK:
             self._clear_editor()
             self._load_document(Path(dialog.GetPath()))
+
+    def _apply_indicator(self, event: wx.CommandEvent) -> None:
+        """
+        # todo here
+        # 36 max colors.
+        :param event: Not used
+        :return: None
+        """
+        last = 0
+        for i in range(0, 255):
+            #self._main_text_field.IndicatorClearRange(0, 10)
+            self._main_text_field.SetIndicatorCurrent(i)
+            self._main_text_field.IndicatorFillRange(last, 10)
+            last = last + 11
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:
         """

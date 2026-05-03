@@ -1,9 +1,9 @@
-from typing import List
+import re
+from typing import List, Dict
 
 import bs4
 import htmlmin
 from bs4 import Tag, NavigableString
-from wx import richtext
 from pathlib import Path
 
 from Constants import Constants
@@ -24,6 +24,8 @@ class Document:
         self._path: Path = path
         self._raw_html_text: str = ""
         self._converted: List = []
+        self._words: Dict = {}
+        self._word_count: int = 0
         self._errors: List[str] = []
         self._new: bool = True
 
@@ -40,13 +42,6 @@ class Document:
         :return: A list of errors from loading the document.
         """
         return self._errors
-
-    def get_raw_text(self) -> str:
-        """
-        Return current document text.
-        :return: Current document text.
-        """
-        return self._raw_html_text
 
     def get_parsed_text(self) -> List:
         """
@@ -74,15 +69,24 @@ class Document:
 
     def set_converted(self, converted: List) -> None:
         """
-        Set new converted text representation.
+        Set new converted text representation. Call before saving with the newly converted document.
         :param converted: New list of tuples.
         :return: None
         """
         self._converted = converted
 
+    def split_words(self) -> None:
+        """
+        Split text into words and fill a dictionary with how often they show up.
+        :return: None
+        """
+        # todo here
+        words = re.split(r'\W+', text)
+        self._words
+
     def read_document(self) -> None:
         """
-        Parse document and fill internal variables and the rich text buffer.
+        Parse document and fill internal variables.
         # todo read metadata from the file too.
         :return: None
         :raises PermissionError if file is not accessible
@@ -133,7 +137,7 @@ class Document:
 
     def save_document(self) -> bool:
         """
-        Create a new HTML from the document.
+        Create a new HTML from the document. Call set_converted() first with new converted document from the gui.
         :return: True if saved successfully.
         """
         # Create a new html file to fill up from the template.

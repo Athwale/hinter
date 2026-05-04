@@ -19,7 +19,6 @@ from Resources.Fetch import Fetch
 
 # todo spell check
 # todo ai integration
-# todo ask for save on exit
 
 class MainFrame(wx.Frame):
     """
@@ -35,6 +34,7 @@ class MainFrame(wx.Frame):
 
         self._main_text_field: stc.StyledTextCtrl = None
         self._side_text_field: wx.TextCtrl = None
+        self._repetition_selector: wx.SpinCtrl = None
 
         self._current_document: Document = None
         self._status_bar: StatusBar = None
@@ -46,8 +46,10 @@ class MainFrame(wx.Frame):
                            Constants.style_italic: 2,
                            Constants.style_bold_italic: 3}
         # Used for undo.
-        self.style_history = {}
-        self.action_token = 0
+        self._style_history = {}
+        self._action_token = 0
+        self._indicator_number = 0
+        self._indicator_map = {}
 
         self._init_menu_bar()
         self._init_tool_bar()
@@ -138,49 +140,57 @@ class MainFrame(wx.Frame):
         """
         self._toolbar = self.CreateToolBar(style=wx.TB_DEFAULT_STYLE)
 
-        new_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_NEW, Strings.menu_item_new,
+        new_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_NEW, Strings.menu_item_new,
                                                               wx.ArtProvider.GetBitmap(wx.ART_NEW),
                                                               Strings.menu_item_new)
         self._tools.append(new_tool)
 
-        open_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_OPEN, Strings.menu_item_open,
+        open_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_OPEN, Strings.menu_item_open,
                                                              wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN),
                                                              Strings.menu_item_open)
         self._tools.append(open_tool)
 
-        save_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_SAVE, Strings.menu_item_save,
+        save_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_SAVE, Strings.menu_item_save,
                                                              wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE),
                                                              Strings.menu_item_save)
         self._tools.append(save_tool)
 
-        undo_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_UNDO, Strings.menu_item_undo,
+        undo_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_UNDO, Strings.menu_item_undo,
                                                              wx.ArtProvider.GetBitmap(wx.ART_UNDO),
                                                              Strings.menu_item_undo)
         self._tools.append(undo_tool)
 
-        redo_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_REDO, Strings.menu_item_redo,
+        redo_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_REDO, Strings.menu_item_redo,
                                                          wx.ArtProvider.GetBitmap(wx.ART_REDO),
                                                          Strings.menu_item_redo)
         self._tools.append(redo_tool)
 
-        bold_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_BOLD, Strings.menu_item_bold,
+        bold_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_BOLD, Strings.menu_item_bold,
                                                          self._scale_icon('bold.svg', Constants.icon_tool_width,
                                                                           Constants.icon_tool_height),
                                                          Strings.menu_item_bold)
         self._tools.append(bold_tool)
 
-        italic_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_ITALIC, Strings.menu_item_italic,
+        italic_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_ITALIC, Strings.menu_item_italic,
                                                          self._scale_icon('italic.svg', Constants.icon_tool_width,
                                                                           Constants.icon_tool_height),
                                                          Strings.menu_item_italic)
         self._tools.append(italic_tool)
 
-        colorize_tool = wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_APPLY, Strings.menu_item_italic,
+        colorize_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_APPLY, Strings.menu_item_italic,
                                                                     self._scale_icon('colorize.svg',
                                                                                      Constants.icon_tool_width,
                                                                                      Constants.icon_tool_height),
                                                                     Strings.menu_item_italic)
         self._tools.append(colorize_tool)
+
+        self._repetition_selector = wx.SpinCtrl(self._toolbar, id=wx.ID_ANY,
+                                                value=str(Constants.config_min_repetitions_default),
+                                                style=wx.SP_ARROW_KEYS,
+                                                min=Constants.config_min_repetitions,
+                                                max=Constants.config_max_repetitions,
+                                                initial=Constants.config_min_repetitions_default)
+        self._toolbar.AddControl(self._repetition_selector)
 
         self.Bind(wx.EVT_MENU, self._apply_indicator, colorize_tool)
 
@@ -207,7 +217,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.StyleSetSpec(3, Constants.style_bold_italic)
 
         # todo use one with wx.stc.STC_INDIC_SQUIGGLE for spellcheck
-        indicator = 0
+        self._indicator_number = 0
         alpha = {1:60, 2:150}
         colors = {
             1: wx.Colour(255, 0, 0), # Red
@@ -227,22 +237,20 @@ class MainFrame(wx.Frame):
                 if (a, c) in [(1, 10)]:
                     # Skip combinations that are not distinct enough.
                     continue
-                self._main_text_field.IndicatorSetStyle(indicator, wx.stc.STC_INDIC_FULLBOX)
-                self._main_text_field.IndicatorSetForeground(indicator, c_val)
-                self._main_text_field.IndicatorSetAlpha(indicator, a_val)
-                self._main_text_field.IndicatorSetOutlineAlpha(indicator, a_val)
-                indicator += 1
+                self._main_text_field.IndicatorSetStyle(self._indicator_number, wx.stc.STC_INDIC_FULLBOX)
+                self._main_text_field.IndicatorSetForeground(self._indicator_number, c_val)
+                self._main_text_field.IndicatorSetAlpha(self._indicator_number, a_val)
+                self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, a_val)
+                self._indicator_number += 1
         for c, c_val  in colors.items():
             if c in (9, 10):
                 continue
             # Possibly wx.stc.STC_INDIC_COMPOSITIONTHICK
-            self._main_text_field.IndicatorSetStyle(indicator, wx.stc.STC_INDIC_TEXTFORE)
-            self._main_text_field.IndicatorSetForeground(indicator, c_val)
-            self._main_text_field.IndicatorSetAlpha(indicator, 255)
-            self._main_text_field.IndicatorSetOutlineAlpha(indicator, 255)
-            indicator += 1
-
-        print(indicator)
+            self._main_text_field.IndicatorSetStyle(self._indicator_number, wx.stc.STC_INDIC_TEXTFORE)
+            self._main_text_field.IndicatorSetForeground(self._indicator_number, c_val)
+            self._main_text_field.IndicatorSetAlpha(self._indicator_number, 255)
+            self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, 255)
+            self._indicator_number += 1
 
     @staticmethod
     def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:
@@ -303,6 +311,7 @@ class MainFrame(wx.Frame):
         Disable all features.
         :return: None
         """
+        self._repetition_selector.Disable()
         self._main_text_field.Disable()
         for t in self._tools:
             if t.GetId() not in [wx.ID_NEW, wx.ID_OPEN]:
@@ -316,6 +325,7 @@ class MainFrame(wx.Frame):
         Enable all features of the editor.
         :return: None
         """
+        self._repetition_selector.Enable()
         self._main_text_field.Enable()
         for t in self._tools:
             self._toolbar.EnableTool(t.GetId(), True)
@@ -424,16 +434,45 @@ class MainFrame(wx.Frame):
     def _apply_indicator(self, event: wx.CommandEvent) -> None:
         """
         # todo here
-        # 36 max colors.
         :param event: Not used
         :return: None
         """
-        last = 0
-        for i in range(0, 255):
-            #self._main_text_field.IndicatorClearRange(0, 10)
-            self._main_text_field.SetIndicatorCurrent(i)
-            self._main_text_field.IndicatorFillRange(last, 10)
-            last = last + 11
+        # Saving splits the new document into words for coloring.
+        self._save_file()
+        word_counts = self._current_document.get_word_dict()
+        print(word_counts)
+        limit = self._repetition_selector.GetValue()
+        self._indicator_map.clear()
+        self._main_text_field.IndicatorClearRange(0, len(self._main_text_field.GetText()))
+
+        # todo assign indicators
+        # todo what if we have more words than indicators?
+        # todo list of default ignored words + metadata
+        # (-1, -1 when not found)
+        indicator_n = 0
+        for word, count in word_counts.items():
+            if count >= limit:
+                self._indicator_map[word] = indicator_n
+                indicator_n += 1
+                if indicator_n > self._indicator_number:
+                    # todo
+                    print('not enough indicators')
+
+        # todo it will mark a inside words instead of only a as a whole word.
+        # todo add spinner for word length
+        for word, indicator in self._indicator_map.items():
+            position = 0
+            while True:
+                found = self._main_text_field.FindText(position, len(self._main_text_field.GetText()), word)
+                print(word, found)
+                self._main_text_field.SetIndicatorCurrent(indicator)
+                self._main_text_field.IndicatorFillRange(found[0], len(word))
+                if found == (-1, -1):
+                    break
+                position = found[1]
+
+        print(self._indicator_map)
+        self._main_text_field.Refresh()
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:
         """
@@ -446,10 +485,10 @@ class MainFrame(wx.Frame):
         if length <= 0:
             return
         old_styles = [self._main_text_field.GetStyleAt(start + i) for i in range(length)]
-        self.action_token += 1
-        token = self.action_token
+        self._action_token += 1
+        token = self._action_token
 
-        self.style_history[token] = {
+        self._style_history[token] = {
             'start': start,
             'length': length,
             'old_styles': old_styles,
@@ -524,7 +563,7 @@ class MainFrame(wx.Frame):
 
         if mod_type & stc.STC_MOD_CONTAINER:
             token = event.GetToken()
-            action = self.style_history.get(token)
+            action = self._style_history.get(token)
             if not action:
                 return
 

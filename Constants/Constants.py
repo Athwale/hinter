@@ -19,3 +19,7 @@ words_dialog_width: int = 400
 words_dialog_height: int = 900
 
 html_wildcard: str = "HTML files (*.html)|*.html"
+
+config_min_repetitions: int = 2
+config_min_repetitions_default: int = 3
+config_max_repetitions: int = 100

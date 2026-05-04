@@ -1,4 +1,5 @@
 import re
+from pprint import pprint
 from typing import List, Dict
 
 import bs4
@@ -98,18 +99,13 @@ class Document:
         :param plain_text: Plain text from stc.
         :return: None
         """
-        # todo here
         self._plain_text = plain_text.lower()
         words = self._word_matcher.findall(self._plain_text)
         self._word_count = len(words)
         words_set = set(words)
 
         for w in words_set:
-            # todo ignore some words, have a limit where words are too repeated.
-            self._words[w] = self._plain_text.count(w)
-
-        # todo dialog with a sorted list.
-        print(self._words)
+            self._words[w] = words.count(w)
 
     def read_document(self) -> None:
         """

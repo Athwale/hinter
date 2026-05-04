@@ -25,8 +25,10 @@ class WordInfoDialog(wx.Dialog):
         self._close_button = wx.Button(self, wx.ID_OK, Strings.button_close)
         self._close_button.SetDefault()
 
-        # todo here
-        self._html_window.SetPage(str(words))
+        content = ''
+        for s, n in {k: v for k, v in sorted(words.items(), key=lambda item: item[1], reverse=True)}.items():
+            content += f'{s} -> {n}<br>'
+        self._html_window.SetPage(content)
 
         self._main_vertical_sizer.Add(self._html_window, 1, flag=wx.EXPAND)
         self._main_vertical_sizer.Add(self._close_button, flag=wx.EXPAND)

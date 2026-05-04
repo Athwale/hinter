@@ -26,8 +26,11 @@ class Document:
         self._converted: List = []
         self._words: Dict = {}
         self._word_count: int = 0
+        self._plain_text: str = ''
         self._errors: List[str] = []
         self._new: bool = True
+
+        self._word_matcher = re.compile(r"(\w[\w']*\w|\w)")
 
     def get_path(self) -> Path:
         """
@@ -45,10 +48,24 @@ class Document:
 
     def get_parsed_text(self) -> List:
         """
-        Return the parsed text prepared for richtextctrl.
-        :return: The parsed text prepared for richtextctrl.
+        Return the parsed text prepared for loading into giu.
+        :return: The parsed text prepared for loading into gui.
         """
         return self._converted
+
+    def get_word_count(self) -> int:
+        """
+        Return the number of words in last saved text.
+        :return: the number of words in last saved text.
+        """
+        return self._word_count
+
+    def get_word_dict(self) -> Dict[str, int]:
+        """
+        Return a dictionary of unique words and their counts.
+        :return: a dictionary of unique words and their counts.
+        """
+        return self._words
 
     def is_new(self) -> bool:
         """
@@ -75,14 +92,24 @@ class Document:
         """
         self._converted = converted
 
-    def split_words(self) -> None:
+    def split_words(self, plain_text: str) -> None:
         """
         Split text into words and fill a dictionary with how often they show up.
+        :param plain_text: Plain text from stc.
         :return: None
         """
         # todo here
-        words = re.split(r'\W+', text)
-        self._words
+        self._plain_text = plain_text.lower()
+        words = self._word_matcher.findall(self._plain_text)
+        self._word_count = len(words)
+        words_set = set(words)
+
+        for w in words_set:
+            # todo ignore some words, have a limit where words are too repeated.
+            self._words[w] = self._plain_text.count(w)
+
+        # todo dialog with a sorted list.
+        print(self._words)
 
     def read_document(self) -> None:
         """

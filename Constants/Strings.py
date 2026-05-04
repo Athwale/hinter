@@ -24,6 +24,10 @@ menu_item_italic_hint: str = "Make text italic"
 menu_item_clear: str = "Clear styles"
 menu_item_clear_hint: str = "Clear styles"
 
+menu_tools: str = "&Tools"
+menu_item_word_list: str = "Word list"
+menu_item_word_list_hint: str = "Word list"
+
 menu_about: str = "&About"
 menu_item_about: str = "About..."
 menu_item_about_hint: str = "About editor"
@@ -31,6 +35,7 @@ menu_item_about_hint: str = "About editor"
 dialog_save: str = "Save file"
 dialog_open: str = "Open file"
 dialog_about: str = "About"
+dialog_words_info: str = "Word counts"
 
 button_close: str = "Close"
 
@@ -39,7 +44,7 @@ status_saved: str = "Saved"
 status_not_saved: str = "Not saved"
 status_ready: str = "Ready"
 status_no_document: str = "No document"
-status_doc_info: str = "Lines: {}"
+status_doc_info: str = "Lines: {}, Words: {}"
 
 warn_file_not_saved: str = "Save current file: {}?"
 warn_errors: str = "Errors found in HTML:\n\n {}\nCan not continue\nAllowed text tags: <b>, <i>"

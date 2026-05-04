@@ -1,4 +1,5 @@
 import shutil
+from asyncio import tools
 from pathlib import Path
 from typing import List
 
@@ -12,6 +13,7 @@ from Constants import Constants
 from Constants import Strings
 from Containers.Document import Document
 from Dialogs.AboutDialog import AboutDialog
+from Dialogs.WordInfoDialog import WordInfoDialog
 from Resources.Fetch import Fetch
 
 
@@ -94,6 +96,12 @@ class MainFrame(wx.Frame):
         edit_menu_item_remove_styles = edit_menu.Append(wx.ID_CLEAR, Strings.menu_item_clear, Strings.menu_item_clear_hint)
         self._menu_items.append(edit_menu_item_remove_styles)
 
+        # Tools menu:
+        tools_menu = wx.Menu()
+        tools_menu_item_words = tools_menu.Append(wx.ID_INFO, Strings.menu_item_word_list,
+                                                Strings.menu_item_word_list_hint)
+        self._menu_items.append(tools_menu_item_words)
+
         # About menu:
         about_menu = wx.Menu()
         about_menu_item_about = about_menu.Append(wx.ID_ABOUT, Strings.menu_item_about, Strings.menu_item_about_hint)
@@ -101,6 +109,7 @@ class MainFrame(wx.Frame):
 
         menubar.Append(file_menu, Strings.menu_file)
         menubar.Append(edit_menu, Strings.menu_edit)
+        menubar.Append(tools_menu, Strings.menu_tools)
         menubar.Append(about_menu, Strings.menu_about)
 
         # Bind menu item handlers.
@@ -115,6 +124,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._undo, edit_menu_item_undo)
         self.Bind(wx.EVT_MENU, self._redo, edit_menu_item_redo)
         self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
+        self.Bind(wx.EVT_MENU, self._info_word_counts, tools_menu_item_words)
 
         self.Bind(stc.EVT_STC_MODIFIED, self.on_modified)
         self.Bind(wx.EVT_CLOSE, self._on_exit)
@@ -379,6 +389,15 @@ class MainFrame(wx.Frame):
             shutil.copy(Path(Fetch.get_resource_path('template.html')), location)
             self._load_document(Path(location))
 
+    def _info_word_counts(self, event: wx.CommandEvent) -> None:
+        """
+        Show a dialog with information about word counts.
+        :param event: Not used.
+        :return: None
+        """
+        # todo here.
+        WordInfoDialog(self, self._current_document.get_word_dict())
+
     def _clear_editor(self) -> None:
         """
         Clear the gui to default state.
@@ -493,7 +512,10 @@ class MainFrame(wx.Frame):
         :return: None
         """
         lines = self._main_text_field.NumberOfLines
-        self._set_status_text(Strings.status_doc_info.format(lines), 0)
+        words = 0
+        if self._current_document:
+            words = self._current_document.get_word_count()
+        self._set_status_text(Strings.status_doc_info.format(lines, words), 0)
 
         # The even contains a bit mask of what happened, we need to compare it with &.
         mod_type: int = event.GetModificationType()
@@ -570,6 +592,7 @@ class MainFrame(wx.Frame):
                 self._append_styled_text(content, style)
 
         self._main_text_field.EmptyUndoBuffer()
+        self._current_document.split_words(self._main_text_field.GetText())
         self._main_text_field.Thaw()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._enable_editor()
@@ -596,6 +619,7 @@ class MainFrame(wx.Frame):
                     self._set_status_text(self._current_document.get_path().name, 1)
                     self._main_text_field.SetSavePoint()
                     self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
+                    self._current_document.split_words(self._main_text_field.GetText())
                     self._main_text_field.Thaw()
                 else:
                     self._set_status_text(Strings.status_not_saved, 0)

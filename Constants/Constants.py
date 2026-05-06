@@ -1,4 +1,8 @@
+from pathlib import Path
+
 from wx._core import Size
+
+config_file: Path = Path.home() / '.config' / 'w-hinter.conf'
 
 main_window_size: Size = Size(800, 600)
 default_border: int = 3
@@ -23,3 +27,9 @@ html_wildcard: str = "HTML files (*.html)|*.html"
 config_min_repetitions: int = 2
 config_min_repetitions_default: int = 3
 config_max_repetitions: int = 100
+
+config_min_len: int = 1
+config_min_len_default: int = 3
+config_max_len: int = 100
+
+static_box_font_size: int = 9

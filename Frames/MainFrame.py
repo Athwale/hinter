@@ -15,6 +15,7 @@ from Containers.Document import Document
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
 from Resources.Fetch import Fetch
+from Tools.Config import Config
 
 
 # todo spell check
@@ -29,12 +30,14 @@ class MainFrame(wx.Frame):
         """
         User interface constructor.
         """
+        # todo create config file if not exists
         super(MainFrame, self).__init__(None, title=Strings.app_title.format(Strings.status_no_document),
                                         size=Constants.main_window_size)
 
         self._main_text_field: stc.StyledTextCtrl = None
         self._side_text_field: wx.TextCtrl = None
         self._repetition_selector: wx.SpinCtrl = None
+        self._min_repeated_word_length_selector: wx.SpinCtrl = None
 
         self._current_document: Document = None
         self._status_bar: StatusBar = None
@@ -59,6 +62,12 @@ class MainFrame(wx.Frame):
         self._disable_editor()
         self._set_status_text(Strings.status_ready, 0)
         self._set_status_text(Strings.status_no_document, 1)
+
+        # Load configuration
+        self._config = Config()
+        if self._config.get_last_file() != Path():
+            # todo offer to load last file.
+            wx.CallAfter(self._on_fully_loaded)
 
     def _init_menu_bar(self) -> None:
         """
@@ -184,14 +193,6 @@ class MainFrame(wx.Frame):
                                                                     Strings.menu_item_italic)
         self._tools.append(colorize_tool)
 
-        self._repetition_selector = wx.SpinCtrl(self._toolbar, id=wx.ID_ANY,
-                                                value=str(Constants.config_min_repetitions_default),
-                                                style=wx.SP_ARROW_KEYS,
-                                                min=Constants.config_min_repetitions,
-                                                max=Constants.config_max_repetitions,
-                                                initial=Constants.config_min_repetitions_default)
-        self._toolbar.AddControl(self._repetition_selector)
-
         self.Bind(wx.EVT_MENU, self._apply_indicator, colorize_tool)
 
         self._toolbar.Realize()
@@ -270,6 +271,20 @@ class MainFrame(wx.Frame):
         Main layout initialization.
         :return:
         """
+        self._repetition_selector = wx.SpinCtrl(self, id=wx.ID_ANY,
+                                                value=str(Constants.config_min_repetitions_default),
+                                                style=wx.SP_ARROW_KEYS,
+                                                min=Constants.config_min_repetitions,
+                                                max=Constants.config_max_repetitions,
+                                                initial=Constants.config_min_repetitions_default)
+
+        self._min_repeated_word_length_selector = wx.SpinCtrl(self, id=wx.ID_ANY,
+                                                              value=str(Constants.config_min_repetitions_default),
+                                                              style=wx.SP_ARROW_KEYS,
+                                                              min=Constants.config_min_len,
+                                                              max=Constants.config_max_len,
+                                                              initial=Constants.config_min_len_default)
+
         self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
         self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
@@ -278,11 +293,27 @@ class MainFrame(wx.Frame):
         self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
                                                         wx.TE_WORDWRAP)
 
+        main_vertical_box = wx.BoxSizer(wx.VERTICAL)
         main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
+        toolbar_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
+
+        coloring_repetitions_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_coloring_box)
+        font = coloring_repetitions_box.GetStaticBox().GetFont()
+        font.SetPointSize(Constants.static_box_font_size)
+        coloring_repetitions_box.GetStaticBox().SetFont(font)
+
+        coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
+        coloring_repetitions_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM,
+                                     Constants.default_border)
+
+        toolbar_horizontal_box.Add(coloring_repetitions_box, 0, wx.LEFT | wx.RIGHT, Constants.default_border)
+
+        main_vertical_box.Add(toolbar_horizontal_box, 0)
+        main_vertical_box.Add(main_horizontal_box, 1, wx.EXPAND)
         main_horizontal_box.Add(self._main_text_field, 3, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
         main_horizontal_box.Add(self._side_text_field, 1, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT, Constants.default_border)
 
-        self.SetSizer(main_horizontal_box)
+        self.SetSizer(main_vertical_box)
 
     def _init_status_bar(self) -> None:
         """
@@ -306,12 +337,22 @@ class MainFrame(wx.Frame):
         to_set = f'| {text}'
         self._status_bar.SetStatusText(to_set, position)
 
+    def _on_fully_loaded(self) -> None:
+        """
+        Runs once the gui is loaded.
+        :return: None
+        """
+        last_file = self._config.get_last_file()
+        if self._show_yes_no_dialog(Strings.warn_load_last_file.format(last_file)):
+            self._load_document(last_file)
+
     def _disable_editor(self) -> None:
         """
         Disable all features.
         :return: None
         """
         self._repetition_selector.Disable()
+        self._min_repeated_word_length_selector.Disable()
         self._main_text_field.Disable()
         for t in self._tools:
             if t.GetId() not in [wx.ID_NEW, wx.ID_OPEN]:
@@ -326,6 +367,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         self._repetition_selector.Enable()
+        self._min_repeated_word_length_selector.Enable()
         self._main_text_field.Enable()
         for t in self._tools:
             self._toolbar.EnableTool(t.GetId(), True)
@@ -405,7 +447,6 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # todo here.
         WordInfoDialog(self, self._current_document.get_word_dict())
 
     def _clear_editor(self) -> None:
@@ -434,6 +475,7 @@ class MainFrame(wx.Frame):
     def _apply_indicator(self, event: wx.CommandEvent) -> None:
         """
         # todo here
+        # todo make the button toggle and remove markers on untoggle?
         :param event: Not used
         :return: None
         """
@@ -441,17 +483,16 @@ class MainFrame(wx.Frame):
         self._save_file()
         word_counts = self._current_document.get_word_dict()
         print(word_counts)
-        limit = self._repetition_selector.GetValue()
+        repetition_limit = self._repetition_selector.GetValue()
+        length_limit = self._min_repeated_word_length_selector.GetValue()
         self._indicator_map.clear()
         self._main_text_field.IndicatorClearRange(0, len(self._main_text_field.GetText()))
 
-        # todo assign indicators
-        # todo what if we have more words than indicators?
+        # Assign indicators
         # todo list of default ignored words + metadata
-        # (-1, -1 when not found)
         indicator_n = 0
         for word, count in word_counts.items():
-            if count >= limit:
+            if count >= repetition_limit and len(word) >= length_limit:
                 self._indicator_map[word] = indicator_n
                 indicator_n += 1
                 if indicator_n > self._indicator_number:
@@ -459,7 +500,6 @@ class MainFrame(wx.Frame):
                     print('not enough indicators')
 
         # todo it will mark a inside words instead of only a as a whole word.
-        # todo add spinner for word length
         for word, indicator in self._indicator_map.items():
             position = 0
             while True:
@@ -468,6 +508,7 @@ class MainFrame(wx.Frame):
                 self._main_text_field.SetIndicatorCurrent(indicator)
                 self._main_text_field.IndicatorFillRange(found[0], len(word))
                 if found == (-1, -1):
+                    # (-1, -1) when nothing is found.
                     break
                 position = found[1]
 
@@ -659,6 +700,8 @@ class MainFrame(wx.Frame):
                     self._main_text_field.SetSavePoint()
                     self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
                     self._current_document.split_words(self._main_text_field.GetText())
+                    self._config.set_last_file(self._current_document.get_path())
+                    self._config.save_config()
                     self._main_text_field.Thaw()
                 else:
                     self._set_status_text(Strings.status_not_saved, 0)

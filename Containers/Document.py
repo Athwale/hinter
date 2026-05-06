@@ -1,5 +1,4 @@
 import re
-from pprint import pprint
 from typing import List, Dict
 
 import bs4
@@ -25,9 +24,8 @@ class Document:
         self._path: Path = path
         self._raw_html_text: str = ""
         self._converted: List = []
-        self._words: Dict = {}
+        self._word_counts: Dict = {}
         self._word_count: int = 0
-        self._plain_text: str = ''
         self._errors: List[str] = []
         self._new: bool = True
 
@@ -66,7 +64,7 @@ class Document:
         Return a dictionary of unique words and their counts.
         :return: a dictionary of unique words and their counts.
         """
-        return self._words
+        return self._word_counts
 
     def is_new(self) -> bool:
         """
@@ -99,13 +97,18 @@ class Document:
         :param plain_text: Plain text from stc.
         :return: None
         """
-        self._plain_text = plain_text.lower()
-        words = self._word_matcher.findall(self._plain_text)
-        self._word_count = len(words)
-        words_set = set(words)
+        plain_text = plain_text.lower()
+        # todo save words with positions for marking?
+        words = self._word_matcher.findall(plain_text)
+        for w in self._word_matcher.finditer(plain_text):
+            print(w)
 
-        for w in words_set:
-            self._words[w] = words.count(w)
+        # How many words does the document have.
+        self._word_count = len(words)
+
+        for w in set(words):
+            # For each unique word, save how many there are.
+            self._word_counts[w] = words.count(w)
 
     def read_document(self) -> None:
         """

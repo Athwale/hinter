@@ -37,6 +37,8 @@ dialog_open: str = "Open file"
 dialog_about: str = "About"
 dialog_words_info: str = "Word counts"
 
+label_coloring_box: str = "Word repetitions / length"
+
 button_close: str = "Close"
 
 status_warning: str = "Warning"
@@ -48,6 +50,7 @@ status_doc_info: str = "Lines: {}, Words: {}"
 
 warn_file_not_saved: str = "Save current file: {}?"
 warn_errors: str = "Errors found in HTML:\n\n {}\nCan not continue\nAllowed text tags: <b>, <i>"
+warn_load_last_file: str = "Load previous file: {}?"
 
 err_file_format: str = "File formatting mismatch"
 err_file_permissions: str = "Can not read file"

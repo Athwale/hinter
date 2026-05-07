@@ -6,6 +6,7 @@ from typing import List
 import html
 import wx
 import wx.stc as stc
+from wx import ToolBarToolBase
 from wx._core import StatusBar, ToolBar
 from wx.svg import SVGimage
 
@@ -20,6 +21,7 @@ from Tools.Config import Config
 
 # todo spell check
 # todo ai integration
+# todo show some statisctics, how many unique words, list repetitions in a side panel, click a word to highlight all occurences
 
 class MainFrame(wx.Frame):
     """
@@ -164,6 +166,8 @@ class MainFrame(wx.Frame):
                                                              Strings.menu_item_save)
         self._tools.append(save_tool)
 
+        self._toolbar.AddSeparator()
+
         undo_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_UNDO, Strings.menu_item_undo,
                                                              wx.ArtProvider.GetBitmap(wx.ART_UNDO),
                                                              Strings.menu_item_undo)
@@ -173,6 +177,8 @@ class MainFrame(wx.Frame):
                                                          wx.ArtProvider.GetBitmap(wx.ART_REDO),
                                                          Strings.menu_item_redo)
         self._tools.append(redo_tool)
+
+        self._toolbar.AddSeparator()
 
         bold_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_BOLD, Strings.menu_item_bold,
                                                          self._scale_icon('bold.svg', Constants.icon_tool_width,
@@ -186,11 +192,17 @@ class MainFrame(wx.Frame):
                                                          Strings.menu_item_italic)
         self._tools.append(italic_tool)
 
-        colorize_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_APPLY, Strings.menu_item_italic,
-                                                                    self._scale_icon('colorize.svg',
-                                                                                     Constants.icon_tool_width,
-                                                                                     Constants.icon_tool_height),
-                                                                    Strings.menu_item_italic)
+        self._toolbar.AddSeparator()
+
+        colorize_tool: wx.ToolBarToolBase = self._toolbar.AddCheckTool(toolId=wx.ID_APPLY,
+                                                                       label=Strings.menu_item_italic,
+                                                                       bitmap1=self._scale_icon('colorize.svg',
+                                                                                        Constants.icon_tool_width,
+                                                                                        Constants.icon_tool_height),
+                                                                       bmpDisabled=self._scale_icon('colorize.svg',
+                                                                                        Constants.icon_tool_width,
+                                                                                        Constants.icon_tool_height),
+                                                                       shortHelp=Strings.menu_item_italic)
         self._tools.append(colorize_tool)
 
         self.Bind(wx.EVT_MENU, self._apply_indicator, colorize_tool)
@@ -290,6 +302,8 @@ class MainFrame(wx.Frame):
         self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
         self._main_text_field.SetMarginMask(1, 0)
         self._main_text_field.SetMarginWidth(1, 30)
+        # todo Add a list view and a statistics area.
+        # todo add search text box
         self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
                                                         wx.TE_WORDWRAP)
 
@@ -343,6 +357,8 @@ class MainFrame(wx.Frame):
         :return: None
         """
         last_file = self._config.get_last_file()
+        # todo add type to dialog.
+        # todo only offer to save on exit and load if the file was changed.
         if self._show_yes_no_dialog(Strings.warn_load_last_file.format(last_file)):
             self._load_document(last_file)
 
@@ -447,7 +463,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        WordInfoDialog(self, self._current_document.get_word_dict())
+        WordInfoDialog(self, self._current_document.get_word_marking_data()[0])
 
     def _clear_editor(self) -> None:
         """
@@ -474,45 +490,42 @@ class MainFrame(wx.Frame):
 
     def _apply_indicator(self, event: wx.CommandEvent) -> None:
         """
-        # todo here
+        # todo after saving return word count into status bar
         # todo make the button toggle and remove markers on untoggle?
         :param event: Not used
         :return: None
         """
-        # Saving splits the new document into words for coloring.
-        self._save_file()
-        word_counts = self._current_document.get_word_dict()
-        print(word_counts)
-        repetition_limit = self._repetition_selector.GetValue()
-        length_limit = self._min_repeated_word_length_selector.GetValue()
-        self._indicator_map.clear()
+        # todo Clearing does not work on untoggle?
         self._main_text_field.IndicatorClearRange(0, len(self._main_text_field.GetText()))
+        # Saving splits the new document into words for coloring.
+        colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
+        if not colorize_tool.IsToggled():
+            self._main_text_field.Refresh()
+            return
+        else:
+            self._save_file()
+            # todo list of default ignored words + metadata
+            word_counts, spans = self._current_document.get_word_marking_data()
+            repetition_limit = self._repetition_selector.GetValue()
+            length_limit = self._min_repeated_word_length_selector.GetValue()
+            self._indicator_map.clear()
 
-        # Assign indicators
-        # todo list of default ignored words + metadata
-        indicator_n = 0
-        for word, count in word_counts.items():
-            if count >= repetition_limit and len(word) >= length_limit:
-                self._indicator_map[word] = indicator_n
-                indicator_n += 1
-                if indicator_n > self._indicator_number:
-                    # todo
-                    print('not enough indicators')
+            # Assign indicators
+            indicator_n = 0
+            for word, count in word_counts.items():
+                if count >= repetition_limit and len(word) >= length_limit:
+                    self._indicator_map[word] = indicator_n
+                    indicator_n += 1
+                    if indicator_n > self._indicator_number:
+                        # todo
+                        print('not enough indicators')
 
-        # todo it will mark a inside words instead of only a as a whole word.
-        for word, indicator in self._indicator_map.items():
-            position = 0
-            while True:
-                found = self._main_text_field.FindText(position, len(self._main_text_field.GetText()), word)
-                print(word, found)
-                self._main_text_field.SetIndicatorCurrent(indicator)
-                self._main_text_field.IndicatorFillRange(found[0], len(word))
-                if found == (-1, -1):
-                    # (-1, -1) when nothing is found.
-                    break
-                position = found[1]
+            for word, indicator in self._indicator_map.items():
+                locations = [w.span() for w in spans if w.group() == word]
+                for word_span in locations:
+                    self._main_text_field.SetIndicatorCurrent(indicator)
+                    self._main_text_field.IndicatorFillRange(word_span[0], len(word))
 
-        print(self._indicator_map)
         self._main_text_field.Refresh()
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:
@@ -594,6 +607,7 @@ class MainFrame(wx.Frame):
         lines = self._main_text_field.NumberOfLines
         words = 0
         if self._current_document:
+            self._current_document.set_modified(True)
             words = self._current_document.get_word_count()
         self._set_status_text(Strings.status_doc_info.format(lines, words), 0)
 
@@ -675,6 +689,8 @@ class MainFrame(wx.Frame):
         self._current_document.split_words(self._main_text_field.GetText())
         self._main_text_field.Thaw()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
+        # on_modified will run while loading and erroneously set modified to True so we need to fix it.
+        self._current_document.set_modified(False)
         self._enable_editor()
 
     def _save_file(self, save_as: bool = False) -> None:
@@ -702,6 +718,7 @@ class MainFrame(wx.Frame):
                     self._current_document.split_words(self._main_text_field.GetText())
                     self._config.set_last_file(self._current_document.get_path())
                     self._config.save_config()
+                    self._current_document.set_modified(False)
                     self._main_text_field.Thaw()
                 else:
                     self._set_status_text(Strings.status_not_saved, 0)
@@ -770,8 +787,9 @@ class MainFrame(wx.Frame):
         User is performing an action that could destroy the document, ask for save.
         :return: None
         """
-        if self._show_yes_no_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name)):
-            self._save_file()
+        if self._current_document.is_modified():
+            if self._show_yes_no_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name)):
+                self._save_file()
 
     def _quit(self, _) -> None:
         """

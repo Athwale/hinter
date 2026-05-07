@@ -4,7 +4,7 @@ from wx._core import Size
 
 config_file: Path = Path.home() / '.config' / 'w-hinter.conf'
 
-main_window_size: Size = Size(800, 600)
+main_window_size: Size = Size(1000, 800)
 default_border: int = 3
 
 icon_tool_height: int = 16

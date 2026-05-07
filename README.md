@@ -1,4 +1,4 @@
 # hinter
-Writing gui.
+Writing helper program.
 
 Icons used: https://commons.wikimedia.org/wiki/GNOME_Desktop_icons 

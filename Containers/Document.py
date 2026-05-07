@@ -26,8 +26,10 @@ class Document:
         self._converted: List = []
         self._word_counts: Dict = {}
         self._word_count: int = 0
+        self._word_spans: List = []
         self._errors: List[str] = []
         self._new: bool = True
+        self._is_modified = False
 
         self._word_matcher = re.compile(r"(\w[\w']*\w|\w)")
 
@@ -59,12 +61,12 @@ class Document:
         """
         return self._word_count
 
-    def get_word_dict(self) -> Dict[str, int]:
+    def get_word_marking_data(self) -> tuple[Dict[str, int], List]:
         """
         Return a dictionary of unique words and their counts.
         :return: a dictionary of unique words and their counts.
         """
-        return self._word_counts
+        return self._word_counts, self._word_spans
 
     def is_new(self) -> bool:
         """
@@ -72,6 +74,13 @@ class Document:
         :return: True if this document was never saved.
         """
         return self._new
+
+    def is_modified(self) -> bool:
+        """
+        Return True if this document is modified.
+        :return: True if this document is modified.
+        """
+        return self._is_modified
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -91,6 +100,14 @@ class Document:
         """
         self._converted = converted
 
+    def set_modified(self, modified: bool) -> None:
+        """
+        Set modified state.
+        :param modified: True/False
+        :return: None
+        """
+        self._is_modified = modified
+
     def split_words(self, plain_text: str) -> None:
         """
         Split text into words and fill a dictionary with how often they show up.
@@ -98,17 +115,15 @@ class Document:
         :return: None
         """
         plain_text = plain_text.lower()
-        # todo save words with positions for marking?
-        words = self._word_matcher.findall(plain_text)
-        for w in self._word_matcher.finditer(plain_text):
-            print(w)
+        self._word_spans = list(self._word_matcher.finditer(plain_text))
 
         # How many words does the document have.
-        self._word_count = len(words)
+        self._word_count = len(self._word_spans)
+        plain_words = [word.group() for word in self._word_spans]
 
-        for w in set(words):
+        for w in set(plain_words):
             # For each unique word, save how many there are.
-            self._word_counts[w] = words.count(w)
+            self._word_counts[w] = plain_words.count(w)
 
     def read_document(self) -> None:
         """

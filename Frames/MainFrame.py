@@ -299,11 +299,13 @@ class MainFrame(wx.Frame):
 
         self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
+        self._main_text_field.SetCodePage(wx.stc.STC_CP_UTF8)
         self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
         self._main_text_field.SetMarginMask(1, 0)
         self._main_text_field.SetMarginWidth(1, 30)
         # todo Add a list view and a statistics area.
         # todo add search text box
+        # todo reset toggle buttons on load
         self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
                                                         wx.TE_WORDWRAP)
 
@@ -315,6 +317,9 @@ class MainFrame(wx.Frame):
         font = coloring_repetitions_box.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
         coloring_repetitions_box.GetStaticBox().SetFont(font)
+        # todo add min word length
+        # todo select word and context menu to set lengths?
+        # todo on change recolor
 
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
         coloring_repetitions_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM,
@@ -357,9 +362,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         last_file = self._config.get_last_file()
-        # todo add type to dialog.
-        # todo only offer to save on exit and load if the file was changed.
-        if self._show_yes_no_dialog(Strings.warn_load_last_file.format(last_file)):
+        if self._show_yes_no_dialog(Strings.warn_load_last_file.format(last_file), wx.ICON_QUESTION):
             self._load_document(last_file)
 
     def _disable_editor(self) -> None:
@@ -410,13 +413,13 @@ class MainFrame(wx.Frame):
         wx.MessageBox(error, Strings.status_warning, wx.OK | wx.ICON_WARNING)
         self._set_status_text(Strings.status_warning, 1)
 
-    def _show_yes_no_dialog(self, message: str) -> bool:
+    def _show_yes_no_dialog(self, message: str, kind: int) -> bool:
         """
         Display a dialog with message and yes/no buttons.
         :param message: The message to display in the dialog.
         :return: User choice. True if yes.
         """
-        dialog = wx.MessageDialog(self, message, Strings.status_warning, wx.YES_NO | wx.ICON_ASTERISK)
+        dialog = wx.MessageDialog(self, message, Strings.status_warning, wx.YES_NO | kind)
         if dialog.ShowModal() == wx.ID_YES:
             return True
         return False
@@ -491,18 +494,20 @@ class MainFrame(wx.Frame):
     def _apply_indicator(self, event: wx.CommandEvent) -> None:
         """
         # todo after saving return word count into status bar
-        # todo make the button toggle and remove markers on untoggle?
+        # todo do not mark the document modified when coloring is applied or removed
         :param event: Not used
         :return: None
         """
-        # todo Clearing does not work on untoggle?
-        self._main_text_field.IndicatorClearRange(0, len(self._main_text_field.GetText()))
-        # Saving splits the new document into words for coloring.
+        for indicator in range(0, self._indicator_number):
+            self._main_text_field.SetIndicatorCurrent(indicator)
+            self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
+
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
             self._main_text_field.Refresh()
             return
         else:
+            # Saving splits the new document into words for coloring.
             self._save_file()
             # todo list of default ignored words + metadata
             word_counts, spans = self._current_document.get_word_marking_data()
@@ -524,7 +529,7 @@ class MainFrame(wx.Frame):
                 locations = [w.span() for w in spans if w.group() == word]
                 for word_span in locations:
                     self._main_text_field.SetIndicatorCurrent(indicator)
-                    self._main_text_field.IndicatorFillRange(word_span[0], len(word))
+                    self._main_text_field.IndicatorFillRange(word_span[0], word_span[1] - word_span[0])
 
         self._main_text_field.Refresh()
 
@@ -663,6 +668,8 @@ class MainFrame(wx.Frame):
         """
         # todo Open in background eventually and disable the editor in the meanwhile.
         self._main_text_field.Freeze()
+        self._toolbar.ToggleTool(wx.ID_APPLY, False)
+        self._toolbar.Refresh()
         self._current_document = Document(file_path)
         try:
             self._current_document.read_document()
@@ -788,7 +795,8 @@ class MainFrame(wx.Frame):
         :return: None
         """
         if self._current_document.is_modified():
-            if self._show_yes_no_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name)):
+            if self._show_yes_no_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name),
+                                        wx.ICON_ASTERISK):
                 self._save_file()
 
     def _quit(self, _) -> None:

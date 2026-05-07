@@ -31,7 +31,7 @@ class Document:
         self._new: bool = True
         self._is_modified = False
 
-        self._word_matcher = re.compile(r"(\w[\w']*\w|\w)")
+        self._word_matcher = re.compile(rb"\b([A-Za-z0-9]+)\b")
 
     def get_path(self) -> Path:
         """
@@ -115,7 +115,8 @@ class Document:
         :return: None
         """
         plain_text = plain_text.lower()
-        self._word_spans = list(self._word_matcher.finditer(plain_text))
+
+        self._word_spans = list(self._word_matcher.finditer(plain_text.encode('utf-8')))
 
         # How many words does the document have.
         self._word_count = len(self._word_spans)
@@ -209,9 +210,9 @@ class Document:
                 par.append(b)
         body.append(par)
 
-        # Replace \n with <br> in the whole file.
         for element in par.descendants:
             if isinstance(element, NavigableString):
+                # Replace \n with <br> in the whole file for correct html displaying.
                 replacement = element.string.replace("\n", "<br>")
                 element.replace_with(bs4.BeautifulSoup(replacement, "html.parser"))
 

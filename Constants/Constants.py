@@ -33,3 +33,5 @@ config_min_len_default: int = 3
 config_max_len: int = 100
 
 static_box_font_size: int = 9
+
+statistics_delay: int = 3000

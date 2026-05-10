@@ -319,7 +319,7 @@ class MainFrame(wx.Frame):
         coloring_repetitions_box.GetStaticBox().SetFont(font)
         # todo add min word length
         # todo select word and context menu to set lengths?
-        # todo on change recolor
+        # todo on change ranges recolor
 
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
         coloring_repetitions_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM,
@@ -493,8 +493,6 @@ class MainFrame(wx.Frame):
 
     def _apply_indicator(self, event: wx.CommandEvent) -> None:
         """
-        # todo after saving return word count into status bar
-        # todo do not mark the document modified when coloring is applied or removed
         :param event: Not used
         :return: None
         """
@@ -603,21 +601,32 @@ class MainFrame(wx.Frame):
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
                                         self._style_map[Constants.style_italic])
 
+    def _text_statistics(self) -> None:
+        """
+        Update the status bar with text information.
+        :return: None
+        """
+        lines = self._main_text_field.NumberOfLines
+        words = len(self._main_text_field.GetText().split())
+        chars = self._main_text_field.GetLastPosition()
+        self._set_status_text(Strings.status_doc_info.format(lines, words, chars), 0)
+
     def on_modified(self, event: wx._stc.StyledTextEvent) -> None:
         """
         Catches modifications and handles custom undo/redo events.
         :param event: Used to get modification data.
         :return: None
         """
-        lines = self._main_text_field.NumberOfLines
-        words = 0
-        if self._current_document:
-            self._current_document.set_modified(True)
-            words = self._current_document.get_word_count()
-        self._set_status_text(Strings.status_doc_info.format(lines, words), 0)
-
         # The even contains a bit mask of what happened, we need to compare it with &.
         mod_type: int = event.GetModificationType()
+        if mod_type & stc.STC_MOD_CHANGEINDICATOR:
+            return
+
+        wx.CallLater(Constants.statistics_delay, self._text_statistics)
+
+        if self._current_document:
+            self._current_document.set_modified(True)
+
         if not self.GetTitle().startswith('*'):
             self.SetTitle(f"* {self.GetTitle()}")
 
@@ -699,6 +708,7 @@ class MainFrame(wx.Frame):
         # on_modified will run while loading and erroneously set modified to True so we need to fix it.
         self._current_document.set_modified(False)
         self._enable_editor()
+        wx.CallLater(Constants.statistics_delay, self._text_statistics)
 
     def _save_file(self, save_as: bool = False) -> None:
         """
@@ -737,6 +747,7 @@ class MainFrame(wx.Frame):
             self._set_status_text(Strings.status_not_saved, 0)
             self._main_text_field.Thaw()
             return
+        wx.CallLater(Constants.statistics_delay, self._text_statistics)
 
     def _convert_document(self) -> List:
         """

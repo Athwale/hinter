@@ -37,7 +37,10 @@ dialog_open: str = "Open file"
 dialog_about: str = "About"
 dialog_words_info: str = "Word counts"
 
-label_coloring_box: str = "Word repetitions / length"
+label_coloring_box_rep: str = "Min word repetitions"
+label_coloring_box_min_len: str = "Min length"
+label_coloring_box_max_len: str = "Max length"
+label_search_box: str = "Find"
 
 button_close: str = "Close"
 

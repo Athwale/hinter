@@ -40,6 +40,8 @@ class MainFrame(wx.Frame):
         self._side_text_field: wx.TextCtrl = None
         self._repetition_selector: wx.SpinCtrl = None
         self._min_repeated_word_length_selector: wx.SpinCtrl = None
+        self._max_repeated_word_length_selector: wx.SpinCtrl = None
+        self._search_text_field: wx.TextCtrl = None
 
         self._current_document: Document = None
         self._status_bar: StatusBar = None
@@ -64,6 +66,8 @@ class MainFrame(wx.Frame):
         self._disable_editor()
         self._set_status_text(Strings.status_ready, 0)
         self._set_status_text(Strings.status_no_document, 1)
+
+        self._last_found_pos = 0
 
         # Load configuration
         self._config = Config()
@@ -297,6 +301,13 @@ class MainFrame(wx.Frame):
                                                               max=Constants.config_max_len,
                                                               initial=Constants.config_min_len_default)
 
+        self._max_repeated_word_length_selector = wx.SpinCtrl(self, id=wx.ID_ANY,
+                                                              value=str(Constants.config_max_len),
+                                                              style=wx.SP_ARROW_KEYS,
+                                                              min=Constants.config_min_len,
+                                                              max=Constants.config_max_len,
+                                                              initial=Constants.config_max_len)
+
         self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
         self._main_text_field.SetCodePage(wx.stc.STC_CP_UTF8)
@@ -304,28 +315,56 @@ class MainFrame(wx.Frame):
         self._main_text_field.SetMarginMask(1, 0)
         self._main_text_field.SetMarginWidth(1, 30)
         # todo Add a list view and a statistics area.
+        #  show a list of all words sorted by repetitions and have a checkbox to enable or disable their coloring.
+        #  show words with 2 or more repetitions and their average distance in lines, on click show lines where they are.
+
         # todo add search text box
-        # todo reset toggle buttons on load
         self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
                                                         wx.TE_WORDWRAP)
+        self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self.Bind(wx.EVT_TEXT, self._search, self._search_text_field)
+        self.Bind(wx.EVT_TEXT_ENTER, self._search, self._search_text_field)
 
         main_vertical_box = wx.BoxSizer(wx.VERTICAL)
         main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
         toolbar_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
 
-        coloring_repetitions_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_coloring_box)
+        coloring_repetitions_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_coloring_box_rep)
         font = coloring_repetitions_box.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
         coloring_repetitions_box.GetStaticBox().SetFont(font)
-        # todo add min word length
+
+        coloring_len_min_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_coloring_box_min_len)
+        font = coloring_len_min_box.GetStaticBox().GetFont()
+        font.SetPointSize(Constants.static_box_font_size)
+        coloring_len_min_box.GetStaticBox().SetFont(font)
+
+        coloring_len_max_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_coloring_box_max_len)
+        font = coloring_len_max_box.GetStaticBox().GetFont()
+        font.SetPointSize(Constants.static_box_font_size)
+        coloring_len_max_box.GetStaticBox().SetFont(font)
+
+        search_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_search_box)
+        font = search_box.GetStaticBox().GetFont()
+        font.SetPointSize(Constants.static_box_font_size)
+        search_box.GetStaticBox().SetFont(font)
+
         # todo select word and context menu to set lengths?
-        # todo on change ranges recolor
 
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
-        coloring_repetitions_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM,
+
+        coloring_len_min_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT,
                                      Constants.default_border)
 
+        coloring_len_max_box.Add(self._max_repeated_word_length_selector, 0, wx.LEFT,
+                                 Constants.default_border)
+
+        search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
+
         toolbar_horizontal_box.Add(coloring_repetitions_box, 0, wx.LEFT | wx.RIGHT, Constants.default_border)
+        toolbar_horizontal_box.Add(coloring_len_min_box, 0, wx.LEFT, Constants.default_border)
+        toolbar_horizontal_box.Add(coloring_len_max_box, 0, wx.LEFT, Constants.default_border)
+        toolbar_horizontal_box.Add(search_box, 0, wx.LEFT, Constants.default_border)
 
         main_vertical_box.Add(toolbar_horizontal_box, 0)
         main_vertical_box.Add(main_horizontal_box, 1, wx.EXPAND)
@@ -345,6 +384,7 @@ class MainFrame(wx.Frame):
         # Initialize status bar
         self._set_status_text('', 0)
         self._set_status_text('', 1)
+    # ------------------------------------------------------------------------------------------------------------------
 
     def _set_status_text(self, text: str, position=0) -> None:
         """
@@ -372,6 +412,7 @@ class MainFrame(wx.Frame):
         """
         self._repetition_selector.Disable()
         self._min_repeated_word_length_selector.Disable()
+        self._max_repeated_word_length_selector.Disable()
         self._main_text_field.Disable()
         for t in self._tools:
             if t.GetId() not in [wx.ID_NEW, wx.ID_OPEN]:
@@ -387,6 +428,7 @@ class MainFrame(wx.Frame):
         """
         self._repetition_selector.Enable()
         self._min_repeated_word_length_selector.Enable()
+        self._max_repeated_word_length_selector.Enable()
         self._main_text_field.Enable()
         for t in self._tools:
             self._toolbar.EnableTool(t.GetId(), True)
@@ -423,6 +465,21 @@ class MainFrame(wx.Frame):
         if dialog.ShowModal() == wx.ID_YES:
             return True
         return False
+
+    def _search(self, event: wx.CommandEvent) -> None:
+        """
+        Undo last change.
+        :param event: Not used.
+        :return: None
+        """
+        # todo copy focus to search on ctrl-f from WB
+        # todo wrap around and clear when text ctrl is cleared, clear on load.
+        # todo arrows and show how many matches and where we are?
+        word = self._main_text_field.FindText(self._last_found_pos, self._main_text_field.GetTextLength(),
+                                       self._search_text_field.GetValue())
+        print(word)
+        self._main_text_field.SetSelection(word[0], word[1])
+        self._last_found_pos = word[1]
 
     def _undo(self, event: wx.CommandEvent) -> None:
         """
@@ -496,6 +553,7 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
+        # todo if active and spinners change, recolor.
         for indicator in range(0, self._indicator_number):
             self._main_text_field.SetIndicatorCurrent(indicator)
             self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
@@ -510,13 +568,14 @@ class MainFrame(wx.Frame):
             # todo list of default ignored words + metadata
             word_counts, spans = self._current_document.get_word_marking_data()
             repetition_limit = self._repetition_selector.GetValue()
-            length_limit = self._min_repeated_word_length_selector.GetValue()
+            length_min_limit = self._min_repeated_word_length_selector.GetValue()
+            length_max_limit = self._max_repeated_word_length_selector.GetValue()
             self._indicator_map.clear()
 
             # Assign indicators
             indicator_n = 0
             for word, count in word_counts.items():
-                if count >= repetition_limit and len(word) >= length_limit:
+                if count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
                     self._indicator_map[word] = indicator_n
                     indicator_n += 1
                     if indicator_n > self._indicator_number:

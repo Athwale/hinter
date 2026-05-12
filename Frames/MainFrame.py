@@ -21,7 +21,6 @@ from Tools.Config import Config
 
 # todo spell check
 # todo ai integration
-# todo statistics may be too slow on 200 page documents.
 
 class MainFrame(wx.Frame):
     """
@@ -211,7 +210,7 @@ class MainFrame(wx.Frame):
                                                                        shortHelp=Strings.menu_item_italic)
         self._tools.append(colorize_tool)
 
-        self.Bind(wx.EVT_MENU, self._apply_indicator, colorize_tool)
+        self.Bind(wx.EVT_MENU, self._apply_indicators, colorize_tool)
 
         self._toolbar.Realize()
 
@@ -310,6 +309,11 @@ class MainFrame(wx.Frame):
                                                               max=Constants.config_max_len,
                                                               initial=Constants.config_max_len)
 
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector, self._repetition_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector, self._min_repeated_word_length_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector, self._main_text_field)
+
+
         self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
         self._main_text_field.SetCodePage(wx.stc.STC_CP_UTF8)
@@ -357,11 +361,11 @@ class MainFrame(wx.Frame):
         font.SetPointSize(Constants.static_box_font_size)
         coloring_len_max_box.GetStaticBox().SetFont(font)
 
-        self._search_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_search_box)
-        self._search_box.SetMinSize(width=350, height=-1)
-        font = self._search_box.GetStaticBox().GetFont()
+        search_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_search_box)
+        search_box.SetMinSize(width=350, height=-1)
+        font = search_box.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
-        self._search_box.GetStaticBox().SetFont(font)
+        search_box.GetStaticBox().SetFont(font)
 
         # todo select word and context menu to set lengths?
 
@@ -373,15 +377,15 @@ class MainFrame(wx.Frame):
         coloring_len_max_box.Add(self._max_repeated_word_length_selector, 0, wx.LEFT,
                                  Constants.default_border)
 
-        self._search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
-        self._search_box.Add(self._search_button_up, 0, wx.LEFT, Constants.default_border)
-        self._search_box.Add(self._search_button_down, 0, wx.LEFT, Constants.default_border)
-        self._search_box.Add(self._search_results, 0, wx.LEFT | wx.CENTER, Constants.default_border)
+        search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
+        search_box.Add(self._search_button_up, 0, wx.LEFT, Constants.default_border)
+        search_box.Add(self._search_button_down, 0, wx.LEFT, Constants.default_border)
+        search_box.Add(self._search_results, 0, wx.LEFT | wx.CENTER, Constants.default_border)
 
         toolbar_horizontal_box.Add(coloring_repetitions_box, 0, wx.LEFT | wx.RIGHT, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_min_box, 0, wx.LEFT, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_max_box, 0, wx.LEFT, Constants.default_border)
-        toolbar_horizontal_box.Add(self._search_box, 0, wx.LEFT, Constants.default_border)
+        toolbar_horizontal_box.Add(search_box, 0, wx.LEFT, Constants.default_border)
 
         main_vertical_box.Add(toolbar_horizontal_box, 0)
         main_vertical_box.Add(main_horizontal_box, 1, wx.EXPAND)
@@ -632,12 +636,12 @@ class MainFrame(wx.Frame):
             self._clear_editor()
             self._load_document(Path(dialog.GetPath()))
 
-    def _apply_indicator(self, event: wx.CommandEvent) -> None:
+    def _apply_indicators(self, event: wx.CommandEvent) -> None:
         """
+        Apply word repetition indicators into text.
         :param event: Not used
         :return: None
         """
-        # todo if active and spinners change, recolor.
         for indicator in range(0, self._indicator_number):
             self._main_text_field.SetIndicatorCurrent(indicator)
             self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
@@ -663,7 +667,7 @@ class MainFrame(wx.Frame):
                     self._indicator_map[word] = indicator_n
                     indicator_n += 1
                     if indicator_n > self._indicator_number:
-                        # todo
+                        # todo handle not enough indicators
                         print('not enough indicators')
 
             for word, indicator in self._indicator_map.items():
@@ -673,6 +677,16 @@ class MainFrame(wx.Frame):
                     self._main_text_field.IndicatorFillRange(word_span[0], word_span[1] - word_span[0])
 
         self._main_text_field.Refresh()
+
+    def _handle_marking_selector(self, event: wx.CommandEvent) -> None:
+        """
+        Handle changes to word repetition spin ctrls.
+        :param event: Not used.
+        :return: None
+        """
+        colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
+        if colorize_tool.IsToggled():
+            self._apply_indicators(event)
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:
         """
@@ -767,7 +781,7 @@ class MainFrame(wx.Frame):
 
         self._found_last_index = 0
         self._found_words.clear()
-        # todo these calls are slow on large documents, run in background.
+        # todo statistics calls are slow on large documents, run in background.
         wx.CallLater(Constants.statistics_delay, self._text_statistics)
 
         if self._current_document:
@@ -825,6 +839,10 @@ class MainFrame(wx.Frame):
         self._main_text_field.Freeze()
         self._toolbar.ToggleTool(wx.ID_APPLY, False)
         self._toolbar.Refresh()
+        # Clear search
+        self._found_last_index = 0
+        self._found_words.clear()
+        self._search_text_field.SetValue('')
         self._current_document = Document(file_path)
         try:
             self._current_document.read_document()

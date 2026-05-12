@@ -32,7 +32,6 @@ class MainFrame(wx.Frame):
         """
         User interface constructor.
         """
-        # todo create config file if not exists
         super(MainFrame, self).__init__(None, title=Strings.app_title.format(Strings.status_no_document),
                                         size=Constants.main_window_size)
 
@@ -44,6 +43,7 @@ class MainFrame(wx.Frame):
         self._search_text_field: wx.TextCtrl = None
         self._search_button_up: wx.BitmapButton = None
         self._search_button_down: wx.BitmapButton = None
+        self._search_results: wx.StaticText = None
 
         self._current_document: Document = None
         self._status_bar: StatusBar = None
@@ -69,13 +69,12 @@ class MainFrame(wx.Frame):
         self._set_status_text(Strings.status_ready, 0)
         self._set_status_text(Strings.status_no_document, 1)
 
-        self._found_words: List[tuple[int, int]] = []
+        self._found_words: List[tuple[tuple[int, int], int]] = []
         self._found_last_index = 0
 
         # Load configuration
         self._config = Config()
         if self._config.get_last_file() != Path():
-            # todo offer to load last file.
             wx.CallAfter(self._on_fully_loaded)
 
     def _init_menu_bar(self) -> None:
@@ -326,6 +325,7 @@ class MainFrame(wx.Frame):
         self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
         self._search_button_up = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_UP))
         self._search_button_down = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_DOWN))
+        self._search_results = wx.StaticText(self, -1, label=Strings.label_search_results.format(0, 0))
 
         self.Bind(wx.EVT_BUTTON, self._search_up, self._search_button_up)
         self.Bind(wx.EVT_BUTTON, self._search_down, self._search_button_down)
@@ -357,10 +357,11 @@ class MainFrame(wx.Frame):
         font.SetPointSize(Constants.static_box_font_size)
         coloring_len_max_box.GetStaticBox().SetFont(font)
 
-        search_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_search_box)
-        font = search_box.GetStaticBox().GetFont()
+        self._search_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_search_box)
+        self._search_box.SetMinSize(width=350, height=-1)
+        font = self._search_box.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
-        search_box.GetStaticBox().SetFont(font)
+        self._search_box.GetStaticBox().SetFont(font)
 
         # todo select word and context menu to set lengths?
 
@@ -372,14 +373,15 @@ class MainFrame(wx.Frame):
         coloring_len_max_box.Add(self._max_repeated_word_length_selector, 0, wx.LEFT,
                                  Constants.default_border)
 
-        search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
-        search_box.Add(self._search_button_up, 0, wx.LEFT, Constants.default_border)
-        search_box.Add(self._search_button_down, 0, wx.LEFT, Constants.default_border)
+        self._search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
+        self._search_box.Add(self._search_button_up, 0, wx.LEFT, Constants.default_border)
+        self._search_box.Add(self._search_button_down, 0, wx.LEFT, Constants.default_border)
+        self._search_box.Add(self._search_results, 0, wx.LEFT | wx.CENTER, Constants.default_border)
 
         toolbar_horizontal_box.Add(coloring_repetitions_box, 0, wx.LEFT | wx.RIGHT, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_min_box, 0, wx.LEFT, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_max_box, 0, wx.LEFT, Constants.default_border)
-        toolbar_horizontal_box.Add(search_box, 0, wx.LEFT, Constants.default_border)
+        toolbar_horizontal_box.Add(self._search_box, 0, wx.LEFT, Constants.default_border)
 
         main_vertical_box.Add(toolbar_horizontal_box, 0)
         main_vertical_box.Add(main_horizontal_box, 1, wx.EXPAND)
@@ -495,32 +497,29 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        # todo clear when text ctrl is cleared, clear on load. Clean on text change.
-        # todo arrows and show how many matches and where we are?
-
         text = self._search_text_field.GetValue()
         if text:
             last_found_pos = 0
             found_word = (0, 0)
             self._found_words.clear()
             self._found_last_index = 0
+            counter = 1
             while found_word != (-1, -1):
                 found_word = self._main_text_field.FindText(last_found_pos, self._main_text_field.GetTextLength(),
                                            text)
                 if found_word != (-1, -1):
-                    self._found_words.append(found_word)
+                    self._found_words.append((found_word, counter))
+                    counter += 1
                 last_found_pos = found_word[1]
+            self._search_results.SetLabel(Strings.label_search_results.format(1 if self._found_words else 0, len(self._found_words)))
             if self._found_words:
-                self._main_text_field.SetSelection(self._found_words[0][0], self._found_words[0][1])
-                line = self._main_text_field.LineFromPosition(self._found_words[0][0])
+                self._main_text_field.SetSelection(self._found_words[0][0][0], self._found_words[0][0][1])
                 self._main_text_field.VerticalCentreCaret()
-                if len(self._found_words) > 1:
-                    # Skip the first already selected word on Enter.
-                    self._found_last_index = 1
         else:
             self._found_last_index = 0
             self._found_words.clear()
             self._main_text_field.SetSelection(0,0)
+            self._search_results.SetLabel(label=Strings.label_search_results.format(0, 0))
 
     def _search_enter(self, event: wx.CommandEvent) -> None:
         """
@@ -528,18 +527,21 @@ class MainFrame(wx.Frame):
         :param event: Used to detect direction.
         :return: None
         """
-        # todo the vars are cleared on modification and in that case we have to rerun normal search.
         try:
             if self._found_words:
-                self._main_text_field.SetSelection(self._found_words[self._found_last_index][0],
-                                                   self._found_words[self._found_last_index][1])
-                line = self._main_text_field.LineFromPosition(self._found_words[self._found_last_index][0])
-                self._main_text_field.VerticalCentreCaret()
                 if event.GetString() == 'up':
                     self._found_last_index -= 1
                 else:
                     self._found_last_index += 1
-
+                self._main_text_field.SetSelection(self._found_words[self._found_last_index][0][0],
+                                                   self._found_words[self._found_last_index][0][1])
+                self._main_text_field.VerticalCentreCaret()
+                self._search_results.SetLabel(Strings.label_search_results.
+                                              format(self._found_words[self._found_last_index][1] if self._found_words else 0,
+                                                     len(self._found_words)))
+            else:
+                # Restart search when the text was edited.
+                self._search(event)
         except IndexError as _:
             if event.GetString() == 'up':
                 self._found_last_index = len(self._found_words)

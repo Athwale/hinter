@@ -41,6 +41,7 @@ label_coloring_box_rep: str = "Min word repetitions"
 label_coloring_box_min_len: str = "Min length"
 label_coloring_box_max_len: str = "Max length"
 label_search_box: str = "Find"
+label_search_results: str = "Matches: {}/{}"
 
 button_close: str = "Close"
 

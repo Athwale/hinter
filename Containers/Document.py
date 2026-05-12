@@ -133,6 +133,7 @@ class Document:
         :return: None
         :raises PermissionError if file is not accessible
         :raises FormatError if formatting marks are not evenly matched.
+        :raises AttributeError if format is incorrect
         """
         self._errors = []
         try:

@@ -21,7 +21,7 @@ from Tools.Config import Config
 
 # todo spell check
 # todo ai integration
-# todo show some statisctics, how many unique words, list repetitions in a side panel, click a word to highlight all occurences
+# todo statistics may be too slow on 200 page documents.
 
 class MainFrame(wx.Frame):
     """
@@ -67,7 +67,8 @@ class MainFrame(wx.Frame):
         self._set_status_text(Strings.status_ready, 0)
         self._set_status_text(Strings.status_no_document, 1)
 
-        self._last_found_pos = 0
+        self._found_words: List[tuple[int, int]] = []
+        self._found_last_index = 0
 
         # Load configuration
         self._config = Config()
@@ -323,7 +324,12 @@ class MainFrame(wx.Frame):
                                                         wx.TE_WORDWRAP)
         self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
         self.Bind(wx.EVT_TEXT, self._search, self._search_text_field)
-        self.Bind(wx.EVT_TEXT_ENTER, self._search, self._search_text_field)
+        self.Bind(wx.EVT_TEXT_ENTER, self._search_enter, self._search_text_field)
+        # Initialize search shortcut into accelerator table
+        new_id = wx.NewId()
+        self.Bind(wx.EVT_MENU, self._focus_to_search, id=new_id)
+        accel_tbl = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('F'), new_id)])
+        self.SetAcceleratorTable(accel_tbl)
 
         main_vertical_box = wx.BoxSizer(wx.VERTICAL)
         main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
@@ -466,20 +472,63 @@ class MainFrame(wx.Frame):
             return True
         return False
 
+    def _focus_to_search(self, event: wx.CommandEvent) -> None:
+        """
+        Handles Ctrl+F shortcut to set focus into the search box.
+        :param event: Not used
+        :return: None
+        """
+        self._search_text_field.SetFocus()
+
     def _search(self, event: wx.CommandEvent) -> None:
         """
         Undo last change.
-        :param event: Not used.
+        :param event: Not used
         :return: None
         """
-        # todo copy focus to search on ctrl-f from WB
-        # todo wrap around and clear when text ctrl is cleared, clear on load.
+        # todo clear when text ctrl is cleared, clear on load. Clean on text change.
         # todo arrows and show how many matches and where we are?
-        word = self._main_text_field.FindText(self._last_found_pos, self._main_text_field.GetTextLength(),
-                                       self._search_text_field.GetValue())
-        print(word)
-        self._main_text_field.SetSelection(word[0], word[1])
-        self._last_found_pos = word[1]
+
+        text = self._search_text_field.GetValue()
+        if text:
+            last_found_pos = 0
+            found_word = (0, 0)
+            self._found_words.clear()
+            self._found_last_index = 0
+            while found_word != (-1, -1):
+                found_word = self._main_text_field.FindText(last_found_pos, self._main_text_field.GetTextLength(),
+                                           text)
+                if found_word != (-1, -1):
+                    self._found_words.append(found_word)
+                last_found_pos = found_word[1]
+            if self._found_words:
+                self._main_text_field.SetSelection(self._found_words[0][0], self._found_words[0][1])
+                line = self._main_text_field.LineFromPosition(self._found_words[0][0])
+                self._main_text_field.ScrollToLine(line)
+                if len(self._found_words) > 1:
+                    # Skip the first already selected word on Enter.
+                    self._found_last_index = 1
+        else:
+            self._found_last_index = 0
+            self._found_words.clear()
+            self._main_text_field.SetSelection(0,0)
+
+    def _search_enter(self, event: wx.CommandEvent) -> None:
+        """
+        Handle the Enter key behavior of searching and cycle through results.
+        :param event: Not used
+        :return: None
+        """
+        # todo the vars are cleared on modification and in that case we have to rerun normal search.
+        try:
+            if self._found_words:
+                self._main_text_field.SetSelection(self._found_words[self._found_last_index][0],
+                                                   self._found_words[self._found_last_index][1])
+                line = self._main_text_field.LineFromPosition(self._found_words[self._found_last_index][0])
+                self._main_text_field.ScrollToLine(line)
+                self._found_last_index += 1
+        except IndexError as _:
+            self._found_last_index = 0
 
     def _undo(self, event: wx.CommandEvent) -> None:
         """
@@ -681,6 +730,9 @@ class MainFrame(wx.Frame):
         if mod_type & stc.STC_MOD_CHANGEINDICATOR:
             return
 
+        self._found_last_index = 0
+        self._found_words.clear()
+        # todo these calls are slow on large documents, run in background.
         wx.CallLater(Constants.statistics_delay, self._text_statistics)
 
         if self._current_document:
@@ -744,6 +796,9 @@ class MainFrame(wx.Frame):
         except PermissionError as _:
             self._show_error_ok_dialog(Strings.err_file_permissions)
             return
+        except AttributeError as _:
+            self._show_error_ok_dialog(Strings.err_file_format)
+            return
         errors = self._current_document.get_errors()
         if errors:
             formatted = ''
@@ -767,6 +822,7 @@ class MainFrame(wx.Frame):
         # on_modified will run while loading and erroneously set modified to True so we need to fix it.
         self._current_document.set_modified(False)
         self._enable_editor()
+        self._main_text_field.SetFocus()
         wx.CallLater(Constants.statistics_delay, self._text_statistics)
 
     def _save_file(self, save_as: bool = False) -> None:

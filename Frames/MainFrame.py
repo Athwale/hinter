@@ -42,6 +42,8 @@ class MainFrame(wx.Frame):
         self._min_repeated_word_length_selector: wx.SpinCtrl = None
         self._max_repeated_word_length_selector: wx.SpinCtrl = None
         self._search_text_field: wx.TextCtrl = None
+        self._search_button_up: wx.BitmapButton = None
+        self._search_button_down: wx.BitmapButton = None
 
         self._current_document: Document = None
         self._status_bar: StatusBar = None
@@ -319,10 +321,15 @@ class MainFrame(wx.Frame):
         #  show a list of all words sorted by repetitions and have a checkbox to enable or disable their coloring.
         #  show words with 2 or more repetitions and their average distance in lines, on click show lines where they are.
 
-        # todo add search text box
         self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
                                                         wx.TE_WORDWRAP)
         self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self._search_button_up = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_UP))
+        self._search_button_down = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_DOWN))
+
+        self.Bind(wx.EVT_BUTTON, self._search_up, self._search_button_up)
+        self.Bind(wx.EVT_BUTTON, self._search_down, self._search_button_down)
+
         self.Bind(wx.EVT_TEXT, self._search, self._search_text_field)
         self.Bind(wx.EVT_TEXT_ENTER, self._search_enter, self._search_text_field)
         # Initialize search shortcut into accelerator table
@@ -366,6 +373,8 @@ class MainFrame(wx.Frame):
                                  Constants.default_border)
 
         search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
+        search_box.Add(self._search_button_up, 0, wx.LEFT, Constants.default_border)
+        search_box.Add(self._search_button_down, 0, wx.LEFT, Constants.default_border)
 
         toolbar_horizontal_box.Add(coloring_repetitions_box, 0, wx.LEFT | wx.RIGHT, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_min_box, 0, wx.LEFT, Constants.default_border)
@@ -504,7 +513,7 @@ class MainFrame(wx.Frame):
             if self._found_words:
                 self._main_text_field.SetSelection(self._found_words[0][0], self._found_words[0][1])
                 line = self._main_text_field.LineFromPosition(self._found_words[0][0])
-                self._main_text_field.ScrollToLine(line)
+                self._main_text_field.VerticalCentreCaret()
                 if len(self._found_words) > 1:
                     # Skip the first already selected word on Enter.
                     self._found_last_index = 1
@@ -516,7 +525,7 @@ class MainFrame(wx.Frame):
     def _search_enter(self, event: wx.CommandEvent) -> None:
         """
         Handle the Enter key behavior of searching and cycle through results.
-        :param event: Not used
+        :param event: Used to detect direction.
         :return: None
         """
         # todo the vars are cleared on modification and in that case we have to rerun normal search.
@@ -525,10 +534,34 @@ class MainFrame(wx.Frame):
                 self._main_text_field.SetSelection(self._found_words[self._found_last_index][0],
                                                    self._found_words[self._found_last_index][1])
                 line = self._main_text_field.LineFromPosition(self._found_words[self._found_last_index][0])
-                self._main_text_field.ScrollToLine(line)
-                self._found_last_index += 1
+                self._main_text_field.VerticalCentreCaret()
+                if event.GetString() == 'up':
+                    self._found_last_index -= 1
+                else:
+                    self._found_last_index += 1
+
         except IndexError as _:
-            self._found_last_index = 0
+            if event.GetString() == 'up':
+                self._found_last_index = len(self._found_words)
+            else:
+                self._found_last_index = 0
+
+    def _search_up(self, event: wx.CommandEvent) -> None:
+        """
+        Search button up handler.
+        :param event: Used to set direction.
+        :return: None
+        """
+        event.SetString('up')
+        self._search_enter(event)
+
+    def _search_down(self, event: wx.CommandEvent) -> None:
+        """
+        Search button down handler.
+        :param event: Not used.
+        :return: None
+        """
+        self._search_enter(event)
 
     def _undo(self, event: wx.CommandEvent) -> None:
         """

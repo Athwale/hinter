@@ -26,8 +26,9 @@ class WordInfoDialog(wx.Dialog):
         self._close_button.SetDefault()
 
         content = ''
-        for s, n in {k: v for k, v in sorted(words.items(), key=lambda item: item[1], reverse=True)}.items():
-            content += f'{s} -> {n}<br>'
+        for s, n in sorted(words.items(), key=lambda item: item[1], reverse=True):
+            s: bytes
+            content += f'{s.decode('utf-8')} -> {n}<br>'
         self._html_window.SetPage(content)
 
         self._main_vertical_sizer.Add(self._html_window, 1, flag=wx.EXPAND)

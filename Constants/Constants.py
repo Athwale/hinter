@@ -22,6 +22,8 @@ about_dialog_height: int = 300
 words_dialog_width: int = 400
 words_dialog_height: int = 900
 
+word_list_width: int = 220
+
 html_wildcard: str = "HTML files (*.html)|*.html"
 
 config_min_repetitions: int = 2

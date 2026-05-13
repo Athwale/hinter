@@ -42,6 +42,7 @@ label_coloring_box_min_len: str = "Min length"
 label_coloring_box_max_len: str = "Max length"
 label_search_box: str = "Find"
 label_search_results: str = "Matches: {}/{}"
+label_words: str = "Words"
 
 button_close: str = "Close"
 

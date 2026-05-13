@@ -1,6 +1,7 @@
 import shutil
 from asyncio import tools
 from pathlib import Path
+from random import choice
 from typing import List
 
 import html
@@ -35,7 +36,7 @@ class MainFrame(wx.Frame):
                                         size=Constants.main_window_size)
 
         self._main_text_field: stc.StyledTextCtrl = None
-        self._side_text_field: wx.TextCtrl = None
+        self._side_word_list: wx.CheckListBox = None
         self._repetition_selector: wx.SpinCtrl = None
         self._min_repeated_word_length_selector: wx.SpinCtrl = None
         self._max_repeated_word_length_selector: wx.SpinCtrl = None
@@ -324,8 +325,8 @@ class MainFrame(wx.Frame):
         #  show a list of all words sorted by repetitions and have a checkbox to enable or disable their coloring.
         #  show words with 2 or more repetitions and their average distance in lines, on click show lines where they are.
 
-        self._side_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE | wx.TE_RICH2 |
-                                                        wx.TE_WORDWRAP)
+        self._side_word_list = wx.CheckListBox(self, -1, size=wx.Size(Constants.word_list_width, -1), choices=[])
+
         self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
         self._search_button_up = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_UP))
         self._search_button_down = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_DOWN))
@@ -389,8 +390,8 @@ class MainFrame(wx.Frame):
 
         main_vertical_box.Add(toolbar_horizontal_box, 0)
         main_vertical_box.Add(main_horizontal_box, 1, wx.EXPAND)
-        main_horizontal_box.Add(self._main_text_field, 3, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
-        main_horizontal_box.Add(self._side_text_field, 1, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT, Constants.default_border)
+        main_horizontal_box.Add(self._main_text_field, 4, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
+        main_horizontal_box.Add(self._side_word_list, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT, Constants.default_border)
 
         self.SetSizer(main_vertical_box)
 
@@ -431,6 +432,7 @@ class MainFrame(wx.Frame):
         Disable all features.
         :return: None
         """
+        self._side_word_list.Disable()
         self._repetition_selector.Disable()
         self._min_repeated_word_length_selector.Disable()
         self._max_repeated_word_length_selector.Disable()
@@ -447,6 +449,7 @@ class MainFrame(wx.Frame):
         Enable all features of the editor.
         :return: None
         """
+        self._side_word_list.Enable()
         self._repetition_selector.Enable()
         self._min_repeated_word_length_selector.Enable()
         self._max_repeated_word_length_selector.Enable()
@@ -649,6 +652,7 @@ class MainFrame(wx.Frame):
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
             self._main_text_field.Refresh()
+            self._side_word_list.Clear()
             return
         else:
             # Saving splits the new document into words for coloring.
@@ -668,13 +672,19 @@ class MainFrame(wx.Frame):
                     indicator_n += 1
                     if indicator_n > self._indicator_number:
                         # todo handle not enough indicators
-                        print('not enough indicators')
+                        print(f'not enough indicators for: {word, count}')
 
             for word, indicator in self._indicator_map.items():
                 locations = [w.span() for w in spans if w.group() == word]
                 for word_span in locations:
                     self._main_text_field.SetIndicatorCurrent(indicator)
                     self._main_text_field.IndicatorFillRange(word_span[0], word_span[1] - word_span[0])
+
+            # Fill word list.
+            for word, count in sorted(word_counts.items(), key=lambda item: item[1], reverse=True):
+                # todo sort by count
+                word: bytes
+                self._side_word_list.Append(f'{count}: {word.decode('utf-8')}')
 
         self._main_text_field.Refresh()
 

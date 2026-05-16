@@ -672,6 +672,7 @@ class MainFrame(wx.Frame):
                     indicator_n += 1
                     if indicator_n > self._indicator_number:
                         # todo handle not enough indicators
+                        # todo with too many indicators text underline and font color is unexpectedly used.
                         print(f'not enough indicators for: {word, count}')
 
             for word, indicator in self._indicator_map.items():
@@ -682,8 +683,8 @@ class MainFrame(wx.Frame):
 
             # Fill word list.
             for word, count in sorted(word_counts.items(), key=lambda item: item[1], reverse=True):
-                # todo sort by count
                 word: bytes
+                # todo show only those above 1 occurrence?
                 self._side_word_list.Append(f'{count}: {word.decode('utf-8')}')
 
         self._main_text_field.Refresh()
@@ -853,6 +854,7 @@ class MainFrame(wx.Frame):
         self._found_last_index = 0
         self._found_words.clear()
         self._search_text_field.SetValue('')
+        self._side_word_list.Clear()
         self._current_document = Document(file_path)
         try:
             self._current_document.read_document()

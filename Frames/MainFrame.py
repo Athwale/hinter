@@ -669,6 +669,7 @@ class MainFrame(wx.Frame):
             for word, count in word_counts.items():
                 if count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
                     self._indicator_map[word] = indicator_n
+                    print(indicator_n)
                     indicator_n += 1
                     if indicator_n > self._indicator_number:
                         # todo handle not enough indicators

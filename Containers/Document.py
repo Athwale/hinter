@@ -7,6 +7,7 @@ from bs4 import Tag, NavigableString
 from pathlib import Path
 
 from Constants import Constants
+from Containers.Word import Word
 from Resources.Fetch import Fetch
 
 
@@ -24,9 +25,10 @@ class Document:
         self._path: Path = path
         self._raw_html_text: str = ""
         self._converted: List = []
-        self._word_counts: Dict = {}
         self._word_count: int = 0
-        self._word_spans: List = []
+
+        self._word_data: List[Word] = []
+
         self._errors: List[str] = []
         self._new: bool = True
         self._is_modified = False
@@ -61,12 +63,12 @@ class Document:
         """
         return self._word_count
 
-    def get_word_marking_data(self) -> tuple[Dict[str, int], List]:
+    def get_word_marking_data(self) -> List[Word]:
         """
         Return a dictionary of unique words and their counts.
         :return: a dictionary of unique words and their counts.
         """
-        return self._word_counts, self._word_spans
+        return self._word_data
 
     def is_new(self) -> bool:
         """
@@ -110,21 +112,20 @@ class Document:
 
     def split_words(self, plain_text: str) -> None:
         """
-        Split text into words and fill a dictionary with how often they show up.
+        Split text into words and fill a dictionary with Word objects containing data about every unique word.
         :param plain_text: Plain text from stc.
         :return: None
         """
+        self._word_data.clear()
         plain_text = plain_text.lower()
+        word_spans = list(self._word_matcher.finditer(plain_text.encode('utf-8')))
+        plain_words = [word.group() for word in word_spans]
 
-        self._word_spans = list(self._word_matcher.finditer(plain_text.encode('utf-8')))
+        for word in set(plain_words):
+            spans = [s for s in word_spans if s.group() == word]
+            self._word_data.append(Word(word, spans , plain_words.count(word)))
 
-        # How many words does the document have.
-        self._word_count = len(self._word_spans)
-        plain_words = [word.group() for word in self._word_spans]
-
-        for w in set(plain_words):
-            # For each unique word, save how many there are.
-            self._word_counts[w] = plain_words.count(w)
+        self._word_count = len(word_spans)
 
     def read_document(self) -> None:
         """
@@ -227,4 +228,4 @@ class Document:
             raise PermissionError(e)
 
     def __str__(self):
-     return f"Path: {self._path}\nText: {self._raw_html_text}"
+        return f"Path: {self._path}\nText: {self._raw_html_text}"

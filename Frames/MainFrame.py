@@ -1,3 +1,4 @@
+import re
 import shutil
 from asyncio import tools
 from pathlib import Path
@@ -14,6 +15,7 @@ from wx.svg import SVGimage
 from Constants import Constants
 from Constants import Strings
 from Containers.Document import Document
+from Containers.Word import Word
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
 from Resources.Fetch import Fetch
@@ -58,7 +60,6 @@ class MainFrame(wx.Frame):
         self._style_history = {}
         self._action_token = 0
         self._indicator_number = 0
-        self._indicator_map = {}
 
         self._init_menu_bar()
         self._init_tool_bar()
@@ -260,7 +261,6 @@ class MainFrame(wx.Frame):
                 self._main_text_field.IndicatorSetForeground(self._indicator_number, c_val)
                 self._main_text_field.IndicatorSetAlpha(self._indicator_number, a_val)
                 self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, a_val)
-                print(self._indicator_number, self._main_text_field.IndicatorGetStyle(self._indicator_number))
                 self._indicator_number += 1
         for c, c_val  in colors.items():
             if c in (9, 10):
@@ -270,7 +270,6 @@ class MainFrame(wx.Frame):
             self._main_text_field.IndicatorSetForeground(self._indicator_number, c_val)
             self._main_text_field.IndicatorSetAlpha(self._indicator_number, 255)
             self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, 255)
-            print(self._indicator_number, self._main_text_field.IndicatorGetStyle(self._indicator_number))
             self._indicator_number += 1
 
         # We have indicators 0-29 and can have 0-31, add two thick underlines
@@ -658,6 +657,7 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
+        # Clear before reapplying.
         for indicator in range(0, self._indicator_number):
             self._main_text_field.SetIndicatorCurrent(indicator)
             self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
@@ -671,36 +671,42 @@ class MainFrame(wx.Frame):
             # Saving splits the new document into words for coloring.
             self._save_file()
             # todo list of default ignored words + metadata
-            word_counts, spans = self._current_document.get_word_marking_data()
+            word_data: List[Word] = self._current_document.get_word_marking_data()
             repetition_limit = self._repetition_selector.GetValue()
             length_min_limit = self._min_repeated_word_length_selector.GetValue()
             length_max_limit = self._max_repeated_word_length_selector.GetValue()
-            self._indicator_map.clear()
 
             # Assign indicators
             indicator_n = 0
-            for word, count in word_counts.items():
+            for w in sorted(word_data, reverse=True):
+                word = w.get_word()
+                count = w.get_count()
+                # todo show only words that fit the spinner settings, words that are not shown must not retain indicators
+                # todo if we do not have spare indicators disable additional checkboxes
+                # todo filter the words that fit the criteria to a new list and work on that.
                 if count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
                     if indicator_n > self._indicator_number:
                         # todo handle not enough indicators
-                        print(f'not enough indicators for: {word, count, 'would set:' , indicator_n}')
+                        print(f'not enough indicators for: {word}, {count}, would set indicator: {indicator_n}')
                     else:
-                        self._indicator_map[word] = indicator_n
-                        print(f'indicators for: {word, count, 'set:' , indicator_n}')
+                        w.set_indicator(indicator_n)
                         indicator_n += 1
 
-            for word, indicator in self._indicator_map.items():
-                locations = [w.span() for w in spans if w.group() == word]
-                for word_span in locations:
-                    self._main_text_field.SetIndicatorCurrent(indicator)
-                    self._main_text_field.IndicatorFillRange(word_span[0], word_span[1] - word_span[0])
-
+            for w in word_data:
+                indicator = w.get_indicator()
+                if w.has_indicator():
+                    locations = w.get_spans()
+                    for word_span in locations:
+                        word_span: re.Match
+                        self._main_text_field.SetIndicatorCurrent(indicator)
+                        self._main_text_field.IndicatorFillRange(word_span.span()[0],
+                                                                 word_span.span()[1] - word_span.span()[0])
             # Fill word list.
-            for word, count in sorted(word_counts.items(), key=lambda item: item[1], reverse=True):
-                word: bytes
-                # todo show only those above 1 occurrence?
-                self._side_word_list.Append(f'{count}: {word.decode('utf-8')}')
-
+            for w in sorted(word_data, reverse=True):
+                item = f'{w.get_count()}: {w.get_word().decode('utf-8')}'
+                i = self._side_word_list.Append(item)
+                if w.has_indicator():
+                    self._side_word_list.Check(i, True)
         self._main_text_field.Refresh()
 
     def _handle_marking_selector(self, event: wx.CommandEvent) -> None:

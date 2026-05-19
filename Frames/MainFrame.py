@@ -260,6 +260,7 @@ class MainFrame(wx.Frame):
                 self._main_text_field.IndicatorSetForeground(self._indicator_number, c_val)
                 self._main_text_field.IndicatorSetAlpha(self._indicator_number, a_val)
                 self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, a_val)
+                print(self._indicator_number, self._main_text_field.IndicatorGetStyle(self._indicator_number))
                 self._indicator_number += 1
         for c, c_val  in colors.items():
             if c in (9, 10):
@@ -269,7 +270,19 @@ class MainFrame(wx.Frame):
             self._main_text_field.IndicatorSetForeground(self._indicator_number, c_val)
             self._main_text_field.IndicatorSetAlpha(self._indicator_number, 255)
             self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, 255)
+            print(self._indicator_number, self._main_text_field.IndicatorGetStyle(self._indicator_number))
             self._indicator_number += 1
+
+        # We have indicators 0-29 and can have 0-31, add two thick underlines
+        self._main_text_field.IndicatorSetStyle(self._indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
+        self._main_text_field.IndicatorSetForeground(self._indicator_number,  wx.Colour(255, 0, 0))
+        self._main_text_field.IndicatorSetAlpha(self._indicator_number, 255)
+        self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, 255)
+        self._indicator_number += 1
+        self._main_text_field.IndicatorSetStyle(self._indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
+        self._main_text_field.IndicatorSetForeground(self._indicator_number, wx.Colour(0, 255, 0))
+        self._main_text_field.IndicatorSetAlpha(self._indicator_number, 255)
+        self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, 255)
 
     @staticmethod
     def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:
@@ -668,13 +681,13 @@ class MainFrame(wx.Frame):
             indicator_n = 0
             for word, count in word_counts.items():
                 if count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
-                    self._indicator_map[word] = indicator_n
-                    print(indicator_n)
-                    indicator_n += 1
                     if indicator_n > self._indicator_number:
                         # todo handle not enough indicators
-                        # todo with too many indicators text underline and font color is unexpectedly used.
-                        print(f'not enough indicators for: {word, count}')
+                        print(f'not enough indicators for: {word, count, 'would set:' , indicator_n}')
+                    else:
+                        self._indicator_map[word] = indicator_n
+                        print(f'indicators for: {word, count, 'set:' , indicator_n}')
+                        indicator_n += 1
 
             for word, indicator in self._indicator_map.items():
                 locations = [w.span() for w in spans if w.group() == word]

@@ -3,7 +3,7 @@ import shutil
 from asyncio import tools
 from pathlib import Path
 from random import choice
-from typing import List
+from typing import List, Dict
 
 import html
 import wx
@@ -59,7 +59,8 @@ class MainFrame(wx.Frame):
         # Used for undo.
         self._style_history = {}
         self._action_token = 0
-        self._indicator_number = 0
+
+        self._used_indicators: Dict[int, bool] = {}
 
         self._init_menu_bar()
         self._init_tool_bar()
@@ -237,7 +238,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.StyleSetSpec(3, Constants.style_bold_italic)
 
         # todo use one with wx.stc.STC_INDIC_SQUIGGLE for spellcheck
-        self._indicator_number = 0
+        indicator_number = 0
         alpha = {1:60, 2:150}
         colors = {
             1: wx.Colour(255, 0, 0), # Red
@@ -257,31 +258,35 @@ class MainFrame(wx.Frame):
                 if (a, c) in [(1, 10)]:
                     # Skip combinations that are not distinct enough.
                     continue
-                self._main_text_field.IndicatorSetStyle(self._indicator_number, wx.stc.STC_INDIC_FULLBOX)
-                self._main_text_field.IndicatorSetForeground(self._indicator_number, c_val)
-                self._main_text_field.IndicatorSetAlpha(self._indicator_number, a_val)
-                self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, a_val)
-                self._indicator_number += 1
+                self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_FULLBOX)
+                self._main_text_field.IndicatorSetForeground(indicator_number, c_val)
+                self._main_text_field.IndicatorSetAlpha(indicator_number, a_val)
+                self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, a_val)
+                self._used_indicators[indicator_number] = False
+                indicator_number += 1
         for c, c_val  in colors.items():
             if c in (9, 10):
                 continue
             # Possibly wx.stc.STC_INDIC_COMPOSITIONTHICK
-            self._main_text_field.IndicatorSetStyle(self._indicator_number, wx.stc.STC_INDIC_TEXTFORE)
-            self._main_text_field.IndicatorSetForeground(self._indicator_number, c_val)
-            self._main_text_field.IndicatorSetAlpha(self._indicator_number, 255)
-            self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, 255)
-            self._indicator_number += 1
+            self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_TEXTFORE)
+            self._main_text_field.IndicatorSetForeground(indicator_number, c_val)
+            self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
+            self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
+            self._used_indicators[indicator_number] = False
+            indicator_number += 1
 
         # We have indicators 0-29 and can have 0-31, add two thick underlines
-        self._main_text_field.IndicatorSetStyle(self._indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
-        self._main_text_field.IndicatorSetForeground(self._indicator_number,  wx.Colour(255, 0, 0))
-        self._main_text_field.IndicatorSetAlpha(self._indicator_number, 255)
-        self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, 255)
-        self._indicator_number += 1
-        self._main_text_field.IndicatorSetStyle(self._indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
-        self._main_text_field.IndicatorSetForeground(self._indicator_number, wx.Colour(0, 255, 0))
-        self._main_text_field.IndicatorSetAlpha(self._indicator_number, 255)
-        self._main_text_field.IndicatorSetOutlineAlpha(self._indicator_number, 255)
+        self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
+        self._main_text_field.IndicatorSetForeground(indicator_number,  wx.Colour(255, 0, 0))
+        self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
+        self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
+        self._used_indicators[indicator_number] = False
+        indicator_number += 1
+        self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
+        self._main_text_field.IndicatorSetForeground(indicator_number, wx.Colour(0, 255, 0))
+        self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
+        self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
+        self._used_indicators[indicator_number] = False
 
     @staticmethod
     def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:
@@ -658,9 +663,11 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # Clear before reapplying.
-        for indicator in range(0, self._indicator_number):
+        for indicator in self._used_indicators.keys():
             self._main_text_field.SetIndicatorCurrent(indicator)
             self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
+            self._used_indicators[indicator] = False
+            self._side_word_list.Clear()
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
@@ -676,23 +683,37 @@ class MainFrame(wx.Frame):
             length_min_limit = self._min_repeated_word_length_selector.GetValue()
             length_max_limit = self._max_repeated_word_length_selector.GetValue()
 
+            selected_words = []
+
+            # todo show only words that fit the spinner settings, words that are not shown must not retain indicators
+            # todo if we do not have spare indicators disable additional checkboxes
             # Assign indicators
-            indicator_n = 0
             for w in sorted(word_data, reverse=True):
                 word = w.get_word()
                 count = w.get_count()
-                # todo show only words that fit the spinner settings, words that are not shown must not retain indicators
-                # todo if we do not have spare indicators disable additional checkboxes
-                # todo filter the words that fit the criteria to a new list and work on that.
+                # Filter the words that fit the criteria to a new list and work on that.
                 if count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
-                    if indicator_n > self._indicator_number:
-                        # todo handle not enough indicators
-                        print(f'not enough indicators for: {word}, {count}, would set indicator: {indicator_n}')
-                    else:
-                        w.set_indicator(indicator_n)
-                        indicator_n += 1
+                    selected_words.append(w)
 
-            for w in word_data:
+            for w in sorted(selected_words, reverse=True):
+                word = w.get_word()
+                count = w.get_count()
+
+                indicator_n = -1
+                # Find first unused indicator ID.
+                for i_id, state in self._used_indicators.items():
+                    if not state:
+                        indicator_n = i_id
+                        break
+
+                if indicator_n == -1:
+                    # todo handle not enough indicators
+                    print(f'not enough indicators for: {word}, {count}')
+                else:
+                    w.set_indicator(indicator_n)
+                    self._used_indicators[indicator_n] = True
+
+            for w in selected_words:
                 indicator = w.get_indicator()
                 if w.has_indicator():
                     locations = w.get_spans()
@@ -702,7 +723,7 @@ class MainFrame(wx.Frame):
                         self._main_text_field.IndicatorFillRange(word_span.span()[0],
                                                                  word_span.span()[1] - word_span.span()[0])
             # Fill word list.
-            for w in sorted(word_data, reverse=True):
+            for w in sorted(selected_words, reverse=True):
                 item = f'{w.get_count()}: {w.get_word().decode('utf-8')}'
                 i = self._side_word_list.Append(item)
                 if w.has_indicator():

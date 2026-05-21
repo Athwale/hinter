@@ -61,6 +61,7 @@ class MainFrame(wx.Frame):
         self._action_token = 0
 
         self._used_indicators: Dict[int, bool] = {}
+        self._selected_words: List[str] = []
 
         self._init_menu_bar()
         self._init_tool_bar()
@@ -354,6 +355,7 @@ class MainFrame(wx.Frame):
 
         self.Bind(wx.EVT_TEXT, self._search, self._search_text_field)
         self.Bind(wx.EVT_TEXT_ENTER, self._search_enter, self._search_text_field)
+        self.Bind(wx.EVT_CHECKLISTBOX, self._word_list_handler, self._side_word_list)
         # Initialize search shortcut into accelerator table
         new_id = wx.NewId()
         self.Bind(wx.EVT_MENU, self._focus_to_search, id=new_id)
@@ -667,12 +669,14 @@ class MainFrame(wx.Frame):
             self._main_text_field.SetIndicatorCurrent(indicator)
             self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
             self._used_indicators[indicator] = False
-            self._side_word_list.Clear()
+            if not self._selected_words:
+                self._side_word_list.Clear()
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
             self._main_text_field.Refresh()
             self._side_word_list.Clear()
+            self._selected_words.clear()
             return
         else:
             # Saving splits the new document into words for coloring.
@@ -683,19 +687,20 @@ class MainFrame(wx.Frame):
             length_min_limit = self._min_repeated_word_length_selector.GetValue()
             length_max_limit = self._max_repeated_word_length_selector.GetValue()
 
-            selected_words = []
+            all_words = []
 
-            # todo show only words that fit the spinner settings, words that are not shown must not retain indicators
             # todo if we do not have spare indicators disable additional checkboxes
-            # Assign indicators
+            # Filter the words that fit the criteria to a new list and work on that.
             for w in sorted(word_data, reverse=True):
                 word = w.get_word()
                 count = w.get_count()
-                # Filter the words that fit the criteria to a new list and work on that.
                 if count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
-                    selected_words.append(w)
+                    if word.decode('utf-8') in self._selected_words:
+                        w.set_selected(True)
+                    all_words.append(w)
 
-            for w in sorted(selected_words, reverse=True):
+            # Assign indicators to filtered words.
+            for w in sorted(all_words, reverse=True):
                 word = w.get_word()
                 count = w.get_count()
 
@@ -710,12 +715,20 @@ class MainFrame(wx.Frame):
                     # todo handle not enough indicators
                     print(f'not enough indicators for: {word}, {count}')
                 else:
-                    w.set_indicator(indicator_n)
-                    self._used_indicators[indicator_n] = True
+                    if self._selected_words:
+                        if w.is_selected():
+                            # Give indicators only to words selected in the side panel list.
+                            w.set_indicator(indicator_n)
+                            self._used_indicators[indicator_n] = True
+                    else:
+                        # The tool is running for the first time, assign indicators to everything top down.
+                        w.set_indicator(indicator_n)
+                        self._used_indicators[indicator_n] = True
 
-            for w in selected_words:
-                indicator = w.get_indicator()
+            # Display indicators.
+            for w in all_words:
                 if w.has_indicator():
+                    indicator = w.get_indicator()
                     locations = w.get_spans()
                     for word_span in locations:
                         word_span: re.Match
@@ -723,11 +736,21 @@ class MainFrame(wx.Frame):
                         self._main_text_field.IndicatorFillRange(word_span.span()[0],
                                                                  word_span.span()[1] - word_span.span()[0])
             # Fill word list.
-            for w in sorted(selected_words, reverse=True):
-                item = f'{w.get_count()}: {w.get_word().decode('utf-8')}'
-                i = self._side_word_list.Append(item)
-                if w.has_indicator():
-                    self._side_word_list.Check(i, True)
+            if not self._selected_words:
+                # Fill only once.
+                for w in sorted(all_words, reverse=True):
+                    w: Word
+                    list_item = Strings.word_list_item.format(w.get_count(), w.get_word().decode('utf-8'))
+                    i = self._side_word_list.Append(list_item)
+                    w.set_index(i)
+                    if w.has_indicator():
+                        self._side_word_list.Check(i, True)
+            else:
+                for w in sorted(all_words, reverse=True):
+                    w: Word
+                    if w.get_index() > -1:
+                        self._side_word_list.Check(w.get_index(), True)
+                    print(w, w.is_selected())
         self._main_text_field.Refresh()
 
     def _handle_marking_selector(self, event: wx.CommandEvent) -> None:
@@ -739,6 +762,20 @@ class MainFrame(wx.Frame):
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if colorize_tool.IsToggled():
             self._apply_indicators(event)
+
+    def _word_list_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Handle checkboxes in the side word list.
+        :param event: Passed along.
+        :return: None
+        """
+        # todo re-mark words, but do not reassign indicators, remove indicators from unchecked words
+        #  add indicators to newly checked.
+        self._selected_words.clear()
+        for item in self._side_word_list.GetCheckedStrings():
+            item: str
+            self._selected_words.append(item.split(' ')[1])
+        self._apply_indicators(event)
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:
         """

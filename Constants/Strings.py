@@ -44,6 +44,8 @@ label_search_box: str = "Find"
 label_search_results: str = "Matches: {}/{}"
 label_words: str = "Words"
 
+word_list_item: str = "{}x: {}"
+
 button_close: str = "Close"
 
 status_warning: str = "Warning"

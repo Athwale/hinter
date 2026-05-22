@@ -1,8 +1,6 @@
 import re
 import shutil
-from asyncio import tools
 from pathlib import Path
-from random import choice
 from typing import List, Dict
 
 import html
@@ -11,6 +9,7 @@ import wx.stc as stc
 from wx import ToolBarToolBase
 from wx._core import StatusBar, ToolBar
 from wx.svg import SVGimage
+import wx.dataview as dv
 
 from Constants import Constants
 from Constants import Strings
@@ -37,8 +36,9 @@ class MainFrame(wx.Frame):
         super(MainFrame, self).__init__(None, title=Strings.app_title.format(Strings.status_no_document),
                                         size=Constants.main_window_size)
 
+        self.SetMinSize(Constants.main_window_size)
         self._main_text_field: stc.StyledTextCtrl = None
-        self._side_word_list: wx.CheckListBox = None
+        self._side_word_list: dv.DataViewListCtrl = None
         self._repetition_selector: wx.SpinCtrl = None
         self._min_repeated_word_length_selector: wx.SpinCtrl = None
         self._max_repeated_word_length_selector: wx.SpinCtrl = None
@@ -343,7 +343,11 @@ class MainFrame(wx.Frame):
         #  show a list of all words sorted by repetitions and have a checkbox to enable or disable their coloring.
         #  show words with 2 or more repetitions and their average distance in lines, on click show lines where they are.
 
-        self._side_word_list = wx.CheckListBox(self, -1, size=wx.Size(Constants.word_list_width, -1), choices=[])
+        # Initialize word list:
+        self._side_word_list = dv.DataViewListCtrl(self, -1, size=wx.Size(Constants.word_list_width, -1), style=dv.DV_VERT_RULES)
+        self._side_word_list.AppendToggleColumn(Strings.label_selected, width=25)
+        self._side_word_list.AppendTextColumn(Strings.label_word, width=120)
+        self._side_word_list.AppendTextColumn(Strings.label_count, width=20)
 
         self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
         self._search_button_up = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_UP))
@@ -355,7 +359,7 @@ class MainFrame(wx.Frame):
 
         self.Bind(wx.EVT_TEXT, self._search, self._search_text_field)
         self.Bind(wx.EVT_TEXT_ENTER, self._search_enter, self._search_text_field)
-        self.Bind(wx.EVT_CHECKLISTBOX, self._word_list_handler, self._side_word_list)
+        self.Bind(dv.EVT_DATAVIEW_ITEM_VALUE_CHANGED, self._word_list_handler, self._side_word_list)
         # Initialize search shortcut into accelerator table
         new_id = wx.NewId()
         self.Bind(wx.EVT_MENU, self._focus_to_search, id=new_id)
@@ -633,7 +637,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        WordInfoDialog(self, self._current_document.get_word_marking_data()[0])
+        WordInfoDialog(self, self._current_document.get_word_marking_data())
 
     def _clear_editor(self) -> None:
         """
@@ -670,12 +674,13 @@ class MainFrame(wx.Frame):
             self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
             self._used_indicators[indicator] = False
             if not self._selected_words:
-                self._side_word_list.Clear()
+                # todo this does not work, it clears everything, clear just data
+                self._side_word_list.DeleteAllItems()
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
             self._main_text_field.Refresh()
-            self._side_word_list.Clear()
+            self._side_word_list.DeleteAllItems()
             self._selected_words.clear()
             return
         else:
@@ -689,7 +694,6 @@ class MainFrame(wx.Frame):
 
             all_words = []
 
-            # todo if we do not have spare indicators disable additional checkboxes
             # Filter the words that fit the criteria to a new list and work on that.
             for w in sorted(word_data, reverse=True):
                 word = w.get_word()
@@ -713,7 +717,8 @@ class MainFrame(wx.Frame):
 
                 if indicator_n == -1:
                     # todo handle not enough indicators
-                    print(f'not enough indicators for: {word}, {count}')
+                    pass
+                    #print(f'not enough indicators for: {word}, {count}')
                 else:
                     if self._selected_words:
                         if w.is_selected():
@@ -740,17 +745,16 @@ class MainFrame(wx.Frame):
                 # Fill only once.
                 for w in sorted(all_words, reverse=True):
                     w: Word
-                    list_item = Strings.word_list_item.format(w.get_count(), w.get_word().decode('utf-8'))
-                    i = self._side_word_list.Append(list_item)
-                    w.set_index(i)
-                    if w.has_indicator():
-                        self._side_word_list.Check(i, True)
+                    list_item = [True if w.has_indicator() else False,
+                                 w.get_word().decode('utf-8'),
+                                 str(w.get_count())]
+                    self._side_word_list.AppendItem(list_item)
             else:
+                # todo do not reassign indicators?
                 for w in sorted(all_words, reverse=True):
                     w: Word
-                    if w.get_index() > -1:
-                        self._side_word_list.Check(w.get_index(), True)
-                    print(w, w.is_selected())
+                    if not w.is_selected():
+                        w.set_indicator(-1)
         self._main_text_field.Refresh()
 
     def _handle_marking_selector(self, event: wx.CommandEvent) -> None:
@@ -763,19 +767,30 @@ class MainFrame(wx.Frame):
         if colorize_tool.IsToggled():
             self._apply_indicators(event)
 
-    def _word_list_handler(self, event: wx.CommandEvent) -> None:
+    def _word_list_handler(self, event: dv.DataViewEvent) -> None:
         """
         Handle checkboxes in the side word list.
+        This even fires after the checkbox has been changed.
         :param event: Passed along.
         :return: None
         """
-        # todo re-mark words, but do not reassign indicators, remove indicators from unchecked words
-        #  add indicators to newly checked.
+        # todo if we do not have spare indicators prevent clicking more checkboxes, show a warning.
+        # todo re-enable if we do have spare indicators.
+
         self._selected_words.clear()
-        for item in self._side_word_list.GetCheckedStrings():
-            item: str
-            self._selected_words.append(item.split(' ')[1])
+        for item in range(self._side_word_list.GetItemCount()):
+            checked = self._side_word_list.GetValue(item, 0)
+            word = self._side_word_list.GetValue(item, 1)
+            if checked:
+                self._selected_words.append(word)
         self._apply_indicators(event)
+        # todo switch to base ctrl and reimplement.
+        # todo can we extend the class and turn off checkboxes there?
+        # todo show how many free indicators we have somewhere.
+        spare_indicators = not all(self._used_indicators.values())
+        print(spare_indicators)
+
+        self._side_word_list.SetToggleValue(False, 0, 0)
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:
         """
@@ -932,7 +947,7 @@ class MainFrame(wx.Frame):
         self._found_last_index = 0
         self._found_words.clear()
         self._search_text_field.SetValue('')
-        self._side_word_list.Clear()
+        self._side_word_list.DeleteAllItems()
         self._current_document = Document(file_path)
         try:
             self._current_document.read_document()

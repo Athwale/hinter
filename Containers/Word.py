@@ -12,7 +12,6 @@ class Word:
         self._count = count
         self._indicator = -1
         self._selected = False
-        self._index = -1
 
     def set_selected(self, value: bool) -> None:
         """
@@ -42,20 +41,6 @@ class Word:
         :param value: The word as bytes.
         """
         self._word = value
-
-    def get_index(self) -> int:
-        """
-        Get the word index in list.
-        :return: The index in side list.
-        """
-        return self._index
-
-    def set_index(self, value: int):
-        """
-        Set the word index.
-        :param value: The word index in side list.
-        """
-        self._index = value
 
     def get_spans(self):
         """

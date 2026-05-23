@@ -5,15 +5,19 @@ from typing import List, Dict
 
 import html
 import wx
+import wx.grid
 import wx.stc as stc
 from wx import ToolBarToolBase
 from wx._core import StatusBar, ToolBar
 from wx.svg import SVGimage
 import wx.dataview as dv
+import wx.lib.scrolledpanel
 
 from Constants import Constants
 from Constants import Strings
+from Containers.ListItemPanel import ListItemPanel
 from Containers.Document import Document
+from Containers.SidePanel import SidePanel
 from Containers.Word import Word
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
@@ -38,7 +42,6 @@ class MainFrame(wx.Frame):
 
         self.SetMinSize(Constants.main_window_size)
         self._main_text_field: stc.StyledTextCtrl = None
-        self._side_word_list: dv.DataViewListCtrl = None
         self._repetition_selector: wx.SpinCtrl = None
         self._min_repeated_word_length_selector: wx.SpinCtrl = None
         self._max_repeated_word_length_selector: wx.SpinCtrl = None
@@ -60,6 +63,7 @@ class MainFrame(wx.Frame):
         self._style_history = {}
         self._action_token = 0
 
+        self._side_word_list_scroller: SidePanel = None
         self._used_indicators: Dict[int, bool] = {}
         self._selected_words: List[str] = []
 
@@ -344,10 +348,12 @@ class MainFrame(wx.Frame):
         #  show words with 2 or more repetitions and their average distance in lines, on click show lines where they are.
 
         # Initialize word list:
-        self._side_word_list = dv.DataViewListCtrl(self, -1, size=wx.Size(Constants.word_list_width, -1), style=dv.DV_VERT_RULES)
-        self._side_word_list.AppendToggleColumn(Strings.label_selected, width=25)
-        self._side_word_list.AppendTextColumn(Strings.label_word, width=120)
-        self._side_word_list.AppendTextColumn(Strings.label_count, width=20)
+        self._side_word_list_scroller = SidePanel(self)
+        side_word_border_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, Strings.label_words)
+        font = side_word_border_sizer.GetStaticBox().GetFont()
+        font.SetPointSize(Constants.static_box_font_size)
+        side_word_border_sizer.GetStaticBox().SetFont(font)
+        side_word_border_sizer.Add(self._side_word_list_scroller, 1, wx.EXPAND)
 
         self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
         self._search_button_up = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_UP))
@@ -359,7 +365,6 @@ class MainFrame(wx.Frame):
 
         self.Bind(wx.EVT_TEXT, self._search, self._search_text_field)
         self.Bind(wx.EVT_TEXT_ENTER, self._search_enter, self._search_text_field)
-        self.Bind(dv.EVT_DATAVIEW_ITEM_VALUE_CHANGED, self._word_list_handler, self._side_word_list)
         # Initialize search shortcut into accelerator table
         new_id = wx.NewId()
         self.Bind(wx.EVT_MENU, self._focus_to_search, id=new_id)
@@ -414,7 +419,7 @@ class MainFrame(wx.Frame):
         main_vertical_box.Add(toolbar_horizontal_box, 0)
         main_vertical_box.Add(main_horizontal_box, 1, wx.EXPAND)
         main_horizontal_box.Add(self._main_text_field, 4, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
-        main_horizontal_box.Add(self._side_word_list, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT, Constants.default_border)
+        main_horizontal_box.Add(side_word_border_sizer, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT, Constants.default_border)
 
         self.SetSizer(main_vertical_box)
 
@@ -455,7 +460,7 @@ class MainFrame(wx.Frame):
         Disable all features.
         :return: None
         """
-        self._side_word_list.Disable()
+        # todo self._side_word_list.Disable()
         self._repetition_selector.Disable()
         self._min_repeated_word_length_selector.Disable()
         self._max_repeated_word_length_selector.Disable()
@@ -472,7 +477,7 @@ class MainFrame(wx.Frame):
         Enable all features of the editor.
         :return: None
         """
-        self._side_word_list.Enable()
+        # todo self._side_word_list.Enable()
         self._repetition_selector.Enable()
         self._min_repeated_word_length_selector.Enable()
         self._max_repeated_word_length_selector.Enable()
@@ -668,6 +673,9 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
+        self._side_word_list_scroller.add_item(0, Word(b'test', None, 100))
+        return
+
         # Clear before reapplying.
         for indicator in self._used_indicators.keys():
             self._main_text_field.SetIndicatorCurrent(indicator)
@@ -675,12 +683,12 @@ class MainFrame(wx.Frame):
             self._used_indicators[indicator] = False
             if not self._selected_words:
                 # todo this does not work, it clears everything, clear just data
-                self._side_word_list.DeleteAllItems()
+                self._sizer.ClearGrid()
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
             self._main_text_field.Refresh()
-            self._side_word_list.DeleteAllItems()
+            self._sizer.ClearGrid()
             self._selected_words.clear()
             return
         else:
@@ -748,7 +756,7 @@ class MainFrame(wx.Frame):
                     list_item = [True if w.has_indicator() else False,
                                  w.get_word().decode('utf-8'),
                                  str(w.get_count())]
-                    self._side_word_list.AppendItem(list_item)
+                    self._sizer.AppendItem(list_item)
             else:
                 # todo do not reassign indicators?
                 for w in sorted(all_words, reverse=True):
@@ -784,8 +792,7 @@ class MainFrame(wx.Frame):
             if checked:
                 self._selected_words.append(word)
         self._apply_indicators(event)
-        # todo switch to base ctrl and reimplement.
-        # todo can we extend the class and turn off checkboxes there?
+        # todo switch to wx grid.
         # todo show how many free indicators we have somewhere.
         spare_indicators = not all(self._used_indicators.values())
         print(spare_indicators)
@@ -947,7 +954,7 @@ class MainFrame(wx.Frame):
         self._found_last_index = 0
         self._found_words.clear()
         self._search_text_field.SetValue('')
-        self._side_word_list.DeleteAllItems()
+        # todo self._side_word_list.ClearGrid()
         self._current_document = Document(file_path)
         try:
             self._current_document.read_document()

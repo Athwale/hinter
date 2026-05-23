@@ -43,6 +43,7 @@ label_coloring_box_max_len: str = "Max length"
 label_search_box: str = "Find"
 label_search_results: str = "Matches: {}/{}"
 label_word: str = 'Word'
+label_words: str = 'Word'
 label_selected: str = '✓'
 label_count: str = 'Count'
 

@@ -749,7 +749,8 @@ class MainFrame(wx.Frame):
                 word_index = 0
                 new_items = {}
                 for w in sorted(all_words, reverse=True):
-                    new_items[word_index] = w
+                    w: Word
+                    new_items[word_index] = (w, True if w.has_indicator() else False)
                     word_index += 1
                 self._side_word_list.add_items(new_items)
             else:
@@ -781,11 +782,12 @@ class MainFrame(wx.Frame):
         # todo re-enable if we do have spare indicators.
 
         self._selected_words.clear()
-        for item in range(self._side_word_list.GetItemCount()):
-            checked = self._side_word_list.GetValue(item, 0)
-            word = self._side_word_list.GetValue(item, 1)
-            if checked:
-                self._selected_words.append(word)
+        for item in self._side_word_list.GetChildren():
+            item: ListItemPanel
+            checked = item.is_checked()
+            word = item.get_word()
+            if item.is_checked():
+                self._selected_words.append(item.get_word().get_word().decode('utf-8'))
         self._apply_indicators(event)
         # todo show how many free indicators we have somewhere.
         spare_indicators = not all(self._used_indicators.values())

@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 import wx
 import wx.lib.scrolledpanel
@@ -38,14 +38,19 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         self.SetupScrolling(scroll_x=False, scrollToTop=False)
         self.Layout()
 
-    def add_items(self, items: Dict[int, Word]) -> None:
+    def add_items(self, items: Dict[int, tuple[Word, bool]]) -> None:
         """
         Add new items to the list.
         :param items: Dictionary of items with ids.
         :return: None
         """
         for i, w in items.items():
-            self._sizer.Add(ListItemPanel(self, w, i), 0, wx.EXPAND)
+            item_instance = ListItemPanel(self, i, w[0], w[1])
+            if w[0].has_indicator():
+                item_instance.set_active(True)
+            else:
+                item_instance.set_active(False)
+            self._sizer.Add(item_instance, 0, wx.EXPAND)
         self.SetupScrolling(scroll_x=False, scrollToTop=False)
         self.Layout()
 

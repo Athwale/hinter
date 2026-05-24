@@ -11,15 +11,15 @@ class ListItemPanel(wx.Panel):
     Custom panel for word list items.
     """
 
-    def __init__(self, parent, word: Word, item_id: int):
+    def __init__(self, parent, item_id: int, word: Word, state: bool):
         """
         List item constructor.
         :param parent: Parent control.
-        :param word: Word instance.
         :param item_id: Item id.
+        :param word: Word instance.
+        :param state: Initial checkbox state.
         """
         super().__init__(parent, -1)
-        # todo handle checkbox clicks
         # todo add checkbox enabling/disabling
 
         self._word_instance: Word = word
@@ -30,6 +30,7 @@ class ListItemPanel(wx.Panel):
         self.SetBackgroundColour(wx.Colour(255, 255, 255))
 
         self._check_box = wx.CheckBox(self, -1)
+        self._check_box.SetValue(state)
         self._word = wx.StaticText(self, -1, self._word_instance.get_word().decode('utf-8'),
                                    style=wx.ST_ELLIPSIZE_MIDDLE,
                                    size=Size(120, -1))
@@ -56,8 +57,10 @@ class ListItemPanel(wx.Panel):
         evt = CheckboxChangedEvent(self.GetId())
         if self._check_box.IsChecked():
             evt.SetInt(1)
+            evt.SetClientObject(self._word)
         else:
             evt.SetInt(0)
+            evt.SetClientObject(self._word)
         wx.PostEvent(self.GetEventHandler(), evt)
 
     def get_word(self) -> Word:
@@ -87,3 +90,22 @@ class ListItemPanel(wx.Panel):
         :param value: The word as bytes.
         """
         self._item_id = value
+
+    def is_checked(self) -> bool:
+        """
+        Returns True if the checkbox is checked.
+        :return: True if the checkbox is checked.
+        """
+        return self._check_box.IsChecked()
+
+    def set_active(self, state: bool) -> None:
+        """
+        Set the item to Enabled or Disabled state.
+        :param state: True / False
+        :return: None
+        """
+        # todo visually indicate disabled state.
+        if state:
+            self._check_box.Enable(True)
+        else:
+            self._check_box.Enable(False)

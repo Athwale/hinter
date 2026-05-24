@@ -1,6 +1,9 @@
 from pathlib import Path
+import wx.lib.newevent
 
-from wx._core import Size
+from wx import Size
+
+CheckboxChangedEvent, EVT_CHECKBOX_CHANGED = wx.lib.newevent.NewCommandEvent()
 
 config_file: Path = Path.home() / '.config' / 'w-hinter.conf'
 

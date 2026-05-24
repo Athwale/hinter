@@ -15,6 +15,7 @@ import wx.lib.scrolledpanel
 
 from Constants import Constants
 from Constants import Strings
+from Constants.Constants import EVT_CHECKBOX_CHANGED
 from Containers.ListItemPanel import ListItemPanel
 from Containers.Document import Document
 from Containers.SidePanel import SidePanel
@@ -63,7 +64,7 @@ class MainFrame(wx.Frame):
         self._style_history = {}
         self._action_token = 0
 
-        self._side_word_list_scroller: SidePanel = None
+        self._side_word_list: SidePanel = None
         self._used_indicators: Dict[int, bool] = {}
         self._selected_words: List[str] = []
 
@@ -348,17 +349,19 @@ class MainFrame(wx.Frame):
         #  show words with 2 or more repetitions and their average distance in lines, on click show lines where they are.
 
         # Initialize word list:
-        self._side_word_list_scroller = SidePanel(self)
+        self._side_word_list = SidePanel(self)
         side_word_border_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, Strings.label_words)
         font = side_word_border_sizer.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
         side_word_border_sizer.GetStaticBox().SetFont(font)
-        side_word_border_sizer.Add(self._side_word_list_scroller, 1, wx.EXPAND)
+        side_word_border_sizer.Add(self._side_word_list, 1, wx.EXPAND)
 
         self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
         self._search_button_up = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_UP))
         self._search_button_down = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_DOWN))
         self._search_results = wx.StaticText(self, -1, label=Strings.label_search_results.format(0, 0))
+
+        self.Bind(EVT_CHECKBOX_CHANGED, self._word_list_handler)
 
         self.Bind(wx.EVT_BUTTON, self._search_up, self._search_button_up)
         self.Bind(wx.EVT_BUTTON, self._search_down, self._search_button_down)
@@ -460,7 +463,6 @@ class MainFrame(wx.Frame):
         Disable all features.
         :return: None
         """
-        # todo self._side_word_list.Disable()
         self._repetition_selector.Disable()
         self._min_repeated_word_length_selector.Disable()
         self._max_repeated_word_length_selector.Disable()
@@ -477,7 +479,6 @@ class MainFrame(wx.Frame):
         Enable all features of the editor.
         :return: None
         """
-        # todo self._side_word_list.Enable()
         self._repetition_selector.Enable()
         self._min_repeated_word_length_selector.Enable()
         self._max_repeated_word_length_selector.Enable()
@@ -673,9 +674,6 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        self._side_word_list_scroller.add_item(0, Word(b'test', None, 100))
-        return
-
         # Clear before reapplying.
         for indicator in self._used_indicators.keys():
             self._main_text_field.SetIndicatorCurrent(indicator)
@@ -683,12 +681,12 @@ class MainFrame(wx.Frame):
             self._used_indicators[indicator] = False
             if not self._selected_words:
                 # todo this does not work, it clears everything, clear just data
-                self._sizer.ClearGrid()
+                self._side_word_list.clear_list()
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
             self._main_text_field.Refresh()
-            self._sizer.ClearGrid()
+            self._side_word_list.clear_list()
             self._selected_words.clear()
             return
         else:
@@ -713,9 +711,6 @@ class MainFrame(wx.Frame):
 
             # Assign indicators to filtered words.
             for w in sorted(all_words, reverse=True):
-                word = w.get_word()
-                count = w.get_count()
-
                 indicator_n = -1
                 # Find first unused indicator ID.
                 for i_id, state in self._used_indicators.items():
@@ -751,12 +746,12 @@ class MainFrame(wx.Frame):
             # Fill word list.
             if not self._selected_words:
                 # Fill only once.
+                word_index = 0
+                new_items = {}
                 for w in sorted(all_words, reverse=True):
-                    w: Word
-                    list_item = [True if w.has_indicator() else False,
-                                 w.get_word().decode('utf-8'),
-                                 str(w.get_count())]
-                    self._sizer.AppendItem(list_item)
+                    new_items[word_index] = w
+                    word_index += 1
+                self._side_word_list.add_items(new_items)
             else:
                 # todo do not reassign indicators?
                 for w in sorted(all_words, reverse=True):
@@ -792,12 +787,9 @@ class MainFrame(wx.Frame):
             if checked:
                 self._selected_words.append(word)
         self._apply_indicators(event)
-        # todo switch to wx grid.
         # todo show how many free indicators we have somewhere.
         spare_indicators = not all(self._used_indicators.values())
         print(spare_indicators)
-
-        self._side_word_list.SetToggleValue(False, 0, 0)
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:
         """
@@ -954,7 +946,7 @@ class MainFrame(wx.Frame):
         self._found_last_index = 0
         self._found_words.clear()
         self._search_text_field.SetValue('')
-        # todo self._side_word_list.ClearGrid()
+        self._side_word_list.clear_list()
         self._current_document = Document(file_path)
         try:
             self._current_document.read_document()

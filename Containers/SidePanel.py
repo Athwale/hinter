@@ -1,3 +1,5 @@
+from typing import Dict
+
 import wx
 import wx.lib.scrolledpanel
 from wx._core import Size
@@ -21,19 +23,38 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         self._parent = parent
         self._sizer = wx.BoxSizer(wx.VERTICAL)
         self.SetAutoLayout(True)
-        self.SetupScrolling(scroll_x=False, scrollToTop=False)
         self.SetSizer(self._sizer)
         self.Layout()
 
-    def add_item(self, index: int, word: Word) -> None:
+    def add_item(self, item_id: int, word: Word) -> None:
         """
-        Add new item to the list.
-        :param index: Item index.
+        Add a new item to the list.
+        :param item_id: Item id.
         :param word: Word instance.
         :return: None
         """
-        # todo forward the info to the item.
         # todo delete item
-        # todo clear list Hide, Remove, Destroy, Layout.
-        self._sizer.Add(ListItemPanel(self), 0, wx.EXPAND)
+        self._sizer.Add(ListItemPanel(self, word, item_id), 0, wx.EXPAND)
+        self.SetupScrolling(scroll_x=False, scrollToTop=False)
+        self.Layout()
+
+    def add_items(self, items: Dict[int, Word]) -> None:
+        """
+        Add new items to the list.
+        :param items: Dictionary of items with ids.
+        :return: None
+        """
+        for i, w in items.items():
+            self._sizer.Add(ListItemPanel(self, w, i), 0, wx.EXPAND)
+        self.SetupScrolling(scroll_x=False, scrollToTop=False)
+        self.Layout()
+
+    def clear_list(self) -> None:
+        """
+        Clear all items from list.
+        :return: None
+        """
+        for ch in self.GetChildren():
+            ch.Hide()
+            ch.Destroy()
         self.Layout()

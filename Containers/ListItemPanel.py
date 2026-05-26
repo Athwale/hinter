@@ -31,13 +31,13 @@ class ListItemPanel(wx.Panel):
 
         self._check_box = wx.CheckBox(self, -1)
         self._check_box.SetValue(state)
-        self._word = wx.StaticText(self, -1, self._word_instance.get_word().decode('utf-8'),
-                                   style=wx.ST_ELLIPSIZE_MIDDLE,
-                                   size=Size(120, -1))
+        self._word_label = wx.StaticText(self, -1, self._word_instance.get_word().decode('utf-8'),
+                                         style=wx.ST_ELLIPSIZE_MIDDLE,
+                                         size=Size(120, -1))
         self._count = wx.StaticText(self, -1, str(self._word_instance.get_count()), style=wx.ST_ELLIPSIZE_END)
 
         self._h_sizer.Add(self._check_box, 0, wx.ALL, Constants.default_border)
-        self._h_sizer.Add(self._word, 0, wx.TOP | wx.BOTTOM, Constants.default_border)
+        self._h_sizer.Add(self._word_label, 0, wx.TOP | wx.BOTTOM, Constants.default_border)
         self._h_sizer.Add(wx.StaticLine(self, -1, size=Size(2, 26), style=wx.LI_HORIZONTAL))
         self._h_sizer.Add(self._count, 0, wx.TOP | wx.LEFT | wx.BOTTOM, Constants.default_border)
 
@@ -57,10 +57,10 @@ class ListItemPanel(wx.Panel):
         evt = CheckboxChangedEvent(self.GetId())
         if self._check_box.IsChecked():
             evt.SetInt(1)
-            evt.SetClientObject(self._word)
+            evt.SetClientObject(self._word_label)
         else:
             evt.SetInt(0)
-            evt.SetClientObject(self._word)
+            evt.SetClientObject(self._word_label)
         wx.PostEvent(self.GetEventHandler(), evt)
 
     def get_word(self) -> Word:
@@ -75,7 +75,7 @@ class ListItemPanel(wx.Panel):
         Set the word.
         :param value: The Word instance.
         """
-        self._word = value
+        self._word_label = value
 
     def get_id(self) -> int:
         """
@@ -104,8 +104,9 @@ class ListItemPanel(wx.Panel):
         :param state: True / False
         :return: None
         """
-        # todo visually indicate disabled state.
         if state:
             self._check_box.Enable(True)
+            self._word_label.SetForegroundColour(Constants.color_black)
         else:
             self._check_box.Enable(False)
+            self._word_label.SetForegroundColour(Constants.color_grey)

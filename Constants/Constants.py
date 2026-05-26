@@ -1,4 +1,6 @@
 from pathlib import Path
+from typing import List
+
 import wx.lib.newevent
 
 from wx import Size
@@ -6,6 +8,12 @@ from wx import Size
 CheckboxChangedEvent, EVT_CHECKBOX_CHANGED = wx.lib.newevent.NewCommandEvent()
 
 config_file: Path = Path.home() / '.config' / 'w-hinter.conf'
+
+color_grey: wx.Colour = wx.Colour(158, 162, 168)
+color_black: wx.Colour = wx.Colour(0, 0, 0)
+
+status_places: int = 4
+status_proportions: List[int] = [-6, -7, -3, -2]
 
 main_window_size: Size = Size(1000, 800)
 default_border: int = 3

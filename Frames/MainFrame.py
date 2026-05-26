@@ -1,5 +1,6 @@
 import re
 import shutil
+from itertools import count
 from pathlib import Path
 from typing import List, Dict
 
@@ -432,8 +433,8 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # Create a status bar with 3 fields
-        self._status_bar = self.CreateStatusBar(3)
-        self._status_bar.SetStatusWidths([-6, -7, -2])
+        self._status_bar = self.CreateStatusBar(Constants.status_places)
+        self._status_bar.SetStatusWidths(Constants.status_proportions)
         # Initialize status bar
         self._set_status_text('', 0)
         self._set_status_text('', 1)
@@ -760,6 +761,16 @@ class MainFrame(wx.Frame):
                     if not w.is_selected():
                         w.set_indicator(-1)
         self._main_text_field.Refresh()
+        self._update_indicator_count()
+
+    def _update_indicator_count(self) -> None:
+        """
+        Update how many free indicators we have in the status panel.
+        :return: None
+        """
+        used = sum(self._used_indicators.values())
+        # 32 is our maximum number of usable indicators.
+        self._set_status_text(Strings.status_indicators.format(used, 32 - used), 3)
 
     def _handle_marking_selector(self, event: wx.CommandEvent) -> None:
         """
@@ -778,8 +789,10 @@ class MainFrame(wx.Frame):
         :param event: Passed along.
         :return: None
         """
+        # todo do we need to save each time or would splitting it be faster?
         # todo if we do not have spare indicators prevent clicking more checkboxes, show a warning.
         # todo re-enable if we do have spare indicators.
+        # todo disabling the last indicator enables all of them again.
 
         self._selected_words.clear()
         for item in self._side_word_list.GetChildren():

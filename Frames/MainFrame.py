@@ -704,16 +704,17 @@ class MainFrame(wx.Frame):
             # Filter the words that fit the criteria to a new list and work on that.
             for w in sorted(word_data, reverse=True):
                 word = w.get_word()
-                count = w.get_count()
-                if count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
+                w_count = w.get_count()
+                if w_count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
                     if word.decode('utf-8') in self._selected_words:
                         w.set_selected(True)
                     all_words.append(w)
 
             # Assign indicators to filtered words.
             for w in sorted(all_words, reverse=True):
+                w: Word
                 indicator_n = -1
-                # Find first unused indicator ID.
+                # Find first unused indicator ID. # todo have indicator numbers in a set from where they are borrowed and returned on unselect.
                 for i_id, state in self._used_indicators.items():
                     if not state:
                         indicator_n = i_id
@@ -732,6 +733,7 @@ class MainFrame(wx.Frame):
                     else:
                         # The tool is running for the first time, assign indicators to everything top down.
                         w.set_indicator(indicator_n)
+                        w.set_selected(True)
                         self._used_indicators[indicator_n] = True
 
             # Display indicators.
@@ -756,10 +758,28 @@ class MainFrame(wx.Frame):
                 self._side_word_list.add_items(new_items)
             else:
                 # todo do not reassign indicators?
+                # todo enable checkboxes if we have spare indicators.
                 for w in sorted(all_words, reverse=True):
                     w: Word
                     if not w.is_selected():
                         w.set_indicator(-1)
+
+                spare_indicators = not all(self._used_indicators.values())
+                if spare_indicators:
+                    # Enable all checkboxes.
+                    for item in self._side_word_list.GetChildren():
+                        item: ListItemPanel
+                        if not item.is_enabled():
+                            item.set_active(True)
+                else:
+                    # Disable extra checkboxes.
+                    for item in self._side_word_list.GetChildren():
+                        item: ListItemPanel
+                        if not item.get_word().has_indicator():
+                            # todo newly selected words do not get indicator set in Word?
+                            if item.get_word().get_word() == b'teeth':
+                                print(item.get_word())
+                            item.set_active(False)
         self._main_text_field.Refresh()
         self._update_indicator_count()
 
@@ -790,21 +810,18 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo do we need to save each time or would splitting it be faster?
-        # todo if we do not have spare indicators prevent clicking more checkboxes, show a warning.
-        # todo re-enable if we do have spare indicators.
         # todo disabling the last indicator enables all of them again.
 
         self._selected_words.clear()
         for item in self._side_word_list.GetChildren():
             item: ListItemPanel
-            checked = item.is_checked()
-            word = item.get_word()
             if item.is_checked():
                 self._selected_words.append(item.get_word().get_word().decode('utf-8'))
+                item.get_word().set_selected(True)
+            else:
+                item.get_word().set_selected(False)
+                item.get_word().set_indicator(-1)
         self._apply_indicators(event)
-        # todo show how many free indicators we have somewhere.
-        spare_indicators = not all(self._used_indicators.values())
-        print(spare_indicators)
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:
         """

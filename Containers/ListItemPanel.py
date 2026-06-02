@@ -98,6 +98,13 @@ class ListItemPanel(wx.Panel):
         """
         return self._check_box.IsChecked()
 
+    def is_enabled(self) -> bool:
+        """
+        Return True if the item is clickable.
+        :return: True if the item is clickable.
+        """
+        return self._check_box.IsEnabled()
+
     def set_active(self, state: bool) -> None:
         """
         Set the item to Enabled or Disabled state.

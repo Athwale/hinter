@@ -94,7 +94,7 @@ class Word:
         self._indicator = value
 
     def __str__(self):
-        return f"Word: {self._word}, {self._count}"
+        return f"Word: {self._word}, count: {self._count}, indicator: {self._indicator}, selected: {self.is_selected()}"
 
     def __eq__(self, other):
         if not isinstance(other, Word):

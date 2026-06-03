@@ -93,8 +93,16 @@ class Word:
         """
         self._indicator = value
 
+    def clear_indicator(self) -> None:
+        """
+        Set indicator to -1.
+        :return: None
+        """
+        self.set_indicator(-1)
+
     def __str__(self):
-        return f"Word: {self._word}, count: {self._count}, indicator: {self._indicator}, selected: {self.is_selected()}"
+        return (f"Word: {self._word.decode('utf-8')}, count: {self._count}, indicator: "
+                f"{self._indicator}, selected: {self.is_selected()}")
 
     def __eq__(self, other):
         if not isinstance(other, Word):

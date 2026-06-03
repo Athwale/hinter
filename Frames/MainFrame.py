@@ -2,7 +2,7 @@ import re
 import shutil
 from itertools import count
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Set
 
 import html
 import wx
@@ -66,7 +66,7 @@ class MainFrame(wx.Frame):
         self._action_token = 0
 
         self._side_word_list: SidePanel = None
-        self._used_indicators: Dict[int, bool] = {}
+        self._available_indicators: Set[int] = set()
         self._selected_words: List[str] = []
 
         self._init_menu_bar()
@@ -269,7 +269,6 @@ class MainFrame(wx.Frame):
                 self._main_text_field.IndicatorSetForeground(indicator_number, c_val)
                 self._main_text_field.IndicatorSetAlpha(indicator_number, a_val)
                 self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, a_val)
-                self._used_indicators[indicator_number] = False
                 indicator_number += 1
         for c, c_val  in colors.items():
             if c in (9, 10):
@@ -279,7 +278,6 @@ class MainFrame(wx.Frame):
             self._main_text_field.IndicatorSetForeground(indicator_number, c_val)
             self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
             self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
-            self._used_indicators[indicator_number] = False
             indicator_number += 1
 
         # We have indicators 0-29 and can have 0-31, add two thick underlines
@@ -287,13 +285,11 @@ class MainFrame(wx.Frame):
         self._main_text_field.IndicatorSetForeground(indicator_number,  wx.Colour(255, 0, 0))
         self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
         self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
-        self._used_indicators[indicator_number] = False
         indicator_number += 1
         self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
         self._main_text_field.IndicatorSetForeground(indicator_number, wx.Colour(0, 255, 0))
         self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
         self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
-        self._used_indicators[indicator_number] = False
 
     @staticmethod
     def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:
@@ -358,8 +354,8 @@ class MainFrame(wx.Frame):
         side_word_border_sizer.Add(self._side_word_list, 1, wx.EXPAND)
 
         self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
-        self._search_button_up = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_UP))
-        self._search_button_down = wx.BitmapButton(self, -1, wx.ArtProvider.GetBitmap(wx.ART_GO_DOWN))
+        self._search_button_up = wx.BitmapButton(self, -1, wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_GO_UP)))
+        self._search_button_down = wx.BitmapButton(self, -1, wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_GO_DOWN)))
         self._search_results = wx.StaticText(self, -1, label=Strings.label_search_results.format(0, 0))
 
         self.Bind(EVT_CHECKBOX_CHANGED, self._word_list_handler)
@@ -675,23 +671,23 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        # Clear before reapplying.
-        for indicator in self._used_indicators.keys():
+        # Clear before reapplying. We always have 0-31 indicators.
+        for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
             self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
-            self._used_indicators[indicator] = False
             if not self._selected_words:
-                # todo this does not work, it clears everything, clear just data
                 self._side_word_list.clear_list()
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
+            # Clear if we are turning the tool off.
             self._main_text_field.Refresh()
             self._side_word_list.clear_list()
             self._selected_words.clear()
             return
         else:
             # Saving splits the new document into words for coloring.
+            # todo do we need to save each time or would splitting it be faster?
             self._save_file()
             # todo list of default ignored words + metadata
             word_data: List[Word] = self._current_document.get_word_marking_data()
@@ -699,45 +695,35 @@ class MainFrame(wx.Frame):
             length_min_limit = self._min_repeated_word_length_selector.GetValue()
             length_max_limit = self._max_repeated_word_length_selector.GetValue()
 
-            all_words = []
+            fitting_words: List[Word] = []
 
-            # Filter the words that fit the criteria to a new list and work on that.
+            # Filter the words that fit the marking criteria to a new list and work on that.
             for w in sorted(word_data, reverse=True):
                 word = w.get_word()
                 w_count = w.get_count()
                 if w_count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
                     if word.decode('utf-8') in self._selected_words:
                         w.set_selected(True)
-                    all_words.append(w)
+                    # todo this removes indicators on checkbox check because it recreates new Words.
+                    fitting_words.append(w)
+
+            # todo can we do this live with syntax highlighting?
 
             # Assign indicators to filtered words.
-            for w in sorted(all_words, reverse=True):
-                w: Word
-                indicator_n = -1
-                # Find first unused indicator ID. # todo have indicator numbers in a set from where they are borrowed and returned on unselect.
-                for i_id, state in self._used_indicators.items():
-                    if not state:
-                        indicator_n = i_id
+            if not self._selected_words:
+                indicator_counter = 31
+                for w in sorted(fitting_words, reverse=True):
+                    w: Word
+                    # The tool is running for the first time, assign indicators to everything top down.
+                    w.set_indicator(indicator_counter)
+                    w.set_selected(True)
+                    indicator_counter -= 1
+                    if indicator_counter == -1:
                         break
 
-                if indicator_n == -1:
-                    # todo handle not enough indicators
-                    pass
-                    #print(f'not enough indicators for: {word}, {count}')
-                else:
-                    if self._selected_words:
-                        if w.is_selected():
-                            # Give indicators only to words selected in the side panel list.
-                            w.set_indicator(indicator_n)
-                            self._used_indicators[indicator_n] = True
-                    else:
-                        # The tool is running for the first time, assign indicators to everything top down.
-                        w.set_indicator(indicator_n)
-                        w.set_selected(True)
-                        self._used_indicators[indicator_n] = True
-
             # Display indicators.
-            for w in all_words:
+            for w in fitting_words:
+                # todo after selecting. nothing has indicators
                 if w.has_indicator():
                     indicator = w.get_indicator()
                     locations = w.get_spans()
@@ -751,7 +737,7 @@ class MainFrame(wx.Frame):
                 # Fill only once.
                 word_index = 0
                 new_items = {}
-                for w in sorted(all_words, reverse=True):
+                for w in sorted(fitting_words, reverse=True):
                     w: Word
                     new_items[word_index] = (w, True if w.has_indicator() else False)
                     word_index += 1
@@ -759,14 +745,13 @@ class MainFrame(wx.Frame):
             else:
                 # todo do not reassign indicators?
                 # todo enable checkboxes if we have spare indicators.
-                for w in sorted(all_words, reverse=True):
+                for w in sorted(fitting_words, reverse=True):
                     w: Word
                     if not w.is_selected():
-                        w.set_indicator(-1)
+                        w.clear_indicator()
 
-                spare_indicators = not all(self._used_indicators.values())
-                if spare_indicators:
-                    # Enable all checkboxes.
+                if self._available_indicators:
+                    # We have some spare indicators, enable all checkboxes.
                     for item in self._side_word_list.GetChildren():
                         item: ListItemPanel
                         if not item.is_enabled():
@@ -788,9 +773,9 @@ class MainFrame(wx.Frame):
         Update how many free indicators we have in the status panel.
         :return: None
         """
-        used = sum(self._used_indicators.values())
+        free = len(self._available_indicators)
         # 32 is our maximum number of usable indicators.
-        self._set_status_text(Strings.status_indicators.format(used, 32 - used), 3)
+        self._set_status_text(Strings.status_indicators.format(32 - free, free), 3)
 
     def _handle_marking_selector(self, event: wx.CommandEvent) -> None:
         """
@@ -809,7 +794,6 @@ class MainFrame(wx.Frame):
         :param event: Passed along.
         :return: None
         """
-        # todo do we need to save each time or would splitting it be faster?
         # todo disabling the last indicator enables all of them again.
 
         self._selected_words.clear()
@@ -818,9 +802,15 @@ class MainFrame(wx.Frame):
             if item.is_checked():
                 self._selected_words.append(item.get_word().get_word().decode('utf-8'))
                 item.get_word().set_selected(True)
+                if not item.get_word().has_indicator():
+                    item.get_word().set_indicator(self._available_indicators.pop())
             else:
                 item.get_word().set_selected(False)
-                item.get_word().set_indicator(-1)
+                # Return indicator to magazine.
+                indicator = item.get_word().get_indicator()
+                if indicator > -1:
+                    self._available_indicators.add(indicator)
+                    item.get_word().clear_indicator()
         self._apply_indicators(event)
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:

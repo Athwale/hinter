@@ -26,15 +26,14 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         self.SetSizer(self._sizer)
         self.Layout()
 
-    def add_item(self, item_id: int, word: Word) -> None:
+    def add_item(self, word: ListItemPanel) -> None:
         """
         Add a new item to the list.
-        :param item_id: Item id.
         :param word: Word instance.
         :return: None
         """
         # todo delete item
-        self._sizer.Add(ListItemPanel(self, word, item_id), 0, wx.EXPAND)
+        self._sizer.Add(word, 0, wx.EXPAND)
         self.SetupScrolling(scroll_x=False, scrollToTop=False)
         self.Layout()
 
@@ -44,8 +43,9 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         :param items: Dictionary of items with ids.
         :return: None
         """
+        # todo rewrite for list item
         for i, w in items.items():
-            item_instance = ListItemPanel(self, i, w[0], w[1])
+            item_instance = ListItemPanel(self, w[0], w[1])
             if w[0].has_indicator():
                 item_instance.set_active(True)
             else:

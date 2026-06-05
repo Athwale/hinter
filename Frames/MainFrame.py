@@ -671,6 +671,7 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
+        # todo reimplement with new word data dictionary
         # Clear before reapplying. We always have 0-31 indicators.
         for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
@@ -995,7 +996,7 @@ class MainFrame(wx.Frame):
                 self._append_styled_text(content, style)
 
         self._main_text_field.EmptyUndoBuffer()
-        self._current_document.split_words(self._main_text_field.GetText())
+        self._current_document.split_words(self._side_word_list, self._main_text_field.GetText())
         self._main_text_field.Thaw()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         # on_modified will run while loading and erroneously set modified to True so we need to fix it.
@@ -1026,7 +1027,7 @@ class MainFrame(wx.Frame):
                     self._set_status_text(self._current_document.get_path().name, 1)
                     self._main_text_field.SetSavePoint()
                     self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
-                    self._current_document.split_words(self._main_text_field.GetText())
+                    self._current_document.split_words(self._side_word_list, self._main_text_field.GetText())
                     self._config.set_last_file(self._current_document.get_path())
                     self._config.save_config()
                     self._current_document.set_modified(False)

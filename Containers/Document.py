@@ -7,6 +7,7 @@ from bs4 import Tag, NavigableString
 from pathlib import Path
 
 from Constants import Constants
+from Containers.ListItemPanel import ListItemPanel
 from Containers.Word import Word
 from Resources.Fetch import Fetch
 
@@ -27,7 +28,7 @@ class Document:
         self._converted: List = []
         self._word_count: int = 0
 
-        self._word_data: List[Word] = []
+        self._word_data: Dict[bytes, ListItemPanel] = {}
 
         self._errors: List[str] = []
         self._new: bool = True
@@ -63,7 +64,7 @@ class Document:
         """
         return self._word_count
 
-    def get_word_marking_data(self) -> List[Word]:
+    def get_word_marking_data(self) -> List[ListItemPanel]:
         """
         Return a dictionary of unique words and their counts.
         :return: a dictionary of unique words and their counts.
@@ -110,20 +111,31 @@ class Document:
         """
         self._is_modified = modified
 
-    def split_words(self, plain_text: str) -> None:
+    def split_words(self, parent, plain_text: str) -> None:
         """
         Split text into words and fill a dictionary with Word objects containing data about every unique word.
+        :param parent
         :param plain_text: Plain text from stc.
         :return: None
         """
-        self._word_data.clear()
         plain_text = plain_text.lower()
         word_spans = list(self._word_matcher.finditer(plain_text.encode('utf-8')))
-        plain_words = [word.group() for word in word_spans]
+        # todo can we do counts in here without another loop with .count?
+        plain_words: List[bytes] = [word.group() for word in word_spans]
 
         for word in set(plain_words):
+            # All locations where the word occurs in the text.
             spans = [s for s in word_spans if s.group() == word]
-            self._word_data.append(Word(word, spans , plain_words.count(word)))
+            # This will either give us an existing word or a new one, in either case we need to set spans and count.
+            panel = self._word_data.get(word, ListItemPanel(parent, Word(word, [] , 0), True))
+            word_container = panel.get_word()
+            # 0 evaluates as False
+            add = bool(word_container.get_count())
+            word_container.set_spans(spans)
+            word_container.set_count(plain_words.count(word))
+            if not add:
+                self._word_data[word] = panel
+            # todo remove words no longer present in text from the dict
 
         self._word_count = len(word_spans)
 

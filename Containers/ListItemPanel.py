@@ -11,19 +11,16 @@ class ListItemPanel(wx.Panel):
     Custom panel for word list items.
     """
 
-    def __init__(self, parent, item_id: int, word: Word, state: bool):
+    def __init__(self, parent, word: Word, state: bool):
         """
         List item constructor.
         :param parent: Parent control.
-        :param item_id: Item id.
         :param word: Word instance.
         :param state: Initial checkbox state.
         """
         super().__init__(parent, -1)
-        # todo add checkbox enabling/disabling
 
         self._word_instance: Word = word
-        self._item_id: int = item_id
 
         self._h_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self._v_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -76,20 +73,6 @@ class ListItemPanel(wx.Panel):
         :param value: The Word instance.
         """
         self._word_label = value
-
-    def get_id(self) -> int:
-        """
-        Get the ID.
-        :return: The ID.
-        """
-        return self._item_id
-
-    def set_id(self, value: int):
-        """
-        Set the word.
-        :param value: The word as bytes.
-        """
-        self._item_id = value
 
     def is_checked(self) -> bool:
         """

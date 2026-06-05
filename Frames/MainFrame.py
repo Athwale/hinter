@@ -704,10 +704,9 @@ class MainFrame(wx.Frame):
                 if w_count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
                     if word.decode('utf-8') in self._selected_words:
                         w.set_selected(True)
-                    # todo this removes indicators on checkbox check because it recreates new Words.
+                    # todo this removes indicators on checkbox check because it recreates new Words with no indicators.
+                    # todo keep the list and just update it?
                     fitting_words.append(w)
-
-            # todo can we do this live with syntax highlighting?
 
             # Assign indicators to filtered words.
             if not self._selected_words:
@@ -723,7 +722,8 @@ class MainFrame(wx.Frame):
 
             # Display indicators.
             for w in fitting_words:
-                # todo after selecting. nothing has indicators
+                # todo what happens when text is changed and new word is selected from the side panel?
+                # todo apply live marking only on current line?
                 if w.has_indicator():
                     indicator = w.get_indicator()
                     locations = w.get_spans()

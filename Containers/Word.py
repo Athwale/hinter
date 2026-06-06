@@ -104,6 +104,7 @@ class Word:
         return (f"Word: {self._word.decode('utf-8')}, count: {self._count}, indicator: "
                 f"{self._indicator}, selected: {self.is_selected()}")
 
+    # Sorts words by count not by alphabet order.
     def __eq__(self, other):
         if not isinstance(other, Word):
             return NotImplemented

@@ -671,7 +671,8 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        # todo reimplement with new word data dictionary
+        # todo apply live marking only on current line?
+        # todo what happens when text is changed and new word is selected from the side panel?
         # Clear before reapplying. We always have 0-31 indicators.
         for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
@@ -691,43 +692,42 @@ class MainFrame(wx.Frame):
             # todo do we need to save each time or would splitting it be faster?
             self._save_file()
             # todo list of default ignored words + metadata
-            word_data: List[Word] = self._current_document.get_word_marking_data()
+            word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
             repetition_limit = self._repetition_selector.GetValue()
             length_min_limit = self._min_repeated_word_length_selector.GetValue()
             length_max_limit = self._max_repeated_word_length_selector.GetValue()
 
-            fitting_words: List[Word] = []
+            fitting_words: List[ListItemPanel] = []
 
             # Filter the words that fit the marking criteria to a new list and work on that.
-            for w in sorted(word_data, reverse=True):
-                word = w.get_word()
-                w_count = w.get_count()
-                if w_count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
-                    if word.decode('utf-8') in self._selected_words:
-                        w.set_selected(True)
-                    # todo this removes indicators on checkbox check because it recreates new Words with no indicators.
-                    # todo keep the list and just update it?
-                    fitting_words.append(w)
+            for panel in word_data.values():
+                panel: ListItemPanel
+                word = panel.get_word()
+                w_count = word.get_count()
+                if w_count >= repetition_limit and length_min_limit <= len(word.get_word()) <= length_max_limit:
+                    if word.get_word().decode('utf-8') in self._selected_words:
+                        panel.set_checked(True)
+                    fitting_words.append(panel)
 
             # Assign indicators to filtered words.
             if not self._selected_words:
+                # The tool is running for the first time, assign indicators to everything top down.
                 indicator_counter = 31
+                # Sort the words from the highest number of repetitions down.
                 for w in sorted(fitting_words, reverse=True):
-                    w: Word
-                    # The tool is running for the first time, assign indicators to everything top down.
-                    w.set_indicator(indicator_counter)
-                    w.set_selected(True)
+                    w: ListItemPanel
+                    w.get_word().set_indicator(indicator_counter)
+                    w.set_checked(True)
                     indicator_counter -= 1
                     if indicator_counter == -1:
                         break
 
             # Display indicators.
             for w in fitting_words:
-                # todo what happens when text is changed and new word is selected from the side panel?
-                # todo apply live marking only on current line?
-                if w.has_indicator():
-                    indicator = w.get_indicator()
-                    locations = w.get_spans()
+                w: ListItemPanel
+                if w.get_word().has_indicator():
+                    indicator = w.get_word().get_indicator()
+                    locations = w.get_word().get_spans()
                     for word_span in locations:
                         word_span: re.Match
                         self._main_text_field.SetIndicatorCurrent(indicator)
@@ -735,16 +735,9 @@ class MainFrame(wx.Frame):
                                                                  word_span.span()[1] - word_span.span()[0])
             # Fill word list.
             if not self._selected_words:
-                # Fill only once.
-                word_index = 0
-                new_items = {}
-                for w in sorted(fitting_words, reverse=True):
-                    w: Word
-                    new_items[word_index] = (w, True if w.has_indicator() else False)
-                    word_index += 1
-                self._side_word_list.add_items(new_items)
+                # Fill only once when the tool runs the first time.
+                self._side_word_list.add_items(sorted(fitting_words, reverse=True))
             else:
-                # todo do not reassign indicators?
                 # todo enable checkboxes if we have spare indicators.
                 for w in sorted(fitting_words, reverse=True):
                     w: Word
@@ -756,16 +749,13 @@ class MainFrame(wx.Frame):
                     for item in self._side_word_list.GetChildren():
                         item: ListItemPanel
                         if not item.is_enabled():
-                            item.set_active(True)
+                            item.set_disabled(True)
                 else:
                     # Disable extra checkboxes.
                     for item in self._side_word_list.GetChildren():
                         item: ListItemPanel
                         if not item.get_word().has_indicator():
-                            # todo newly selected words do not get indicator set in Word?
-                            if item.get_word().get_word() == b'teeth':
-                                print(item.get_word())
-                            item.set_active(False)
+                            item.set_disabled(False)
         self._main_text_field.Refresh()
         self._update_indicator_count()
 
@@ -796,6 +786,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo disabling the last indicator enables all of them again.
+        # todo fix this with the new list.
 
         self._selected_words.clear()
         for item in self._side_word_list.GetChildren():

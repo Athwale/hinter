@@ -18,6 +18,7 @@ class ListItemPanel(wx.Panel):
         :param word: Word instance.
         :param state: Initial checkbox state.
         """
+        
         super().__init__(parent, -1)
 
         self._word_instance: Word = word
@@ -60,6 +61,13 @@ class ListItemPanel(wx.Panel):
             evt.SetClientObject(self._word_label)
         wx.PostEvent(self.GetEventHandler(), evt)
 
+    def update_count(self) -> None:
+        """
+        Update the number of words for the item.
+        :return: None
+        """
+        self._count.SetLabel(str(self._word_instance.get_count()))
+
     def get_word(self) -> Word:
         """
         Get the word.
@@ -73,6 +81,15 @@ class ListItemPanel(wx.Panel):
         :param value: The Word instance.
         """
         self._word_label = value
+
+    def set_checked(self, state: bool) -> None:
+        """
+        Set the checkbox state.
+        :param state: True to check.
+        :return: None
+        """
+        self._check_box.SetValue(state)
+        self._word_instance.set_selected(state)
 
     def is_checked(self) -> bool:
         """
@@ -88,7 +105,7 @@ class ListItemPanel(wx.Panel):
         """
         return self._check_box.IsEnabled()
 
-    def set_active(self, state: bool) -> None:
+    def set_disabled(self, state: bool) -> None:
         """
         Set the item to Enabled or Disabled state.
         :param state: True / False
@@ -100,3 +117,14 @@ class ListItemPanel(wx.Panel):
         else:
             self._check_box.Enable(False)
             self._word_label.SetForegroundColour(Constants.color_grey)
+
+    # Sorts words by count not by alphabet order.
+    def __eq__(self, other):
+        if not isinstance(other, ListItemPanel):
+            return NotImplemented
+        return self._word_instance.get_count() == other.get_word().get_count()
+
+    def __lt__(self, other):
+        if not isinstance(other, ListItemPanel):
+            return NotImplemented
+        return self._word_instance.get_count() < other.get_word().get_count()

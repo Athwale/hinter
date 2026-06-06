@@ -26,33 +26,28 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         self.SetSizer(self._sizer)
         self.Layout()
 
-    def add_item(self, word: ListItemPanel) -> None:
+    def add_hidden_item(self, item: Word) -> ListItemPanel:
         """
-        Add a new item to the list.
-        :param word: Word instance.
+        Add new item to the list in invisible state.
+        :param item: Item to add
         :return: None
         """
-        # todo delete item
-        self._sizer.Add(word, 0, wx.EXPAND)
-        self.SetupScrolling(scroll_x=False, scrollToTop=False)
-        self.Layout()
+        panel = ListItemPanel(self, item, True)
+        self._sizer.Add(panel, 0, wx.EXPAND)
+        panel.update_count()
+        panel.Show(False)
+        return panel
 
-    def add_items(self, items: Dict[int, tuple[Word, bool]]) -> None:
+    def add_items(self, items: List[ListItemPanel]) -> None:
         """
         Add new items to the list.
         :param items: Dictionary of items with ids.
         :return: None
         """
-        # todo rewrite for list item
-        for i, w in items.items():
-            item_instance = ListItemPanel(self, w[0], w[1])
-            if w[0].has_indicator():
-                item_instance.set_active(True)
-            else:
-                item_instance.set_active(False)
-            self._sizer.Add(item_instance, 0, wx.EXPAND)
+        for item in items:
+            item.update_count()
+            item.Show(True)
         self.SetupScrolling(scroll_x=False, scrollToTop=False)
-        self.Layout()
 
     def clear_list(self) -> None:
         """
@@ -60,6 +55,6 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         :return: None
         """
         for ch in self.GetChildren():
-            ch.Hide()
-            ch.Destroy()
+            ch: ListItemPanel
+            ch.Show(False)
         self.Layout()

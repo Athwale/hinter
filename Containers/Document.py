@@ -8,6 +8,7 @@ from pathlib import Path
 
 from Constants import Constants
 from Containers.ListItemPanel import ListItemPanel
+from Containers.SidePanel import SidePanel
 from Containers.Word import Word
 from Resources.Fetch import Fetch
 
@@ -64,10 +65,10 @@ class Document:
         """
         return self._word_count
 
-    def get_word_marking_data(self) -> List[ListItemPanel]:
+    def get_word_marking_data(self) -> Dict[bytes, ListItemPanel]:
         """
-        Return a dictionary of unique words and their counts.
-        :return: a dictionary of unique words and their counts.
+        Return a dictionary of unique words and their side panel item.
+        :return: a dictionary of unique words and their side panel item.
         """
         return self._word_data
 
@@ -111,7 +112,7 @@ class Document:
         """
         self._is_modified = modified
 
-    def split_words(self, parent, plain_text: str) -> None:
+    def split_words(self, parent: SidePanel, plain_text: str) -> None:
         """
         Split text into words and fill a dictionary with Word objects containing data about every unique word.
         :param parent
@@ -120,23 +121,31 @@ class Document:
         """
         plain_text = plain_text.lower()
         word_spans = list(self._word_matcher.finditer(plain_text.encode('utf-8')))
-        # todo can we do counts in here without another loop with .count?
-        plain_words: List[bytes] = [word.group() for word in word_spans]
+        plain_words: Dict[bytes, int] = {}
+        for word in word_spans:
+            # Create a dictionary of unique words and count words at the same time.
+            word_bytes: bytes = word.group()
+            entry = plain_words.get(word_bytes, 0)
+            if entry:
+                plain_words[word_bytes] = entry + 1
+            else:
+                plain_words[word_bytes] = 1
 
-        for word in set(plain_words):
+        for word, count in plain_words.items():
             # All locations where the word occurs in the text.
             spans = [s for s in word_spans if s.group() == word]
-            # This will either give us an existing word or a new one, in either case we need to set spans and count.
-            panel = self._word_data.get(word, ListItemPanel(parent, Word(word, [] , 0), True))
-            word_container = panel.get_word()
-            # 0 evaluates as False
-            add = bool(word_container.get_count())
-            word_container.set_spans(spans)
-            word_container.set_count(plain_words.count(word))
-            if not add:
-                self._word_data[word] = panel
-            # todo remove words no longer present in text from the dict
+            # The side panel will own all the items, even the hidden ones.
+            panel = self._word_data.get(word, False)
+            if not panel:
+                new_panel = parent.add_hidden_item(Word(word, spans, count))
+                self._word_data[word] = new_panel
+            else:
+                word_container = panel.get_word()
+                # 0 evaluates as False
+                word_container.set_spans(spans)
+                word_container.set_count(count)
 
+        # todo remove words no longer present in text from the dict and the side panel.
         self._word_count = len(word_spans)
 
     def read_document(self) -> None:

@@ -18,7 +18,7 @@ class ListItemPanel(wx.Panel):
         :param word: Word instance.
         :param state: Initial checkbox state.
         """
-        
+
         super().__init__(parent, -1)
 
         self._word_instance: Word = word
@@ -52,6 +52,7 @@ class ListItemPanel(wx.Panel):
 
     def _on_checkbox(self, event: wx.CommandEvent) -> None:
         # Pass the event into the main window.
+        self._word_instance.set_selected(self._check_box.GetValue())
         evt = CheckboxChangedEvent(self.GetId())
         if self._check_box.IsChecked():
             evt.SetInt(1)
@@ -105,7 +106,7 @@ class ListItemPanel(wx.Panel):
         """
         return self._check_box.IsEnabled()
 
-    def set_disabled(self, state: bool) -> None:
+    def set_enabled(self, state: bool) -> None:
         """
         Set the item to Enabled or Disabled state.
         :param state: True / False

@@ -672,7 +672,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo apply live marking only on current line?
-        # todo what happens when text is changed and new word is selected from the side panel?
+        # todo what happens when text is changed/deleted and new word is selected from the side panel?
         # Clear before reapplying. We always have 0-31 indicators.
         for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
@@ -736,26 +736,23 @@ class MainFrame(wx.Frame):
             # Fill word list.
             if not self._selected_words:
                 # Fill only once when the tool runs the first time.
-                self._side_word_list.add_items(sorted(fitting_words, reverse=True))
+                self._side_word_list.add_items(fitting_words)
             else:
                 # todo enable checkboxes if we have spare indicators.
-                for w in sorted(fitting_words, reverse=True):
-                    w: Word
-                    if not w.is_selected():
-                        w.clear_indicator()
-
                 if self._available_indicators:
                     # We have some spare indicators, enable all checkboxes.
                     for item in self._side_word_list.GetChildren():
                         item: ListItemPanel
                         if not item.is_enabled():
-                            item.set_disabled(True)
+                            item.set_enabled(True)
                 else:
                     # Disable extra checkboxes.
                     for item in self._side_word_list.GetChildren():
                         item: ListItemPanel
-                        if not item.get_word().has_indicator():
-                            item.set_disabled(False)
+                        if item.get_word().has_indicator():
+                            item.set_enabled(True)
+                        else:
+                            item.set_enabled(False)
         self._main_text_field.Refresh()
         self._update_indicator_count()
 
@@ -786,18 +783,15 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo disabling the last indicator enables all of them again.
-        # todo fix this with the new list.
-
+        # todo unchecked boxes recheck on tool rerun.
         self._selected_words.clear()
         for item in self._side_word_list.GetChildren():
             item: ListItemPanel
             if item.is_checked():
                 self._selected_words.append(item.get_word().get_word().decode('utf-8'))
-                item.get_word().set_selected(True)
                 if not item.get_word().has_indicator():
                     item.get_word().set_indicator(self._available_indicators.pop())
             else:
-                item.get_word().set_selected(False)
                 # Return indicator to magazine.
                 indicator = item.get_word().get_indicator()
                 if indicator > -1:

@@ -32,7 +32,8 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         :param item: Item to add
         :return: None
         """
-        panel = ListItemPanel(self, item, True)
+        # Disable all panels by default, assigning indicators will enable them.
+        panel = ListItemPanel(self, item, False)
         self._sizer.Add(panel, 0, wx.EXPAND)
         panel.update_count()
         panel.Show(False)
@@ -44,9 +45,28 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         :param items: Dictionary of items with ids.
         :return: None
         """
-        for item in items:
+        # Add items from most repetitions to least.
+        # The items are added to the sizer above unordered and show up unordered. They are detached in clear_list and
+        # reinserted in order here.
+        insert_later: List[ListItemPanel] = []
+        index = 0
+        for item in sorted(items):
             item.update_count()
             item.Show(True)
+            if not item.get_word().has_indicator():
+                item.set_enabled(False)
+            if item.get_word().is_selected():
+                # Group selected words at the top.
+                self._sizer.Insert(0, item, 0, wx.EXPAND)
+                index += 1
+            else:
+                insert_later.append(item)
+
+        for item in insert_later:
+            # Insert unselected words.
+            self._sizer.Insert(index, item, 0, wx.EXPAND)
+
+        self._sizer.Layout()
         self.SetupScrolling(scroll_x=False, scrollToTop=False)
 
     def clear_list(self) -> None:
@@ -57,4 +77,5 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         for ch in self.GetChildren():
             ch: ListItemPanel
             ch.Show(False)
+            self._sizer.Detach(ch)
         self.Layout()

@@ -68,6 +68,7 @@ class MainFrame(wx.Frame):
         self._side_word_list: SidePanel = None
         self._available_indicators: Set[int] = set()
         self._selected_words: List[str] = []
+        self._coloring_tool_off: bool = True
 
         self._init_menu_bar()
         self._init_tool_bar()
@@ -677,7 +678,7 @@ class MainFrame(wx.Frame):
         for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
             self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
-            if not self._selected_words:
+            if not self._selected_words and self._coloring_tool_off:
                 self._side_word_list.clear_list()
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
@@ -686,6 +687,7 @@ class MainFrame(wx.Frame):
             self._main_text_field.Refresh()
             self._side_word_list.clear_list()
             self._selected_words.clear()
+            self._coloring_tool_off = True
             return
         else:
             # Saving splits the new document into words for coloring.
@@ -710,7 +712,7 @@ class MainFrame(wx.Frame):
                     fitting_words.append(panel)
 
             # Assign indicators to filtered words.
-            if not self._selected_words:
+            if self._coloring_tool_off:
                 # The tool is running for the first time, assign indicators to everything top down.
                 indicator_counter = 31
                 # Sort the words from the highest number of repetitions down.
@@ -734,9 +736,10 @@ class MainFrame(wx.Frame):
                         self._main_text_field.IndicatorFillRange(word_span.span()[0],
                                                                  word_span.span()[1] - word_span.span()[0])
             # Fill word list.
-            if not self._selected_words:
+            if self._coloring_tool_off:
                 # Fill only once when the tool runs the first time.
                 self._side_word_list.add_items(fitting_words)
+                self._coloring_tool_off = False
             else:
                 # todo enable checkboxes if we have spare indicators.
                 if self._available_indicators:
@@ -782,7 +785,6 @@ class MainFrame(wx.Frame):
         :param event: Passed along.
         :return: None
         """
-        # todo disabling the last indicator enables all of them again.
         # todo unchecked boxes recheck on tool rerun.
         self._selected_words.clear()
         for item in self._side_word_list.GetChildren():

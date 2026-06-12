@@ -85,7 +85,7 @@ class ListItemPanel(wx.Panel):
 
     def set_checked(self, state: bool) -> None:
         """
-        Set the checkbox state.
+        Set the checkbox state and set the Word's selected state.
         :param state: True to check.
         :return: None
         """
@@ -118,6 +118,9 @@ class ListItemPanel(wx.Panel):
         else:
             self._check_box.Enable(False)
             self._word_label.SetForegroundColour(Constants.color_grey)
+
+    def __str__(self):
+        return f"Item panel: Checked: {self.is_checked()}, Enabled: {self.is_enabled()}, Word: {self._word_instance}"
 
     # Sorts words by count not by alphabet order.
     def __eq__(self, other):

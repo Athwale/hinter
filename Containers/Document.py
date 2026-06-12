@@ -1,4 +1,5 @@
 import re
+from os import remove
 from typing import List, Dict
 
 import bs4
@@ -145,7 +146,17 @@ class Document:
                 word_container.set_spans(spans)
                 word_container.set_count(count)
 
-        # todo remove words no longer present in text from the dict and the side panel.
+        # Remove words no longer present in text from the dict and the side panel.
+        to_remove = []
+        if len(plain_words.keys()) != len(self._word_data.keys()):
+            # There are words in word_data which are no longer in the text.
+            for w in self._word_data.keys():
+                if not w in plain_words.keys():
+                    to_remove.append(w)
+
+        for w in to_remove:
+            self._word_data.pop(w)
+
         self._word_count = len(word_spans)
 
     def read_document(self) -> None:

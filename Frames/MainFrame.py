@@ -1,6 +1,5 @@
 import re
 import shutil
-from itertools import count
 from pathlib import Path
 from typing import List, Dict, Set
 
@@ -20,7 +19,6 @@ from Constants.Constants import EVT_CHECKBOX_CHANGED
 from Containers.ListItemPanel import ListItemPanel
 from Containers.Document import Document
 from Containers.SidePanel import SidePanel
-from Containers.Word import Word
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
 from Resources.Fetch import Fetch
@@ -343,7 +341,6 @@ class MainFrame(wx.Frame):
         self._main_text_field.SetMarginMask(1, 0)
         self._main_text_field.SetMarginWidth(1, 30)
         # todo Add a list view and a statistics area.
-        #  show a list of all words sorted by repetitions and have a checkbox to enable or disable their coloring.
         #  show words with 2 or more repetitions and their average distance in lines, on click show lines where they are.
 
         # Initialize word list:
@@ -397,7 +394,7 @@ class MainFrame(wx.Frame):
         font.SetPointSize(Constants.static_box_font_size)
         search_box.GetStaticBox().SetFont(font)
 
-        # todo select word and context menu to set lengths?
+        # todo select word and have a context menu to set lengths in the top bar, ai and synonym suggestions
 
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
 
@@ -674,6 +671,7 @@ class MainFrame(wx.Frame):
         """
         # todo apply live marking only on current line?
         # todo what happens when text is changed/deleted and new word is selected from the side panel?
+        # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
         # Clear before reapplying. We always have 0-31 indicators.
         for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
@@ -686,13 +684,10 @@ class MainFrame(wx.Frame):
             # Clear if we are turning the tool off.
             self._main_text_field.Refresh()
             self._side_word_list.clear_list()
-            self._selected_words.clear()
             self._coloring_tool_off = True
             return
         else:
-            # Saving splits the new document into words for coloring.
-            # todo do we need to save each time or would splitting it be faster?
-            self._save_file()
+            self._current_document.split_words(self._side_word_list, self._main_text_field.GetText())
             # todo list of default ignored words + metadata
             word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
             repetition_limit = self._repetition_selector.GetValue()
@@ -719,7 +714,11 @@ class MainFrame(wx.Frame):
                 for w in sorted(fitting_words, reverse=True):
                     w: ListItemPanel
                     w.get_word().set_indicator(indicator_counter)
-                    w.set_checked(True)
+                    if self._selected_words:
+                        if w.get_word().is_selected():
+                            w.set_checked(True)
+                    else:
+                        w.set_checked(True)
                     indicator_counter -= 1
                     if indicator_counter == -1:
                         break
@@ -727,7 +726,7 @@ class MainFrame(wx.Frame):
             # Display indicators.
             for w in fitting_words:
                 w: ListItemPanel
-                if w.get_word().has_indicator():
+                if w.get_word().has_indicator() and w.is_checked():
                     indicator = w.get_word().get_indicator()
                     locations = w.get_word().get_spans()
                     for word_span in locations:
@@ -741,7 +740,6 @@ class MainFrame(wx.Frame):
                 self._side_word_list.add_items(fitting_words)
                 self._coloring_tool_off = False
             else:
-                # todo enable checkboxes if we have spare indicators.
                 if self._available_indicators:
                     # We have some spare indicators, enable all checkboxes.
                     for item in self._side_word_list.GetChildren():
@@ -785,7 +783,6 @@ class MainFrame(wx.Frame):
         :param event: Passed along.
         :return: None
         """
-        # todo unchecked boxes recheck on tool rerun.
         self._selected_words.clear()
         for item in self._side_word_list.GetChildren():
             item: ListItemPanel
@@ -948,15 +945,18 @@ class MainFrame(wx.Frame):
         :param file_path: Document path.
         :return: None
         """
-        # todo Open in background eventually and disable the editor in the meanwhile.
+        # todo Open/Save in background eventually and disable the editor in the meanwhile.
         self._main_text_field.Freeze()
+        self._disable_editor()
         self._toolbar.ToggleTool(wx.ID_APPLY, False)
         self._toolbar.Refresh()
         # Clear search
         self._found_last_index = 0
-        self._found_words.clear()
         self._search_text_field.SetValue('')
+        self._found_words.clear()
         self._side_word_list.clear_list()
+        self._selected_words.clear()
+        self._coloring_tool_off = True
         self._current_document = Document(file_path)
         try:
             self._current_document.read_document()
@@ -998,7 +998,7 @@ class MainFrame(wx.Frame):
         :param save_as: True to show dialog.
         :return: None
         """
-        # todo save in background eventually. Autosave on timer.
+        # todo autosave on timer.
         # todo metadata raw text editor/parser-checker?
         self._main_text_field.Freeze()
         destination = self._current_document.get_path()

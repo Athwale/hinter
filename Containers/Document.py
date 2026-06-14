@@ -168,6 +168,8 @@ class Document:
         :raises FormatError if formatting marks are not evenly matched.
         :raises AttributeError if format is incorrect
         """
+        # todo hide metadata in <title> which is not touched by LibreOffice. Has to be parsed from a single line.
+
         self._errors = []
         try:
             if self._path.exists() and self._path.is_file():

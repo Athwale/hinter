@@ -688,7 +688,6 @@ class MainFrame(wx.Frame):
             return
         else:
             self._current_document.split_words(self._side_word_list, self._main_text_field.GetText())
-            # todo list of default ignored words + metadata
             word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
             repetition_limit = self._repetition_selector.GetValue()
             length_min_limit = self._min_repeated_word_length_selector.GetValue()

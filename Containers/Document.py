@@ -4,13 +4,14 @@ from typing import List, Dict
 
 import bs4
 import htmlmin
-from bs4 import Tag, NavigableString
+from bs4 import Tag, NavigableString, BeautifulSoup
 from pathlib import Path
 
-from Constants import Constants
+from Constants import Constants, Strings
 from Containers.ListItemPanel import ListItemPanel
 from Containers.SidePanel import SidePanel
 from Containers.Word import Word
+from Exceptions.FormatError import FormatError
 from Resources.Fetch import Fetch
 
 
@@ -186,6 +187,8 @@ class Document:
 
         soup = bs4.BeautifulSoup(self._raw_html_text, features="html.parser")
         body = soup.find(name="body")
+        if body is None:
+            raise FormatError(Strings.err_file_format)
         for ch in body.children:
             if isinstance(ch, Tag) and ch.name == 'p':
                 # These can also be NavigableString and those are leftover \n.
@@ -211,7 +214,17 @@ class Document:
                         self._errors.append(str(element))
             else:
                 self._errors.append(str(ch))
+        self.read_metadata(soup)
         self._new = False
+
+    def read_metadata(self, soup: BeautifulSoup) -> None:
+        """
+        Read metadata information from the file and fill internal variables.
+        :param soup: BS of the document
+        :return: None
+        """
+        # todo here
+        print(soup)
 
     def save_document(self) -> bool:
         """

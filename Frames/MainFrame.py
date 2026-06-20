@@ -21,6 +21,7 @@ from Containers.Document import Document
 from Containers.SidePanel import SidePanel
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
+from Exceptions.FormatError import FormatError
 from Resources.Fetch import Fetch
 from Tools.Config import Config
 
@@ -964,6 +965,9 @@ class MainFrame(wx.Frame):
             return
         except AttributeError as _:
             self._show_error_ok_dialog(Strings.err_file_format)
+            return
+        except FormatError as e:
+            self._show_error_ok_dialog(str(e))
             return
         errors = self._current_document.get_errors()
         if errors:

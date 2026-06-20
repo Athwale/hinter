@@ -61,7 +61,8 @@ warn_file_not_saved: str = "Save current file: {}?"
 warn_errors: str = "Errors found in HTML:\n\n {}\nCan not continue\nAllowed text tags: <b>, <i>"
 warn_load_last_file: str = "Load previous file: {}?"
 
-err_file_format: str = "File formatting mismatch"
+err_file_format: str = "File formatting error"
+err_file_format_metadata: str = "File metadata formatting error"
 err_file_permissions: str = "Can not read file"
 err_file_permissions_save: str = "Permission error, can not save"
 

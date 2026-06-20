@@ -1,6 +1,6 @@
 import re
 from os import remove
-from typing import List, Dict
+from typing import List, Dict, Set
 
 import bs4
 import htmlmin
@@ -36,6 +36,11 @@ class Document:
         self._errors: List[str] = []
         self._new: bool = True
         self._is_modified = False
+
+        # todo must ignore case
+        self._ignored_words: Set[str] = set()
+        self._names: Set[str] = set()
+        self._synonyms: List[Set[str]] = []
 
         self._word_matcher = re.compile(rb"\b([A-Za-z0-9]+)\b")
 
@@ -163,14 +168,11 @@ class Document:
     def read_document(self) -> None:
         """
         Parse document and fill internal variables.
-        # todo read metadata from the file too.
         :return: None
         :raises PermissionError if file is not accessible
-        :raises FormatError if formatting marks are not evenly matched.
+        :raises FormatError if formatting marks are not evenly matched
         :raises AttributeError if format is incorrect
         """
-        # todo hide metadata in <title> which is not touched by LibreOffice. Has to be parsed from a single line.
-
         self._errors = []
         try:
             if self._path.exists() and self._path.is_file():
@@ -219,12 +221,36 @@ class Document:
 
     def read_metadata(self, soup: BeautifulSoup) -> None:
         """
+        # todo save metadata too
+        # todo editors for metadata
         Read metadata information from the file and fill internal variables.
+        Format: <title> ignored: test, and ;synonym: auto, car ;synonym: cat, feline ;names: Name, Name1 </title>
         :param soup: BS of the document
         :return: None
+        :raises: FormatError if metadata has wrong format
         """
-        # todo here
-        print(soup)
+        self._names.clear()
+        self._synonyms.clear()
+        self._ignored_words.clear()
+        title_metadata = soup.find('title')
+        if title_metadata is not None:
+            sections = title_metadata.text.split(';')
+            for section in sections:
+                parts = section.split(':')
+                if parts[0] == 'ignored':
+                    for w in parts[1:]:
+                        if w.strip():
+                            self._ignored_words.add(w.strip())
+                elif parts[0] == 'synonym':
+                    synonyms = set([s.strip() for s in parts[1:] if s.strip()])
+                    if synonyms:
+                        self._synonyms.append(synonyms)
+                elif parts[0] == 'names':
+                    for w in parts[1:]:
+                        if w.strip():
+                            self._names.add(w.strip())
+                else:
+                    raise FormatError(Strings.err_file_format_metadata)
 
     def save_document(self) -> bool:
         """

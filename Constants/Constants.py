@@ -33,6 +33,9 @@ about_dialog_height: int = 300
 words_dialog_width: int = 400
 words_dialog_height: int = 900
 
+plain_text_dialog_width: int = 400
+plain_text_dialog_height: int = 600
+
 word_list_width: int = 220
 
 html_wildcard: str = "HTML files (*.html)|*.html"

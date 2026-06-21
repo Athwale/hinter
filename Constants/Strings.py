@@ -23,6 +23,12 @@ menu_item_italic: str = "Italic"
 menu_item_italic_hint: str = "Make text italic"
 menu_item_clear: str = "Clear styles"
 menu_item_clear_hint: str = "Clear styles"
+menu_item_edit_words_ignored: str = "Edit ignored..."
+menu_item_edit_words_ignored_hint: str = "Edit ignored"
+menu_item_edit_words_names: str = "Edit names..."
+menu_item_edit_words_names_hint: str = "Edit names"
+menu_item_edit_words_synonyms: str = "Edit synonyms..."
+menu_item_edit_words_synonyms_hint: str = "Edit synonyms"
 
 menu_tools: str = "&Tools"
 menu_item_word_list: str = "Word list"
@@ -36,18 +42,21 @@ dialog_save: str = "Save file"
 dialog_open: str = "Open file"
 dialog_about: str = "About"
 dialog_words_info: str = "Word counts"
+dialog_edit: str = "Edit: {}"
 
 label_coloring_box_rep: str = "Min word repetitions"
 label_coloring_box_min_len: str = "Min length"
 label_coloring_box_max_len: str = "Max length"
 label_search_box: str = "Find"
 label_search_results: str = "Matches: {}/{}"
-label_word: str = 'Word'
-label_words: str = 'Word'
-label_selected: str = '✓'
-label_count: str = 'Count'
+label_word: str = "Word"
+label_words: str = "Word"
+label_selected: str = "✓"
+label_count: str = "Count"
 
 button_close: str = "Close"
+button_cancel: str = "Cancel"
+button_save: str = "Save"
 
 status_warning: str = "Warning"
 status_saved: str = "Saved"

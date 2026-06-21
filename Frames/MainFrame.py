@@ -20,6 +20,7 @@ from Containers.ListItemPanel import ListItemPanel
 from Containers.Document import Document
 from Containers.SidePanel import SidePanel
 from Dialogs.AboutDialog import AboutDialog
+from Dialogs.PlainTextEditDialog import PlainTextEditDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
 from Exceptions.FormatError import FormatError
 from Resources.Fetch import Fetch
@@ -121,8 +122,20 @@ class MainFrame(wx.Frame):
         self._menu_items.append(edit_menu_item_bold)
         edit_menu_item_italic = edit_menu.Append(wx.ID_ITALIC, Strings.menu_item_italic, Strings.menu_item_italic_hint)
         self._menu_items.append(edit_menu_item_italic)
-        edit_menu_item_remove_styles = edit_menu.Append(wx.ID_CLEAR, Strings.menu_item_clear, Strings.menu_item_clear_hint)
+        edit_menu_item_remove_styles = edit_menu.Append(wx.ID_CLEAR, Strings.menu_item_clear,
+                                                        Strings.menu_item_clear_hint)
         self._menu_items.append(edit_menu_item_remove_styles)
+        edit_menu.AppendSeparator()
+        edit_menu_item_ignored = edit_menu.Append(wx.ID_ANY, Strings.menu_item_edit_words_ignored,
+                                                        Strings.menu_item_edit_words_ignored_hint)
+        self._menu_items.append(edit_menu_item_ignored)
+        edit_menu_item_names = edit_menu.Append(wx.ID_ANY, Strings.menu_item_edit_words_names,
+                                                  Strings.menu_item_edit_words_names_hint)
+        self._menu_items.append(edit_menu_item_names)
+        edit_menu_item_synonyms = edit_menu.Append(wx.ID_ANY, Strings.menu_item_edit_words_synonyms,
+                                                  Strings.menu_item_edit_words_synonyms_hint)
+        self._menu_items.append(edit_menu_item_synonyms)
+
 
         # Tools menu:
         tools_menu = wx.Menu()
@@ -153,6 +166,11 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._redo, edit_menu_item_redo)
         self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
         self.Bind(wx.EVT_MENU, self._info_word_counts, tools_menu_item_words)
+
+        # todo
+        self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_names)
+        self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_ignored)
+        self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_synonyms)
 
         self.Bind(stc.EVT_STC_MODIFIED, self.on_modified)
         self.Bind(wx.EVT_CLOSE, self._on_exit)
@@ -614,6 +632,16 @@ class MainFrame(wx.Frame):
         """
         self._main_text_field.Redo()
         self._main_text_field.Refresh()
+
+    def _edit_words(self, event: wx.CommandEvent) -> None:
+        """
+        Open a dialog for word list editing.
+        :param event: Not used.
+        :return: None
+        """
+        # todo pass document instance
+        dialog = PlainTextEditDialog(self, "test")
+        dialog.ShowModal()
 
     def _new_file(self, event: wx.CommandEvent) -> None:
         """

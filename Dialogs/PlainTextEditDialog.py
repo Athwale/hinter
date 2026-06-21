@@ -1,20 +1,25 @@
 import wx
 
 from Constants import Constants, Strings
+from Containers.Document import Document
 
 
 class PlainTextEditDialog(wx.Dialog):
 
-    def __init__(self, parent, word_list: str):
+    def __init__(self, parent, word_list: str, document: Document):
         """
         Show a simple plain text editor with a file opened with the ability to save the file.
         Used for word lists.
         :param parent: Parent frame.
         :param word_list: Word list name
+        :param document: Document instance
         """
         wx.Dialog.__init__(self, parent, title=Strings.dialog_edit,
                            size=wx.Size(Constants.plain_text_dialog_width, Constants.plain_text_dialog_height),
                            style=wx.DEFAULT_DIALOG_STYLE)
+
+        self._document = document
+        self._list_type = word_list
 
         self._main_vertical_sizer = wx.BoxSizer(wx.VERTICAL)
         self._horizontal_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -53,19 +58,53 @@ class PlainTextEditDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON, self._handle_buttons, self._save_button)
         self.Bind(wx.EVT_BUTTON, self._handle_buttons, self._cancel_button)
 
+        self._illegal_characters = '.,; '
+
     def _handle_buttons(self, event: wx.CommandEvent) -> None:
         """
         Handle button clicks, save the file.
         :param event: The button event
         :return: None
         """
-        event.Skip()
+        # todo check and save if correct
+        # Skip event to let it go into the main thread.
+        # event.Skip()
         if event.GetId() == wx.ID_OK:
-            print('TODO save')
+            if (self._list_type == Strings.menu_item_edit_words_ignored_hint or
+                    self._list_type == Strings.menu_item_edit_words_names_hint):
+                words = self._field_text.GetValue().split('\n')
+                for w in words:
+                    # Skip empty strings
+                    if w:
+                        for ch in self._illegal_characters:
+                            if ch in w:
+                                wx.MessageBox(Strings.warn_word_format_single,
+                                              Strings.status_warning, wx.OK | wx.ICON_WARNING)
+                                return
+                new_set = set()
+                for w in words:
+                    if w:
+                        new_set.add(w.lower())
+                if self._list_type == Strings.menu_item_edit_words_names_hint:
+                    self._document.set_names(new_set)
+                elif self._list_type == Strings.menu_item_edit_words_ignored_hint:
+                    self._document.set_ignored_words(new_set)
+                event.Skip()
+            elif self._list_type == Strings.menu_item_edit_words_synonyms_hint:
+                print('save synonyms')
 
     def _display_dialog_contents(self) -> None:
         """
         Display the image that this dialog edits in the gui.
         :return: None
         """
-        print('TODO')
+        if self._list_type == Strings.menu_item_edit_words_ignored_hint:
+            for w in self._document.get_ignored_words():
+                self._field_text.AppendText(f"{w}\n")
+        elif self._list_type == Strings.menu_item_edit_words_names_hint:
+            for w in self._document.get_names():
+                self._field_text.AppendText(f"{w.capitalize()}\n")
+        elif self._list_type == Strings.menu_item_edit_words_synonyms_hint:
+            for group in self._document.get_synonyms():
+                string = ', '.join(group)
+                self._field_text.AppendText(f"{string}\n")

@@ -1,23 +1,23 @@
+import html
 import re
 import shutil
 from pathlib import Path
 from typing import List, Dict, Set
 
-import html
 import wx
+import wx.dataview as dv
 import wx.grid
+import wx.lib.scrolledpanel
 import wx.stc as stc
 from wx import ToolBarToolBase
 from wx._core import StatusBar, ToolBar
 from wx.svg import SVGimage
-import wx.dataview as dv
-import wx.lib.scrolledpanel
 
 from Constants import Constants
 from Constants import Strings
 from Constants.Constants import EVT_CHECKBOX_CHANGED
-from Containers.ListItemPanel import ListItemPanel
 from Containers.Document import Document
+from Containers.ListItemPanel import ListItemPanel
 from Containers.SidePanel import SidePanel
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.PlainTextEditDialog import PlainTextEditDialog
@@ -118,6 +118,7 @@ class MainFrame(wx.Frame):
         edit_menu_item_redo = edit_menu.Append(wx.ID_REDO, Strings.menu_item_redo, Strings.menu_item_redo_hint)
         self._menu_items.append(edit_menu_item_redo)
         edit_menu.AppendSeparator()
+
         edit_menu_item_bold = edit_menu.Append(wx.ID_BOLD, Strings.menu_item_bold, Strings.menu_item_bold_hint)
         self._menu_items.append(edit_menu_item_bold)
         edit_menu_item_italic = edit_menu.Append(wx.ID_ITALIC, Strings.menu_item_italic, Strings.menu_item_italic_hint)
@@ -126,13 +127,17 @@ class MainFrame(wx.Frame):
                                                         Strings.menu_item_clear_hint)
         self._menu_items.append(edit_menu_item_remove_styles)
         edit_menu.AppendSeparator()
-        edit_menu_item_ignored = edit_menu.Append(wx.ID_ANY, Strings.menu_item_edit_words_ignored,
+
+        self._id_ignored = wx.NewId()
+        edit_menu_item_ignored = edit_menu.Append(self._id_ignored, Strings.menu_item_edit_words_ignored,
                                                         Strings.menu_item_edit_words_ignored_hint)
         self._menu_items.append(edit_menu_item_ignored)
-        edit_menu_item_names = edit_menu.Append(wx.ID_ANY, Strings.menu_item_edit_words_names,
+        self._id_names = wx.NewId()
+        edit_menu_item_names = edit_menu.Append(self._id_names, Strings.menu_item_edit_words_names,
                                                   Strings.menu_item_edit_words_names_hint)
         self._menu_items.append(edit_menu_item_names)
-        edit_menu_item_synonyms = edit_menu.Append(wx.ID_ANY, Strings.menu_item_edit_words_synonyms,
+        self._id_synonyms = wx.NewId()
+        edit_menu_item_synonyms = edit_menu.Append(self._id_synonyms, Strings.menu_item_edit_words_synonyms,
                                                   Strings.menu_item_edit_words_synonyms_hint)
         self._menu_items.append(edit_menu_item_synonyms)
 
@@ -639,9 +644,17 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # todo pass document instance
-        dialog = PlainTextEditDialog(self, "test")
-        dialog.ShowModal()
+        # todo
+        button_id = event.GetId()
+        dialog = None
+        if button_id == self._id_ignored:
+            dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_ignored_hint, self._current_document)
+        elif button_id == self._id_names:
+            dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_names_hint, self._current_document)
+        elif button_id == self._id_synonyms:
+            dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_synonyms_hint, self._current_document)
+        if dialog:
+            dialog.ShowModal()
 
     def _new_file(self, event: wx.CommandEvent) -> None:
         """

@@ -1,11 +1,10 @@
 import re
-from os import remove
+from pathlib import Path
 from typing import List, Dict, Set
 
 import bs4
 import htmlmin
 from bs4 import Tag, NavigableString, BeautifulSoup
-from pathlib import Path
 
 from Constants import Constants, Strings
 from Containers.ListItemPanel import ListItemPanel
@@ -43,6 +42,51 @@ class Document:
         self._synonyms: List[Set[str]] = []
 
         self._word_matcher = re.compile(rb"\b([A-Za-z0-9]+)\b")
+
+    def get_ignored_words(self) -> Set[str]:
+        """
+        Get the set of ignored words.
+        :return: Set of ignored words.
+        """
+        return self._ignored_words
+
+    def get_names(self) -> Set[str]:
+        """
+        Get the set of names.
+        :return: Set of names.
+        """
+        return self._names
+
+    def get_synonyms(self) -> List[Set[str]]:
+        """
+        Get the list of sets of synonyms.
+        :return: List of sets of synonyms.
+        """
+        return self._synonyms
+
+    def set_ignored_words(self, words: Set[str]) -> None:
+        """
+        Set new ignored words.
+        :param words: Set of strings.
+        :return: None
+        """
+        self._ignored_words = words
+
+    def set_names(self, names: Set[str]) -> None:
+        """
+        Set new names.
+        :param names: Set of names.
+        :return: None
+        """
+        self._names = names
+
+    def set_synonyms(self, words: List[Set[str]]) -> None:
+        """
+        Set new synonyms.
+        :param words: List of sets of strings
+        :return: None
+        """
+        self._synonyms = words
 
     def get_path(self) -> Path:
         """
@@ -222,7 +266,6 @@ class Document:
     def read_metadata(self, soup: BeautifulSoup) -> None:
         """
         # todo save metadata too
-        # todo editors for metadata
         Read metadata information from the file and fill internal variables.
         Format: <title> ignored: test, and ;synonym: auto, car ;synonym: cat, feline ;names: Name, Name1 </title>
         :param soup: BS of the document
@@ -238,17 +281,23 @@ class Document:
             for section in sections:
                 parts = section.split(':')
                 if parts[0] == 'ignored':
-                    for w in parts[1:]:
-                        if w.strip():
-                            self._ignored_words.add(w.strip())
+                    for group in parts[1:]:
+                        if group.strip():
+                            for w in group.split(','):
+                                self._ignored_words.add(w.strip())
                 elif parts[0] == 'synonym':
-                    synonyms = set([s.strip() for s in parts[1:] if s.strip()])
+                    synonyms = [s.strip() for s in parts[1:] if s.strip()]
                     if synonyms:
-                        self._synonyms.append(synonyms)
+                        for synonym_group in synonyms:
+                            synonym_set = set()
+                            for w in synonym_group.split(','):
+                                synonym_set.add(w.strip())
+                            self._synonyms.append(synonym_set)
                 elif parts[0] == 'names':
-                    for w in parts[1:]:
-                        if w.strip():
-                            self._names.add(w.strip())
+                    for group in parts[1:]:
+                        if group.strip():
+                            for w in group.split(','):
+                                self._names.add(w.strip().lower())
                 else:
                     raise FormatError(Strings.err_file_format_metadata)
 

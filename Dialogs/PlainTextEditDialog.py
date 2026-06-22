@@ -58,7 +58,8 @@ class PlainTextEditDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON, self._handle_buttons, self._save_button)
         self.Bind(wx.EVT_BUTTON, self._handle_buttons, self._cancel_button)
 
-        self._illegal_characters = '.,; '
+        self._illegal_characters_ignored = '.,; '
+        self._illegal_characters_synonym = '.; '
 
     def _handle_buttons(self, event: wx.CommandEvent) -> None:
         """
@@ -66,9 +67,6 @@ class PlainTextEditDialog(wx.Dialog):
         :param event: The button event
         :return: None
         """
-        # todo check and save if correct
-        # Skip event to let it go into the main thread.
-        # event.Skip()
         if event.GetId() == wx.ID_OK:
             if (self._list_type == Strings.menu_item_edit_words_ignored_hint or
                     self._list_type == Strings.menu_item_edit_words_names_hint):
@@ -76,7 +74,7 @@ class PlainTextEditDialog(wx.Dialog):
                 for w in words:
                     # Skip empty strings
                     if w:
-                        for ch in self._illegal_characters:
+                        for ch in self._illegal_characters_ignored:
                             if ch in w:
                                 wx.MessageBox(Strings.warn_word_format_single,
                                               Strings.status_warning, wx.OK | wx.ICON_WARNING)
@@ -84,14 +82,35 @@ class PlainTextEditDialog(wx.Dialog):
                 new_set = set()
                 for w in words:
                     if w:
-                        new_set.add(w.lower())
+                        new_set.add(w.lower().strip())
                 if self._list_type == Strings.menu_item_edit_words_names_hint:
                     self._document.set_names(new_set)
                 elif self._list_type == Strings.menu_item_edit_words_ignored_hint:
                     self._document.set_ignored_words(new_set)
+                # Skip event to let it go into the main thread and close this dialog.
                 event.Skip()
             elif self._list_type == Strings.menu_item_edit_words_synonyms_hint:
-                print('save synonyms')
+                synonyms = self._field_text.GetValue().split('\n')
+                for group in synonyms:
+                    if group:
+                        for word in group.split(','):
+                            for ch in self._illegal_characters_synonym:
+                                if ch in word.strip():
+                                    wx.MessageBox(Strings.warn_word_format_synonym,
+                                                  Strings.status_warning, wx.OK | wx.ICON_WARNING)
+                                    return
+                new_list = []
+                for group in synonyms:
+                    if group:
+                        new_set = set()
+                        for word in group.split(','):
+                            new_set.add(word.strip())
+                        new_list.append(new_set)
+                self._document.set_synonyms(new_list)
+                event.Skip()
+        elif event.GetId() == wx.ID_CANCEL:
+            event.Skip()
+            return
 
     def _display_dialog_contents(self) -> None:
         """
@@ -99,12 +118,12 @@ class PlainTextEditDialog(wx.Dialog):
         :return: None
         """
         if self._list_type == Strings.menu_item_edit_words_ignored_hint:
-            for w in self._document.get_ignored_words():
+            for w in sorted(self._document.get_ignored_words()):
                 self._field_text.AppendText(f"{w}\n")
         elif self._list_type == Strings.menu_item_edit_words_names_hint:
-            for w in self._document.get_names():
+            for w in sorted(self._document.get_names()):
                 self._field_text.AppendText(f"{w.capitalize()}\n")
         elif self._list_type == Strings.menu_item_edit_words_synonyms_hint:
-            for group in self._document.get_synonyms():
+            for group in sorted(self._document.get_synonyms()):
                 string = ', '.join(group)
                 self._field_text.AppendText(f"{string}\n")

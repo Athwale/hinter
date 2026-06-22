@@ -265,7 +265,6 @@ class Document:
 
     def read_metadata(self, soup: BeautifulSoup) -> None:
         """
-        # todo save metadata too
         Read metadata information from the file and fill internal variables.
         Format: <title> ignored: test, and ;synonym: auto, car ;synonym: cat, feline ;names: Name, Name1 </title>
         :param soup: BS of the document
@@ -280,12 +279,12 @@ class Document:
             sections = title_metadata.text.split(';')
             for section in sections:
                 parts = section.split(':')
-                if parts[0] == 'ignored':
+                if parts[0].strip() == 'ignored':
                     for group in parts[1:]:
                         if group.strip():
                             for w in group.split(','):
                                 self._ignored_words.add(w.strip())
-                elif parts[0] == 'synonym':
+                elif parts[0].strip() == 'synonym':
                     synonyms = [s.strip() for s in parts[1:] if s.strip()]
                     if synonyms:
                         for synonym_group in synonyms:
@@ -293,7 +292,7 @@ class Document:
                             for w in synonym_group.split(','):
                                 synonym_set.add(w.strip())
                             self._synonyms.append(synonym_set)
-                elif parts[0] == 'names':
+                elif parts[0].strip() == 'names':
                     for group in parts[1:]:
                         if group.strip():
                             for w in group.split(','):
@@ -311,7 +310,18 @@ class Document:
             self._raw_html_text = f.read()
 
         soup = bs4.BeautifulSoup(self._raw_html_text, features="html.parser")
-        body: Tag = soup.find(name="body")
+        # We use title because LibreOffice ignores it.
+        title = soup.find(name="title")
+        meta_string: str = f'ignored:'
+        # Format: <title> ignored: test, and ;synonym: auto, car ;synonym: cat, feline ;names: Name, Name1 </title>
+        synonym_part = ''
+        for group in self._synonyms:
+            synonym_part += f'; synonym:{",".join(group)}'
+
+        meta_string += f'{",".join(self._ignored_words)}; names:{",".join(self._names)}{synonym_part}'
+        title.string = meta_string
+
+        body = soup.find(name="body")
         # Everything is in one paragraph, the rest is solved by <br>
         par = soup.new_tag("p")
 

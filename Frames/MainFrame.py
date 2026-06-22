@@ -28,6 +28,7 @@ from Tools.Config import Config
 
 
 # todo spell check
+# todo check that names have a capital letter, is not starting a new line.
 # todo ai integration
 
 class MainFrame(wx.Frame):
@@ -680,6 +681,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        # todo fix this
         WordInfoDialog(self, self._current_document.get_word_marking_data())
 
     def _clear_editor(self) -> None:
@@ -738,6 +740,7 @@ class MainFrame(wx.Frame):
             fitting_words: List[ListItemPanel] = []
 
             # Filter the words that fit the marking criteria to a new list and work on that.
+            # todo incorporate the list of ignored words
             for panel in word_data.values():
                 panel: ListItemPanel
                 word = panel.get_word()

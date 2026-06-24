@@ -1,19 +1,20 @@
-from typing import Dict, List
+from typing import Dict
 
 import wx
 import wx.html
 from wx import Size
 
 from Constants import Strings, Constants
-from Containers.Word import Word
+from Containers.ListItemPanel import ListItemPanel
 
 
 class WordInfoDialog(wx.Dialog):
 
-    def __init__(self, parent, words: List[Word]):
+    def __init__(self, parent, panels: Dict[bytes, ListItemPanel]):
         """
         Display a dialog with a message with the text being selectable.
         :param parent: Parent frame.
+        :param panels: Dictionary of [bytes, ListItemPanel]
         """
         wx.Dialog.__init__(self, parent, title=Strings.dialog_words_info,
                            size=Size(Constants.words_dialog_width, Constants.words_dialog_height))
@@ -27,9 +28,9 @@ class WordInfoDialog(wx.Dialog):
         self._close_button.SetDefault()
 
         content = ''
-        for w in sorted(words, reverse=True):
-            w: Word
-            content += f'{w.get_word().decode('utf-8')} -> {w.get_count()}<br>'
+        for w, p in sorted(panels.items()):
+            content += f'{w.decode('utf-8')} -> {p.get_word_instance().get_count()}<br>'
+
         self._html_window.SetPage(content)
 
         self._main_vertical_sizer.Add(self._html_window, 1, flag=wx.EXPAND)

@@ -681,7 +681,6 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # todo fix this
         WordInfoDialog(self, self._current_document.get_word_marking_data())
 
     def _clear_editor(self) -> None:
@@ -743,7 +742,7 @@ class MainFrame(wx.Frame):
             # todo incorporate the list of ignored words
             for panel in word_data.values():
                 panel: ListItemPanel
-                word = panel.get_word()
+                word = panel.get_word_instance()
                 w_count = word.get_count()
                 if w_count >= repetition_limit and length_min_limit <= len(word.get_word()) <= length_max_limit:
                     if word.get_word().decode('utf-8') in self._selected_words:
@@ -757,9 +756,9 @@ class MainFrame(wx.Frame):
                 # Sort the words from the highest number of repetitions down.
                 for w in sorted(fitting_words, reverse=True):
                     w: ListItemPanel
-                    w.get_word().set_indicator(indicator_counter)
+                    w.get_word_instance().set_indicator(indicator_counter)
                     if self._selected_words:
-                        if w.get_word().is_selected():
+                        if w.get_word_instance().is_selected():
                             w.set_checked(True)
                     else:
                         w.set_checked(True)
@@ -770,9 +769,9 @@ class MainFrame(wx.Frame):
             # Display indicators.
             for w in fitting_words:
                 w: ListItemPanel
-                if w.get_word().has_indicator() and w.is_checked():
-                    indicator = w.get_word().get_indicator()
-                    locations = w.get_word().get_spans()
+                if w.get_word_instance().has_indicator() and w.is_checked():
+                    indicator = w.get_word_instance().get_indicator()
+                    locations = w.get_word_instance().get_spans()
                     for word_span in locations:
                         word_span: re.Match
                         self._main_text_field.SetIndicatorCurrent(indicator)
@@ -794,7 +793,7 @@ class MainFrame(wx.Frame):
                     # Disable extra checkboxes.
                     for item in self._side_word_list.GetChildren():
                         item: ListItemPanel
-                        if item.get_word().has_indicator():
+                        if item.get_word_instance().has_indicator():
                             item.set_enabled(True)
                         else:
                             item.set_enabled(False)
@@ -831,15 +830,15 @@ class MainFrame(wx.Frame):
         for item in self._side_word_list.GetChildren():
             item: ListItemPanel
             if item.is_checked():
-                self._selected_words.append(item.get_word().get_word().decode('utf-8'))
-                if not item.get_word().has_indicator():
-                    item.get_word().set_indicator(self._available_indicators.pop())
+                self._selected_words.append(item.get_word_instance().get_word().decode('utf-8'))
+                if not item.get_word_instance().has_indicator():
+                    item.get_word_instance().set_indicator(self._available_indicators.pop())
             else:
                 # Return indicator to magazine.
-                indicator = item.get_word().get_indicator()
+                indicator = item.get_word_instance().get_indicator()
                 if indicator > -1:
                     self._available_indicators.add(indicator)
-                    item.get_word().clear_indicator()
+                    item.get_word_instance().clear_indicator()
         self._apply_indicators(event)
 
     def _apply_style_with_undo(self, start, length, new_style_id) -> None:

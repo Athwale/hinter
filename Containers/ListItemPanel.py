@@ -69,7 +69,7 @@ class ListItemPanel(wx.Panel):
         """
         self._count.SetLabel(str(self._word_instance.get_count()))
 
-    def get_word(self) -> Word:
+    def get_word_instance(self) -> Word:
         """
         Get the word.
         :return: The Word instance.
@@ -126,9 +126,9 @@ class ListItemPanel(wx.Panel):
     def __eq__(self, other):
         if not isinstance(other, ListItemPanel):
             return NotImplemented
-        return self._word_instance.get_count() == other.get_word().get_count()
+        return self._word_instance.get_count() == other.get_word_instance().get_count()
 
     def __lt__(self, other):
         if not isinstance(other, ListItemPanel):
             return NotImplemented
-        return self._word_instance.get_count() < other.get_word().get_count()
+        return self._word_instance.get_count() < other.get_word_instance().get_count()

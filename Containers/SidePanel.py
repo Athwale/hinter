@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import List
 
 import wx
 import wx.lib.scrolledpanel
@@ -53,9 +53,9 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         for item in sorted(items):
             item.update_count()
             item.Show(True)
-            if not item.get_word().has_indicator():
+            if not item.get_word_instance().has_indicator():
                 item.set_enabled(False)
-            if item.get_word().is_selected():
+            if item.get_word_instance().is_selected():
                 # Group selected words at the top.
                 self._sizer.Insert(0, item, 0, wx.EXPAND)
                 index += 1

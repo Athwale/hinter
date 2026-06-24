@@ -191,7 +191,7 @@ class Document:
                 new_panel = parent.add_hidden_item(Word(word, spans, count))
                 self._word_data[word] = new_panel
             else:
-                word_container = panel.get_word()
+                word_container = panel.get_word_instance()
                 # 0 evaluates as False
                 word_container.set_spans(spans)
                 word_container.set_count(count)

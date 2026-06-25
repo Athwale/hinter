@@ -173,7 +173,6 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
         self.Bind(wx.EVT_MENU, self._info_word_counts, tools_menu_item_words)
 
-        # todo
         self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_names)
         self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_ignored)
         self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_synonyms)
@@ -419,7 +418,21 @@ class MainFrame(wx.Frame):
         font.SetPointSize(Constants.static_box_font_size)
         search_box.GetStaticBox().SetFont(font)
 
-        # todo select word and have a context menu to set lengths in the top bar, ai and synonym suggestions
+        # todo select word and have a context menu to set lengths in the top bar, ai and synonym suggestions, add to ignored, add to names.
+        # todo post save test for names and other problems.
+        # todo Create popup context menu working outside the text area
+        # Side panel context menu.
+        self._menu_side = wx.Menu()
+        self._menu_item_up = wx.MenuItem(self._menu_side, wx.ID_UP, "test")
+        self._menu_side.Append(self._menu_item_up)
+        # todo use this for the side panel.
+        self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_sidepanel, self._side_word_list)
+
+        # Main text area context menu.
+        self._main_text_field.UsePopUp(stc.STC_POPUP_NEVER)
+        self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_text, self._main_text_field)
+        self.Bind(wx.EVT_MENU, lambda _on_copy: self._main_text_field.Copy(), id=wx.ID_COPY)
+        self.Bind(wx.EVT_MENU, lambda _on_paste: self._main_text_field.Paste(), id=wx.ID_PASTE)
 
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
 
@@ -446,6 +459,49 @@ class MainFrame(wx.Frame):
 
         self.SetSizer(main_vertical_box)
 
+    def _on_context_menu_text(self, event) -> None:
+        """
+        Display the context pop up menu.
+        :param event: Unused.
+        :return: None
+        """
+        menu = wx.Menu()
+        undo_item = menu.Append(wx.ID_UNDO, Strings.menu_item_undo)
+        redo_item = menu.Append(wx.ID_REDO, Strings.menu_item_redo)
+        menu.AppendSeparator()
+        copy_item = menu.Append(wx.ID_COPY, Strings.menu_item_copy)
+        paste_item = menu.Append(wx.ID_PASTE, Strings.menu_item_paste)
+        # Disable actions if they aren't valid right now
+        undo_item.Enable(self._main_text_field.CanUndo())
+        redo_item.Enable(self._main_text_field.CanRedo())
+        copy_item.Enable(self._main_text_field.GetSelectionStart() != self._main_text_field.GetSelectionEnd())
+        paste_item.Enable(self._main_text_field.CanPaste())
+        menu.AppendSeparator()
+
+        # todo add word to ignored, add word to names, find synonym, set limits from word
+        custom_id = wx.NewIdRef()
+        menu.Append(custom_id, "Google Search Selected Text")
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=custom_id)
+
+        self.PopupMenu(menu)
+        menu.Destroy()
+
+    def _on_context_menu_text_button(self, event: wx.CommandEvent) -> None:
+        """
+        Display the context pop up menu.
+        :param event: Unused.
+        :return: None
+        """
+        print(type(event))
+
+    def _on_context_menu_sidepanel(self, event) -> None:
+        """
+        Display the context pop up menu.
+        :param event: Unused.
+        :return: None
+        """
+        self.PopupMenu(self._menu_side)
+
     def _init_status_bar(self) -> None:
         """
         Set up status bar for the frame.
@@ -457,6 +513,7 @@ class MainFrame(wx.Frame):
         # Initialize status bar
         self._set_status_text('', 0)
         self._set_status_text('', 1)
+        self._set_status_text('', 2)
     # ------------------------------------------------------------------------------------------------------------------
 
     def _set_status_text(self, text: str, position=0) -> None:
@@ -645,7 +702,6 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # todo
         button_id = event.GetId()
         dialog = None
         if button_id == self._id_ignored:
@@ -656,6 +712,7 @@ class MainFrame(wx.Frame):
             dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_synonyms_hint, self._current_document)
         if dialog:
             dialog.ShowModal()
+        self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
 
     def _new_file(self, event: wx.CommandEvent) -> None:
         """
@@ -739,15 +796,16 @@ class MainFrame(wx.Frame):
             fitting_words: List[ListItemPanel] = []
 
             # Filter the words that fit the marking criteria to a new list and work on that.
-            # todo incorporate the list of ignored words
             for panel in word_data.values():
                 panel: ListItemPanel
-                word = panel.get_word_instance()
-                w_count = word.get_count()
-                if w_count >= repetition_limit and length_min_limit <= len(word.get_word()) <= length_max_limit:
-                    if word.get_word().decode('utf-8') in self._selected_words:
-                        panel.set_checked(True)
-                    fitting_words.append(panel)
+                word_instance = panel.get_word_instance()
+                word = word_instance.get_word().decode('utf-8')
+                w_count = word_instance.get_count()
+                if w_count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
+                    if word not in self._current_document.get_ignored_words():
+                        if word in self._selected_words:
+                            panel.set_checked(True)
+                        fitting_words.append(panel)
 
             # Assign indicators to filtered words.
             if self._coloring_tool_off:
@@ -1034,6 +1092,7 @@ class MainFrame(wx.Frame):
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         # on_modified will run while loading and erroneously set modified to True so we need to fix it.
         self._current_document.set_modified(False)
+        self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
         self._enable_editor()
         self._main_text_field.SetFocus()
         wx.CallLater(Constants.statistics_delay, self._text_statistics)

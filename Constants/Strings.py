@@ -32,8 +32,11 @@ menu_item_edit_words_synonyms_hint: str = "Edit synonyms"
 
 menu_item_copy: str = "Copy"
 menu_item_paste: str = "Paste"
+menu_item_select_all: str = "Select all"
 menu_item_add_ignored: str = "Add to ignored"
 menu_item_add_name: str = "Add to names"
+menu_item_del_ignored: str = "Remove from ignored"
+menu_item_del_name: str = "Remove from names"
 menu_item_synonym: str = "Synonym..."
 menu_item_limits: str = "Set limits from"
 
@@ -79,6 +82,7 @@ warn_errors: str = "Errors found in HTML:\n\n {}\nCan not continue\nAllowed text
 warn_load_last_file: str = "Load previous file: {}?"
 warn_word_format_single: str = "Word list has incorrect format. One word per line is required."
 warn_word_format_synonym: str = "Word list has incorrect format. Each line must have a comma separated list."
+warn_selection: str = 'Selection must be a single word'
 
 err_file_format: str = "File formatting error"
 err_file_format_metadata: str = "File metadata formatting error"

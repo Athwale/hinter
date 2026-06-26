@@ -66,6 +66,14 @@ class MainFrame(wx.Frame):
         self._style_history = {}
         self._action_token = 0
 
+        # Custom IDs
+        self._id_add_ignore = wx.NewIdRef()
+        self._id_add_names = wx.NewIdRef()
+        self._id_del_ignore = wx.NewIdRef()
+        self._id_del_names = wx.NewIdRef()
+        self._id_synonym = wx.NewIdRef()
+        self._id_limits = wx.NewIdRef()
+
         self._side_word_list: SidePanel = None
         self._available_indicators: Set[int] = set()
         self._selected_words: List[str] = []
@@ -137,9 +145,9 @@ class MainFrame(wx.Frame):
         edit_menu_item_names = edit_menu.Append(self._id_names, Strings.menu_item_edit_words_names,
                                                   Strings.menu_item_edit_words_names_hint)
         self._menu_items.append(edit_menu_item_names)
-        self._id_synonyms = wx.NewId()
-        edit_menu_item_synonyms = edit_menu.Append(self._id_synonyms, Strings.menu_item_edit_words_synonyms,
-                                                  Strings.menu_item_edit_words_synonyms_hint)
+        self._id_edit_synonyms = wx.NewId()
+        edit_menu_item_synonyms = edit_menu.Append(self._id_edit_synonyms, Strings.menu_item_edit_words_synonyms,
+                                                   Strings.menu_item_edit_words_synonyms_hint)
         self._menu_items.append(edit_menu_item_synonyms)
 
 
@@ -433,6 +441,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_text, self._main_text_field)
         self.Bind(wx.EVT_MENU, lambda _on_copy: self._main_text_field.Copy(), id=wx.ID_COPY)
         self.Bind(wx.EVT_MENU, lambda _on_paste: self._main_text_field.Paste(), id=wx.ID_PASTE)
+        self.Bind(wx.EVT_MENU, lambda _on_select_all: self._main_text_field.SelectAll(), id=wx.ID_SELECTALL)
 
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
 
@@ -471,17 +480,45 @@ class MainFrame(wx.Frame):
         menu.AppendSeparator()
         copy_item = menu.Append(wx.ID_COPY, Strings.menu_item_copy)
         paste_item = menu.Append(wx.ID_PASTE, Strings.menu_item_paste)
+        menu.Append(wx.ID_SELECTALL, Strings.menu_item_select_all)
+        menu.AppendSeparator()
+
+        # todo remove from ignored, name
+        # todo if metadata changed we need to save on exit too
+        ignore_item = menu.Append(self._id_add_ignore, Strings.menu_item_add_ignored)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_add_ignore)
+
+        name_item = menu.Append(self._id_add_names, Strings.menu_item_add_name)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_add_names)
+
+        menu.AppendSeparator()
+
+        ignore_del_item = menu.Append(self._id_del_ignore, Strings.menu_item_del_ignored)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_del_ignore)
+
+        name_del_item = menu.Append(self._id_del_names, Strings.menu_item_del_name)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_del_names)
+
+        menu.AppendSeparator()
+
+        synonym_item = menu.Append(self._id_synonym, Strings.menu_item_synonym)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_synonym)
+
+        limits_item = menu.Append(self._id_limits, Strings.menu_item_limits)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_limits)
+
         # Disable actions if they aren't valid right now
         undo_item.Enable(self._main_text_field.CanUndo())
         redo_item.Enable(self._main_text_field.CanRedo())
-        copy_item.Enable(self._main_text_field.GetSelectionStart() != self._main_text_field.GetSelectionEnd())
         paste_item.Enable(self._main_text_field.CanPaste())
-        menu.AppendSeparator()
-
-        # todo add word to ignored, add word to names, find synonym, set limits from word
-        custom_id = wx.NewIdRef()
-        menu.Append(custom_id, "Google Search Selected Text")
-        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=custom_id)
+        selection = bool(len(self._main_text_field.GetSelectedText().strip()))
+        copy_item.Enable(selection)
+        ignore_item.Enable(selection)
+        name_item.Enable(selection)
+        synonym_item.Enable(selection)
+        limits_item.Enable(selection)
+        ignore_del_item.Enable(selection)
+        name_del_item.Enable(selection)
 
         self.PopupMenu(menu)
         menu.Destroy()
@@ -492,7 +529,36 @@ class MainFrame(wx.Frame):
         :param event: Unused.
         :return: None
         """
-        print(type(event))
+        event_id = event.GetId()
+        selection = self._main_text_field.GetSelectedText().strip().lower()
+        if selection:
+            if ' ' in selection:
+                self._show_error_ok_dialog(Strings.warn_selection)
+                return
+
+            selection = selection.lstrip('.').rstrip('.').lstrip(',').rstrip(',')
+            if event_id == self._id_add_ignore:
+                words = self._current_document.get_ignored_words()
+                words.add(selection)
+                self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
+                # todo remove from side panel if present and remove indicator.
+            if event_id == self._id_del_ignore:
+                words = self._current_document.get_ignored_words()
+                words.discard(selection)
+                self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
+            if event_id == self._id_add_names:
+                words = self._current_document.get_names()
+                words.add(selection)
+            if event_id == self._id_del_names:
+                words = self._current_document.get_names()
+                words.discard(selection)
+            if event_id == self._id_synonym:
+                print('synonyms')
+            if event_id == self._id_limits:
+                # todo add reset to default limits
+                self._max_repeated_word_length_selector.SetValue(len(selection))
+                self._min_repeated_word_length_selector.SetValue(len(selection))
+                self._handle_marking_selector(event)
 
     def _on_context_menu_sidepanel(self, event) -> None:
         """
@@ -708,7 +774,7 @@ class MainFrame(wx.Frame):
             dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_ignored_hint, self._current_document)
         elif button_id == self._id_names:
             dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_names_hint, self._current_document)
-        elif button_id == self._id_synonyms:
+        elif button_id == self._id_edit_synonyms:
             dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_synonyms_hint, self._current_document)
         if dialog:
             dialog.ShowModal()

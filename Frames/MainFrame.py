@@ -83,7 +83,7 @@ class MainFrame(wx.Frame):
         self._init_tool_bar()
         self._init_layout()
         self._init_status_bar()
-        self._set_styles()
+        self._init_styles()
         self._disable_editor()
         self._set_status_text(Strings.status_ready, 0)
         self._set_status_text(Strings.status_no_document, 1)
@@ -114,7 +114,8 @@ class MainFrame(wx.Frame):
         self._menu_items.append(file_menu_item_open)
         file_menu_item_save = file_menu.Append(wx.ID_SAVE, Strings.menu_item_save, Strings.menu_item_save_hint)
         self._menu_items.append(file_menu_item_save)
-        file_menu_item_save_as = file_menu.Append(wx.ID_SAVEAS, Strings.menu_item_save_as, Strings.menu_item_save_as_hint)
+        file_menu_item_save_as = file_menu.Append(wx.ID_SAVEAS, Strings.menu_item_save_as,
+                                                  Strings.menu_item_save_as_hint)
         self._menu_items.append(file_menu_item_save_as)
         file_menu.AppendSeparator()
         file_menu_item_quit = file_menu.Append(wx.ID_EXIT, Strings.menu_item_quit, Strings.menu_item_quit_hint)
@@ -139,23 +140,25 @@ class MainFrame(wx.Frame):
 
         self._id_ignored = wx.NewId()
         edit_menu_item_ignored = edit_menu.Append(self._id_ignored, Strings.menu_item_edit_words_ignored,
-                                                        Strings.menu_item_edit_words_ignored_hint)
+                                                  Strings.menu_item_edit_words_ignored_hint)
         self._menu_items.append(edit_menu_item_ignored)
         self._id_names = wx.NewId()
         edit_menu_item_names = edit_menu.Append(self._id_names, Strings.menu_item_edit_words_names,
-                                                  Strings.menu_item_edit_words_names_hint)
+                                                Strings.menu_item_edit_words_names_hint)
         self._menu_items.append(edit_menu_item_names)
         self._id_edit_synonyms = wx.NewId()
         edit_menu_item_synonyms = edit_menu.Append(self._id_edit_synonyms, Strings.menu_item_edit_words_synonyms,
                                                    Strings.menu_item_edit_words_synonyms_hint)
         self._menu_items.append(edit_menu_item_synonyms)
 
-
         # Tools menu:
         tools_menu = wx.Menu()
         tools_menu_item_words = tools_menu.Append(wx.ID_INFO, Strings.menu_item_word_list,
-                                                Strings.menu_item_word_list_hint)
+                                                  Strings.menu_item_word_list_hint)
         self._menu_items.append(tools_menu_item_words)
+        tools_menu_item_reset = tools_menu.Append(wx.ID_RESET, Strings.menu_item_reset,
+                                                  Strings.menu_item_reset_hint)
+        self._menu_items.append(tools_menu_item_reset)
 
         # About menu:
         about_menu = wx.Menu()
@@ -179,7 +182,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._undo, edit_menu_item_undo)
         self.Bind(wx.EVT_MENU, self._redo, edit_menu_item_redo)
         self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
+
         self.Bind(wx.EVT_MENU, self._info_word_counts, tools_menu_item_words)
+        self.Bind(wx.EVT_MENU, self._reset_limits_handler, tools_menu_item_reset)
 
         self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_names)
         self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_ignored)
@@ -198,44 +203,45 @@ class MainFrame(wx.Frame):
         self._toolbar = self.CreateToolBar(style=wx.TB_DEFAULT_STYLE)
 
         new_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_NEW, Strings.menu_item_new,
-                                                              wx.ArtProvider.GetBitmap(wx.ART_NEW),
-                                                              Strings.menu_item_new)
+                                                             wx.ArtProvider.GetBitmap(wx.ART_NEW),
+                                                             Strings.menu_item_new)
         self._tools.append(new_tool)
 
         open_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_OPEN, Strings.menu_item_open,
-                                                             wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN),
-                                                             Strings.menu_item_open)
+                                                              wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN),
+                                                              Strings.menu_item_open)
         self._tools.append(open_tool)
 
         save_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_SAVE, Strings.menu_item_save,
-                                                             wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE),
-                                                             Strings.menu_item_save)
+                                                              wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE),
+                                                              Strings.menu_item_save)
         self._tools.append(save_tool)
 
         self._toolbar.AddSeparator()
 
         undo_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_UNDO, Strings.menu_item_undo,
-                                                             wx.ArtProvider.GetBitmap(wx.ART_UNDO),
-                                                             Strings.menu_item_undo)
+                                                              wx.ArtProvider.GetBitmap(wx.ART_UNDO),
+                                                              Strings.menu_item_undo)
         self._tools.append(undo_tool)
 
         redo_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_REDO, Strings.menu_item_redo,
-                                                         wx.ArtProvider.GetBitmap(wx.ART_REDO),
-                                                         Strings.menu_item_redo)
+                                                              wx.ArtProvider.GetBitmap(wx.ART_REDO),
+                                                              Strings.menu_item_redo)
         self._tools.append(redo_tool)
 
         self._toolbar.AddSeparator()
 
         bold_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_BOLD, Strings.menu_item_bold,
-                                                         self._scale_icon('bold.svg', Constants.icon_tool_width,
-                                                                          Constants.icon_tool_height),
-                                                         Strings.menu_item_bold)
+                                                              self._scale_icon('bold.svg', Constants.icon_tool_width,
+                                                                               Constants.icon_tool_height),
+                                                              Strings.menu_item_bold)
         self._tools.append(bold_tool)
 
         italic_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_ITALIC, Strings.menu_item_italic,
-                                                         self._scale_icon('italic.svg', Constants.icon_tool_width,
-                                                                          Constants.icon_tool_height),
-                                                         Strings.menu_item_italic)
+                                                                self._scale_icon('italic.svg',
+                                                                                 Constants.icon_tool_width,
+                                                                                 Constants.icon_tool_height),
+                                                                Strings.menu_item_italic)
         self._tools.append(italic_tool)
 
         self._toolbar.AddSeparator()
@@ -243,21 +249,19 @@ class MainFrame(wx.Frame):
         colorize_tool: wx.ToolBarToolBase = self._toolbar.AddCheckTool(toolId=wx.ID_APPLY,
                                                                        label=Strings.menu_item_italic,
                                                                        bitmap1=self._scale_icon('colorize.svg',
-                                                                                        Constants.icon_tool_width,
-                                                                                        Constants.icon_tool_height),
+                                                                                                Constants.icon_tool_width,
+                                                                                                Constants.icon_tool_height),
                                                                        bmpDisabled=self._scale_icon('colorize.svg',
-                                                                                        Constants.icon_tool_width,
-                                                                                        Constants.icon_tool_height),
+                                                                                                    Constants.icon_tool_width,
+                                                                                                    Constants.icon_tool_height),
                                                                        shortHelp=Strings.menu_item_italic)
         self._tools.append(colorize_tool)
-
         self.Bind(wx.EVT_MENU, self._apply_indicators, colorize_tool)
-
         self._toolbar.Realize()
 
-    def _set_styles(self) -> None:
+    def _init_styles(self) -> None:
         """
-        Set stc styles.
+        Init default stc styles.
         :return: None
         """
         self._main_text_field.StyleSetFaceName(stc.STC_STYLE_DEFAULT, "Courier New")
@@ -266,7 +270,6 @@ class MainFrame(wx.Frame):
         self._main_text_field.StyleSetBackground(stc.STC_STYLE_DEFAULT, wx.Colour(255, 255, 255))
         self._main_text_field.StyleSetBold(stc.STC_STYLE_DEFAULT, False)
         self._main_text_field.StyleSetItalic(stc.STC_STYLE_DEFAULT, False)
-
 
         # Apply style.
         self._main_text_field.StyleClearAll()
@@ -277,22 +280,22 @@ class MainFrame(wx.Frame):
 
         # todo use one with wx.stc.STC_INDIC_SQUIGGLE for spellcheck
         indicator_number = 0
-        alpha = {1:60, 2:150}
+        alpha = {1: 60, 2: 150}
         colors = {
-            1: wx.Colour(255, 0, 0), # Red
-            2: wx.Colour(0, 0, 255), # Blue
-            3: wx.Colour(0, 128, 0), # Green
-            4: wx.Colour(255, 127, 0), # Orange
-            5: wx.Colour(128, 0, 128), # Purple
-            6: wx.Colour(139, 69, 19), # Brown
-            7: wx.Colour(255, 0, 255), # Magenta
-            8: wx.Colour(0, 128, 128), # Teal
+            1: wx.Colour(255, 0, 0),  # Red
+            2: wx.Colour(0, 0, 255),  # Blue
+            3: wx.Colour(0, 128, 0),  # Green
+            4: wx.Colour(255, 127, 0),  # Orange
+            5: wx.Colour(128, 0, 128),  # Purple
+            6: wx.Colour(139, 69, 19),  # Brown
+            7: wx.Colour(255, 0, 255),  # Magenta
+            8: wx.Colour(0, 128, 128),  # Teal
             9: wx.Colour(93, 89, 94),
             10: wx.Colour(50, 84, 54),
             11: wx.Colour(0, 239, 247),
         }
         for a, a_val in alpha.items():
-            for c, c_val  in colors.items():
+            for c, c_val in colors.items():
                 if (a, c) in [(1, 10)]:
                     # Skip combinations that are not distinct enough.
                     continue
@@ -301,7 +304,7 @@ class MainFrame(wx.Frame):
                 self._main_text_field.IndicatorSetAlpha(indicator_number, a_val)
                 self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, a_val)
                 indicator_number += 1
-        for c, c_val  in colors.items():
+        for c, c_val in colors.items():
             if c in (9, 10):
                 continue
             # Possibly wx.stc.STC_INDIC_COMPOSITIONTHICK
@@ -313,7 +316,7 @@ class MainFrame(wx.Frame):
 
         # We have indicators 0-29 and can have 0-31, add two thick underlines
         self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
-        self._main_text_field.IndicatorSetForeground(indicator_number,  wx.Colour(255, 0, 0))
+        self._main_text_field.IndicatorSetForeground(indicator_number, wx.Colour(255, 0, 0))
         self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
         self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
         indicator_number += 1
@@ -321,6 +324,19 @@ class MainFrame(wx.Frame):
         self._main_text_field.IndicatorSetForeground(indicator_number, wx.Colour(0, 255, 0))
         self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
         self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
+
+    def _init_status_bar(self) -> None:
+        """
+        Set up status bar for the frame.
+        :return: None
+        """
+        # Create a status bar with 3 fields
+        self._status_bar = self.CreateStatusBar(Constants.status_places)
+        self._status_bar.SetStatusWidths(Constants.status_proportions)
+        # Initialize status bar
+        self._set_status_text('', 0)
+        self._set_status_text('', 1)
+        self._set_status_text('', 2)
 
     @staticmethod
     def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:
@@ -365,7 +381,6 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector, self._min_repeated_word_length_selector)
         self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector, self._main_text_field)
 
-
         self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
         self._main_text_field.SetCodePage(wx.stc.STC_CP_UTF8)
@@ -397,7 +412,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_TEXT_ENTER, self._search_enter, self._search_text_field)
         # Initialize search shortcut into accelerator table
         new_id = wx.NewId()
-        self.Bind(wx.EVT_MENU, self._focus_to_search, id=new_id)
+        self.Bind(wx.EVT_MENU, self._focus_to_search_handler, id=new_id)
         accel_tbl = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('F'), new_id)])
         self.SetAcceleratorTable(accel_tbl)
 
@@ -434,11 +449,11 @@ class MainFrame(wx.Frame):
         self._menu_item_up = wx.MenuItem(self._menu_side, wx.ID_UP, "test")
         self._menu_side.Append(self._menu_item_up)
         # todo use this for the side panel.
-        self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_sidepanel, self._side_word_list)
+        self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_sidepanel_handler, self._side_word_list)
 
         # Main text area context menu.
         self._main_text_field.UsePopUp(stc.STC_POPUP_NEVER)
-        self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_text, self._main_text_field)
+        self.Bind(wx.EVT_CONTEXT_MENU, self._on_main_text_right_click, self._main_text_field)
         self.Bind(wx.EVT_MENU, lambda _on_copy: self._main_text_field.Copy(), id=wx.ID_COPY)
         self.Bind(wx.EVT_MENU, lambda _on_paste: self._main_text_field.Paste(), id=wx.ID_PASTE)
         self.Bind(wx.EVT_MENU, lambda _on_select_all: self._main_text_field.SelectAll(), id=wx.ID_SELECTALL)
@@ -446,7 +461,7 @@ class MainFrame(wx.Frame):
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
 
         coloring_len_min_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT,
-                                     Constants.default_border)
+                                 Constants.default_border)
 
         coloring_len_max_box.Add(self._max_repeated_word_length_selector, 0, wx.LEFT,
                                  Constants.default_border)
@@ -464,13 +479,17 @@ class MainFrame(wx.Frame):
         main_vertical_box.Add(toolbar_horizontal_box, 0)
         main_vertical_box.Add(main_horizontal_box, 1, wx.EXPAND)
         main_horizontal_box.Add(self._main_text_field, 4, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
-        main_horizontal_box.Add(side_word_border_sizer, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT, Constants.default_border)
+        main_horizontal_box.Add(side_word_border_sizer, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT,
+                                Constants.default_border)
 
         self.SetSizer(main_vertical_box)
 
-    def _on_context_menu_text(self, event) -> None:
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # noinspection PyUnusedLocal
+    def _on_main_text_right_click(self, event) -> None:
         """
-        Display the context pop up menu.
+        Create anc display the context pop up menu.
         :param event: Unused.
         :return: None
         """
@@ -483,29 +502,28 @@ class MainFrame(wx.Frame):
         menu.Append(wx.ID_SELECTALL, Strings.menu_item_select_all)
         menu.AppendSeparator()
 
-        # todo remove from ignored, name
         # todo if metadata changed we need to save on exit too
         ignore_item = menu.Append(self._id_add_ignore, Strings.menu_item_add_ignored)
-        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_add_ignore)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_add_ignore)
 
         name_item = menu.Append(self._id_add_names, Strings.menu_item_add_name)
-        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_add_names)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_add_names)
 
         menu.AppendSeparator()
 
         ignore_del_item = menu.Append(self._id_del_ignore, Strings.menu_item_del_ignored)
-        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_del_ignore)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_del_ignore)
 
         name_del_item = menu.Append(self._id_del_names, Strings.menu_item_del_name)
-        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_del_names)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_del_names)
 
         menu.AppendSeparator()
 
         synonym_item = menu.Append(self._id_synonym, Strings.menu_item_synonym)
-        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_synonym)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_synonym)
 
         limits_item = menu.Append(self._id_limits, Strings.menu_item_limits)
-        self.Bind(wx.EVT_MENU, self._on_context_menu_text_button, id=self._id_limits)
+        self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_limits)
 
         # Disable actions if they aren't valid right now
         undo_item.Enable(self._main_text_field.CanUndo())
@@ -523,10 +541,10 @@ class MainFrame(wx.Frame):
         self.PopupMenu(menu)
         menu.Destroy()
 
-    def _on_context_menu_text_button(self, event: wx.CommandEvent) -> None:
+    def _on_context_menu_text_handler(self, event: wx.CommandEvent) -> None:
         """
-        Display the context pop up menu.
-        :param event: Unused.
+        Handle clicks on the text area context menu buttons.
+        :param event: Used to get ID to distinguish button.
         :return: None
         """
         event_id = event.GetId()
@@ -560,27 +578,14 @@ class MainFrame(wx.Frame):
                 self._min_repeated_word_length_selector.SetValue(len(selection))
                 self._handle_marking_selector(event)
 
-    def _on_context_menu_sidepanel(self, event) -> None:
+    # noinspection PyUnusedLocal
+    def _on_context_menu_sidepanel_handler(self, event) -> None:
         """
         Display the context pop up menu.
         :param event: Unused.
         :return: None
         """
         self.PopupMenu(self._menu_side)
-
-    def _init_status_bar(self) -> None:
-        """
-        Set up status bar for the frame.
-        :return: None
-        """
-        # Create a status bar with 3 fields
-        self._status_bar = self.CreateStatusBar(Constants.status_places)
-        self._status_bar.SetStatusWidths(Constants.status_proportions)
-        # Initialize status bar
-        self._set_status_text('', 0)
-        self._set_status_text('', 1)
-        self._set_status_text('', 2)
-    # ------------------------------------------------------------------------------------------------------------------
 
     def _set_status_text(self, text: str, position=0) -> None:
         """
@@ -614,7 +619,7 @@ class MainFrame(wx.Frame):
             if t.GetId() not in [wx.ID_NEW, wx.ID_OPEN]:
                 self._toolbar.EnableTool(t.GetId(), False)
         for i in self._menu_items:
-            if i.GetId() not in [wx.ID_NEW, wx.ID_OPEN, wx.ID_EXIT,  wx.ID_ABOUT]:
+            if i.GetId() not in [wx.ID_NEW, wx.ID_OPEN, wx.ID_EXIT, wx.ID_ABOUT]:
                 i.Enable(False)
 
     def _enable_editor(self) -> None:
@@ -662,13 +667,25 @@ class MainFrame(wx.Frame):
             return True
         return False
 
-    def _focus_to_search(self, event: wx.CommandEvent) -> None:
+    # noinspection PyUnusedLocal
+    def _focus_to_search_handler(self, event: wx.CommandEvent) -> None:
         """
         Handles Ctrl+F shortcut to set focus into the search box.
         :param event: Not used
         :return: None
         """
         self._search_text_field.SetFocus()
+
+    def _reset_limits_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Reset the spinner controls to default values.
+        :param event: Passed along
+        :return: None
+        """
+        self._repetition_selector.SetValue(Constants.config_min_repetitions_default)
+        self._min_repeated_word_length_selector.SetValue(Constants.config_min_len_default)
+        self._max_repeated_word_length_selector.SetValue(Constants.config_max_len)
+        self._apply_indicators(event)
 
     def _search(self, event: wx.CommandEvent) -> None:
         """
@@ -685,19 +702,20 @@ class MainFrame(wx.Frame):
             counter = 1
             while found_word != (-1, -1):
                 found_word = self._main_text_field.FindText(last_found_pos, self._main_text_field.GetTextLength(),
-                                           text)
+                                                            text)
                 if found_word != (-1, -1):
                     self._found_words.append((found_word, counter))
                     counter += 1
                 last_found_pos = found_word[1]
-            self._search_results.SetLabel(Strings.label_search_results.format(1 if self._found_words else 0, len(self._found_words)))
+            self._search_results.SetLabel(
+                Strings.label_search_results.format(1 if self._found_words else 0, len(self._found_words)))
             if self._found_words:
                 self._main_text_field.SetSelection(self._found_words[0][0][0], self._found_words[0][0][1])
                 self._main_text_field.VerticalCentreCaret()
         else:
             self._found_last_index = 0
             self._found_words.clear()
-            self._main_text_field.SetSelection(0,0)
+            self._main_text_field.SetSelection(0, 0)
             self._search_results.SetLabel(label=Strings.label_search_results.format(0, 0))
 
     def _search_enter(self, event: wx.CommandEvent) -> None:
@@ -716,8 +734,9 @@ class MainFrame(wx.Frame):
                                                    self._found_words[self._found_last_index][0][1])
                 self._main_text_field.VerticalCentreCaret()
                 self._search_results.SetLabel(Strings.label_search_results.
-                                              format(self._found_words[self._found_last_index][1] if self._found_words else 0,
-                                                     len(self._found_words)))
+                format(
+                    self._found_words[self._found_last_index][1] if self._found_words else 0,
+                    len(self._found_words)))
             else:
                 # Restart search when the text was edited.
                 self._search(event)
@@ -744,6 +763,7 @@ class MainFrame(wx.Frame):
         """
         self._search_enter(event)
 
+    # noinspection PyUnusedLocal
     def _undo(self, event: wx.CommandEvent) -> None:
         """
         Undo last change.
@@ -753,6 +773,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.Undo()
         self._main_text_field.Refresh()
 
+    # noinspection PyUnusedLocal
     def _redo(self, event: wx.CommandEvent) -> None:
         """
         Redo last change.
@@ -780,6 +801,7 @@ class MainFrame(wx.Frame):
             dialog.ShowModal()
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
 
+    # noinspection PyUnusedLocal
     def _new_file(self, event: wx.CommandEvent) -> None:
         """
         Create a new empty file.
@@ -798,6 +820,7 @@ class MainFrame(wx.Frame):
             shutil.copy(Path(Fetch.get_resource_path('template.html')), location)
             self._load_document(Path(location))
 
+    # noinspection PyUnusedLocal
     def _info_word_counts(self, event: wx.CommandEvent) -> None:
         """
         Show a dialog with information about word counts.
@@ -813,6 +836,7 @@ class MainFrame(wx.Frame):
         """
         self._main_text_field.ClearAll()
 
+    # noinspection PyUnusedLocal
     def _open_file(self, event: wx.CommandEvent) -> None:
         """
         Open existing file for editing.
@@ -829,6 +853,7 @@ class MainFrame(wx.Frame):
             self._clear_editor()
             self._load_document(Path(dialog.GetPath()))
 
+    # noinspection PyUnusedLocal
     def _apply_indicators(self, event: wx.CommandEvent) -> None:
         """
         Apply word repetition indicators into text.
@@ -993,6 +1018,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.AddUndoAction(token, 0)
         self._main_text_field.EndUndoAction()
 
+    # noinspection PyUnusedLocal
     def _make_bold(self, event: wx.CommandEvent) -> None:
         """
         Change text to bold.
@@ -1014,6 +1040,7 @@ class MainFrame(wx.Frame):
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
                                         self._style_map[Constants.style_bold])
 
+    # noinspection PyUnusedLocal
     def _make_italic(self, event: wx.CommandEvent) -> None:
         """
         Change text to italic.
@@ -1092,7 +1119,7 @@ class MainFrame(wx.Frame):
         start_pos = self._main_text_field.GetSelectionStart()
         self._main_text_field.StartStyling(start_pos)
         self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                             self._style_map[Constants.style_default])
+                                         self._style_map[Constants.style_default])
 
     def _append_styled_text(self, text: str, style: str) -> None:
         """
@@ -1273,6 +1300,7 @@ class MainFrame(wx.Frame):
             self._emergency_save()
         self.Close()
 
+    # noinspection PyUnusedLocal
     def _on_exit(self, event: wx.CommandEvent) -> None:
         """
         Closing the window with X.

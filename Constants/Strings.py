@@ -43,6 +43,8 @@ menu_item_limits: str = "Set limits from"
 menu_tools: str = "&Tools"
 menu_item_word_list: str = "Word list"
 menu_item_word_list_hint: str = "Word list"
+menu_item_reset: str = "Reset limits"
+menu_item_reset_hint: str = "Reset limits"
 
 menu_about: str = "&About"
 menu_item_about: str = "About..."

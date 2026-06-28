@@ -96,6 +96,7 @@ class MainFrame(wx.Frame):
         if self._config.get_last_file() != Path():
             wx.CallAfter(self._on_fully_loaded)
 
+    # Layout ---------------------------------------------------------------------------------------------------------------
     def _init_menu_bar(self) -> None:
         """
         Menu bar initialization.
@@ -171,27 +172,27 @@ class MainFrame(wx.Frame):
         menubar.Append(about_menu, Strings.menu_about)
 
         # Bind menu item handlers.
-        self.Bind(wx.EVT_MENU, self._quit, file_menu_item_quit)
+        self.Bind(wx.EVT_MENU, self._quit_handler, file_menu_item_quit)
         self.Bind(wx.EVT_MENU, self._open_file, file_menu_item_open)
         self.Bind(wx.EVT_MENU, self._save_file_handler, file_menu_item_save)
         self.Bind(wx.EVT_MENU, self._save_as_file_handler, file_menu_item_save_as)
-        self.Bind(wx.EVT_MENU, self._make_bold, edit_menu_item_bold)
-        self.Bind(wx.EVT_MENU, self._make_italic, edit_menu_item_italic)
-        self.Bind(wx.EVT_MENU, self._new_file, file_menu_item_new)
-        self.Bind(wx.EVT_MENU, self._about, about_menu_item_about)
-        self.Bind(wx.EVT_MENU, self._undo, edit_menu_item_undo)
-        self.Bind(wx.EVT_MENU, self._redo, edit_menu_item_redo)
-        self.Bind(wx.EVT_MENU, self._clear_styles, edit_menu_item_remove_styles)
+        self.Bind(wx.EVT_MENU, self._make_bold_handler, edit_menu_item_bold)
+        self.Bind(wx.EVT_MENU, self._make_italic_handler, edit_menu_item_italic)
+        self.Bind(wx.EVT_MENU, self._new_file_handler, file_menu_item_new)
+        self.Bind(wx.EVT_MENU, self._about_handler, about_menu_item_about)
+        self.Bind(wx.EVT_MENU, self._undo_handler, edit_menu_item_undo)
+        self.Bind(wx.EVT_MENU, self._redo_handler, edit_menu_item_redo)
+        self.Bind(wx.EVT_MENU, self._clear_styles_handler, edit_menu_item_remove_styles)
 
-        self.Bind(wx.EVT_MENU, self._info_word_counts, tools_menu_item_words)
+        self.Bind(wx.EVT_MENU, self._info_word_counts_handler, tools_menu_item_words)
         self.Bind(wx.EVT_MENU, self._reset_limits_handler, tools_menu_item_reset)
 
-        self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_names)
-        self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_ignored)
-        self.Bind(wx.EVT_MENU, self._edit_words, edit_menu_item_synonyms)
+        self.Bind(wx.EVT_MENU, self._edit_words_handler, edit_menu_item_names)
+        self.Bind(wx.EVT_MENU, self._edit_words_handler, edit_menu_item_ignored)
+        self.Bind(wx.EVT_MENU, self._edit_words_handler, edit_menu_item_synonyms)
 
-        self.Bind(stc.EVT_STC_MODIFIED, self.on_modified)
-        self.Bind(wx.EVT_CLOSE, self._on_exit)
+        self.Bind(stc.EVT_STC_MODIFIED, self.on_modified_handler)
+        self.Bind(wx.EVT_CLOSE, self._on_exit_handler)
 
         self.SetMenuBar(menubar)
 
@@ -256,7 +257,7 @@ class MainFrame(wx.Frame):
                                                                                                     Constants.icon_tool_height),
                                                                        shortHelp=Strings.menu_item_italic)
         self._tools.append(colorize_tool)
-        self.Bind(wx.EVT_MENU, self._apply_indicators, colorize_tool)
+        self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
         self._toolbar.Realize()
 
     def _init_styles(self) -> None:
@@ -377,9 +378,9 @@ class MainFrame(wx.Frame):
                                                               max=Constants.config_max_len,
                                                               initial=Constants.config_max_len)
 
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector, self._repetition_selector)
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector, self._min_repeated_word_length_selector)
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector, self._main_text_field)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._repetition_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._min_repeated_word_length_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._main_text_field)
 
         self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
@@ -405,11 +406,11 @@ class MainFrame(wx.Frame):
 
         self.Bind(EVT_CHECKBOX_CHANGED, self._word_list_handler)
 
-        self.Bind(wx.EVT_BUTTON, self._search_up, self._search_button_up)
-        self.Bind(wx.EVT_BUTTON, self._search_down, self._search_button_down)
+        self.Bind(wx.EVT_BUTTON, self._search_up_handler, self._search_button_up)
+        self.Bind(wx.EVT_BUTTON, self._search_down_handler, self._search_button_down)
 
-        self.Bind(wx.EVT_TEXT, self._search, self._search_text_field)
-        self.Bind(wx.EVT_TEXT_ENTER, self._search_enter, self._search_text_field)
+        self.Bind(wx.EVT_TEXT, self._search_handler, self._search_text_field)
+        self.Bind(wx.EVT_TEXT_ENTER, self._search_enter_handler, self._search_text_field)
         # Initialize search shortcut into accelerator table
         new_id = wx.NewId()
         self.Bind(wx.EVT_MENU, self._focus_to_search_handler, id=new_id)
@@ -484,10 +485,9 @@ class MainFrame(wx.Frame):
 
         self.SetSizer(main_vertical_box)
 
-    # ------------------------------------------------------------------------------------------------------------------
-
+    # Handlers ---------------------------------------------------------------------------------------------------------
     # noinspection PyUnusedLocal
-    def _on_main_text_right_click(self, event) -> None:
+    def _on_main_text_right_click(self, event: wx.ContextMenuEvent) -> None:
         """
         Create anc display the context pop up menu.
         :param event: Unused.
@@ -576,96 +576,16 @@ class MainFrame(wx.Frame):
                 # todo add reset to default limits
                 self._max_repeated_word_length_selector.SetValue(len(selection))
                 self._min_repeated_word_length_selector.SetValue(len(selection))
-                self._handle_marking_selector(event)
+                self._handle_marking_selector_handler(event)
 
     # noinspection PyUnusedLocal
-    def _on_context_menu_sidepanel_handler(self, event) -> None:
+    def _on_context_menu_sidepanel_handler(self, event: wx.CommandEvent) -> None:
         """
         Display the context pop up menu.
         :param event: Unused.
         :return: None
         """
         self.PopupMenu(self._menu_side)
-
-    def _set_status_text(self, text: str, position=0) -> None:
-        """
-        Set a text into a position in status bar and prepend a separator.
-        :param text: Text to set.
-        :param position: Where to set the text, 0 is default
-        :return: None
-        """
-        to_set = f'| {text}'
-        self._status_bar.SetStatusText(to_set, position)
-
-    def _on_fully_loaded(self) -> None:
-        """
-        Runs once the gui is loaded.
-        :return: None
-        """
-        last_file = self._config.get_last_file()
-        if self._show_yes_no_dialog(Strings.warn_load_last_file.format(last_file), wx.ICON_QUESTION):
-            self._load_document(last_file)
-
-    def _disable_editor(self) -> None:
-        """
-        Disable all features.
-        :return: None
-        """
-        self._repetition_selector.Disable()
-        self._min_repeated_word_length_selector.Disable()
-        self._max_repeated_word_length_selector.Disable()
-        self._main_text_field.Disable()
-        for t in self._tools:
-            if t.GetId() not in [wx.ID_NEW, wx.ID_OPEN]:
-                self._toolbar.EnableTool(t.GetId(), False)
-        for i in self._menu_items:
-            if i.GetId() not in [wx.ID_NEW, wx.ID_OPEN, wx.ID_EXIT, wx.ID_ABOUT]:
-                i.Enable(False)
-
-    def _enable_editor(self) -> None:
-        """
-        Enable all features of the editor.
-        :return: None
-        """
-        self._repetition_selector.Enable()
-        self._min_repeated_word_length_selector.Enable()
-        self._max_repeated_word_length_selector.Enable()
-        self._main_text_field.Enable()
-        for t in self._tools:
-            self._toolbar.EnableTool(t.GetId(), True)
-        for i in self._menu_items:
-            i.Enable(True)
-
-    def _open_save_dialog(self) -> str:
-        """
-        Return path to the new file location or empty string.
-        :return: Path to the new file location or empty string.
-        """
-        with wx.FileDialog(self, Strings.dialog_save, wildcard=Constants.html_wildcard,
-                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
-            if fileDialog.ShowModal() == wx.ID_CANCEL:
-                return ""
-            return fileDialog.GetPath()
-
-    def _show_error_ok_dialog(self, error: str) -> None:
-        """
-        Display an error dialog with the error text. Set error state into the status bar.
-        :param error: The error to display in the dialog.
-        :return: None
-        """
-        wx.MessageBox(error, Strings.status_warning, wx.OK | wx.ICON_WARNING)
-        self._set_status_text(Strings.status_warning, 1)
-
-    def _show_yes_no_dialog(self, message: str, kind: int) -> bool:
-        """
-        Display a dialog with message and yes/no buttons.
-        :param message: The message to display in the dialog.
-        :return: User choice. True if yes.
-        """
-        dialog = wx.MessageDialog(self, message, Strings.status_warning, wx.YES_NO | kind)
-        if dialog.ShowModal() == wx.ID_YES:
-            return True
-        return False
 
     # noinspection PyUnusedLocal
     def _focus_to_search_handler(self, event: wx.CommandEvent) -> None:
@@ -685,9 +605,10 @@ class MainFrame(wx.Frame):
         self._repetition_selector.SetValue(Constants.config_min_repetitions_default)
         self._min_repeated_word_length_selector.SetValue(Constants.config_min_len_default)
         self._max_repeated_word_length_selector.SetValue(Constants.config_max_len)
-        self._apply_indicators(event)
+        self._apply_indicators_handler(event)
 
-    def _search(self, event: wx.CommandEvent) -> None:
+    # noinspection PyUnusedLocal
+    def _search_handler(self, event: wx.CommandEvent) -> None:
         """
         Undo last change.
         :param event: Not used
@@ -718,7 +639,7 @@ class MainFrame(wx.Frame):
             self._main_text_field.SetSelection(0, 0)
             self._search_results.SetLabel(label=Strings.label_search_results.format(0, 0))
 
-    def _search_enter(self, event: wx.CommandEvent) -> None:
+    def _search_enter_handler(self, event: wx.CommandEvent) -> None:
         """
         Handle the Enter key behavior of searching and cycle through results.
         :param event: Used to detect direction.
@@ -739,32 +660,32 @@ class MainFrame(wx.Frame):
                     len(self._found_words)))
             else:
                 # Restart search when the text was edited.
-                self._search(event)
+                self._search_handler(event)
         except IndexError as _:
             if event.GetString() == 'up':
                 self._found_last_index = len(self._found_words)
             else:
                 self._found_last_index = 0
 
-    def _search_up(self, event: wx.CommandEvent) -> None:
+    def _search_up_handler(self, event: wx.CommandEvent) -> None:
         """
         Search button up handler.
         :param event: Used to set direction.
         :return: None
         """
         event.SetString('up')
-        self._search_enter(event)
+        self._search_enter_handler(event)
 
-    def _search_down(self, event: wx.CommandEvent) -> None:
+    def _search_down_handler(self, event: wx.CommandEvent) -> None:
         """
         Search button down handler.
         :param event: Not used.
         :return: None
         """
-        self._search_enter(event)
+        self._search_enter_handler(event)
 
     # noinspection PyUnusedLocal
-    def _undo(self, event: wx.CommandEvent) -> None:
+    def _undo_handler(self, event: wx.CommandEvent) -> None:
         """
         Undo last change.
         :param event: Not used.
@@ -774,7 +695,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.Refresh()
 
     # noinspection PyUnusedLocal
-    def _redo(self, event: wx.CommandEvent) -> None:
+    def _redo_handler(self, event: wx.CommandEvent) -> None:
         """
         Redo last change.
         :param event: Not used.
@@ -783,7 +704,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.Redo()
         self._main_text_field.Refresh()
 
-    def _edit_words(self, event: wx.CommandEvent) -> None:
+    def _edit_words_handler(self, event: wx.CommandEvent) -> None:
         """
         Open a dialog for word list editing.
         :param event: Not used.
@@ -802,7 +723,7 @@ class MainFrame(wx.Frame):
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
 
     # noinspection PyUnusedLocal
-    def _new_file(self, event: wx.CommandEvent) -> None:
+    def _new_file_handler(self, event: wx.CommandEvent) -> None:
         """
         Create a new empty file.
         :param event: Not used.
@@ -821,20 +742,13 @@ class MainFrame(wx.Frame):
             self._load_document(Path(location))
 
     # noinspection PyUnusedLocal
-    def _info_word_counts(self, event: wx.CommandEvent) -> None:
+    def _info_word_counts_handler(self, event: wx.CommandEvent) -> None:
         """
         Show a dialog with information about word counts.
         :param event: Not used.
         :return: None
         """
         WordInfoDialog(self, self._current_document.get_word_marking_data())
-
-    def _clear_editor(self) -> None:
-        """
-        Clear the gui to default state.
-        :return: None
-        """
-        self._main_text_field.ClearAll()
 
     # noinspection PyUnusedLocal
     def _open_file(self, event: wx.CommandEvent) -> None:
@@ -854,7 +768,7 @@ class MainFrame(wx.Frame):
             self._load_document(Path(dialog.GetPath()))
 
     # noinspection PyUnusedLocal
-    def _apply_indicators(self, event: wx.CommandEvent) -> None:
+    def _apply_indicators_handler(self, event: wx.CommandEvent) -> None:
         """
         Apply word repetition indicators into text.
         :param event: Not used
@@ -949,16 +863,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.Refresh()
         self._update_indicator_count()
 
-    def _update_indicator_count(self) -> None:
-        """
-        Update how many free indicators we have in the status panel.
-        :return: None
-        """
-        free = len(self._available_indicators)
-        # 32 is our maximum number of usable indicators.
-        self._set_status_text(Strings.status_indicators.format(32 - free, free), 3)
-
-    def _handle_marking_selector(self, event: wx.CommandEvent) -> None:
+    def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:
         """
         Handle changes to word repetition spin ctrls.
         :param event: Not used.
@@ -966,7 +871,7 @@ class MainFrame(wx.Frame):
         """
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if colorize_tool.IsToggled():
-            self._apply_indicators(event)
+            self._apply_indicators_handler(event)
 
     def _word_list_handler(self, event: dv.DataViewEvent) -> None:
         """
@@ -988,38 +893,10 @@ class MainFrame(wx.Frame):
                 if indicator > -1:
                     self._available_indicators.add(indicator)
                     item.get_word_instance().clear_indicator()
-        self._apply_indicators(event)
-
-    def _apply_style_with_undo(self, start, length, new_style_id) -> None:
-        """
-        Applies a style to a range of text and records it in the native undo stack.
-        :param start:
-        :param length:
-        :param new_style_id:
-        :return:
-        """
-        if length <= 0:
-            return
-        old_styles = [self._main_text_field.GetStyleAt(start + i) for i in range(length)]
-        self._action_token += 1
-        token = self._action_token
-
-        self._style_history[token] = {
-            'start': start,
-            'length': length,
-            'old_styles': old_styles,
-            'new_style_id': new_style_id
-        }
-
-        self._main_text_field.BeginUndoAction()
-        self._main_text_field.StartStyling(start)
-        self._main_text_field.SetStyling(length, new_style_id)
-        # 0 means this action cannot be (merged) with adjacent text typing
-        self._main_text_field.AddUndoAction(token, 0)
-        self._main_text_field.EndUndoAction()
+        self._apply_indicators_handler(event)
 
     # noinspection PyUnusedLocal
-    def _make_bold(self, event: wx.CommandEvent) -> None:
+    def _make_bold_handler(self, event: wx.CommandEvent) -> None:
         """
         Change text to bold.
         :param event: Not used.
@@ -1041,7 +918,7 @@ class MainFrame(wx.Frame):
                                         self._style_map[Constants.style_bold])
 
     # noinspection PyUnusedLocal
-    def _make_italic(self, event: wx.CommandEvent) -> None:
+    def _make_italic_handler(self, event: wx.CommandEvent) -> None:
         """
         Change text to italic.
         :param event: Not used.
@@ -1062,17 +939,7 @@ class MainFrame(wx.Frame):
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
                                         self._style_map[Constants.style_italic])
 
-    def _text_statistics(self) -> None:
-        """
-        Update the status bar with text information.
-        :return: None
-        """
-        lines = self._main_text_field.NumberOfLines
-        words = len(self._main_text_field.GetText().split())
-        chars = self._main_text_field.GetLastPosition()
-        self._set_status_text(Strings.status_doc_info.format(lines, words, chars), 0)
-
-    def on_modified(self, event: wx._stc.StyledTextEvent) -> None:
+    def on_modified_handler(self, event: wx._stc.StyledTextEvent) -> None:
         """
         Catches modifications and handles custom undo/redo events.
         :param event: Used to get modification data.
@@ -1110,7 +977,8 @@ class MainFrame(wx.Frame):
                 self._main_text_field.StartStyling(start)
                 self._main_text_field.SetStyling(length, action['new_style_id'])
 
-    def _clear_styles(self, event: wx.CommandEvent) -> None:
+    # noinspection PyUnusedLocal
+    def _clear_styles_handler(self, event: wx.CommandEvent) -> None:
         """
         Change text to default style.
         :param event: Not used.
@@ -1120,6 +988,191 @@ class MainFrame(wx.Frame):
         self._main_text_field.StartStyling(start_pos)
         self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
                                          self._style_map[Constants.style_default])
+
+    # noinspection PyUnusedLocal
+    def _save_file_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Save file.
+        :param event: Not used
+        :return: None
+        """
+        self._save_file()
+
+    # noinspection PyUnusedLocal
+    def _save_as_file_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Save file.
+        :param event: Not used
+        :return: None
+        """
+        self._save_file(save_as=True)
+
+    # noinspection PyUnusedLocal
+    def _quit_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Quit the program.
+        :param _: Unused
+        :return: None
+        """
+        if self._current_document:
+            self._emergency_save()
+        self.Close()
+
+    # noinspection PyUnusedLocal
+    def _on_exit_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Closing the window with X.
+        :param event: Not used.
+        :return: None
+        """
+        if self._current_document:
+            self._emergency_save()
+        self.Destroy()
+
+    # noinspection PyUnusedLocal
+    def _about_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Show the About dialog.
+        :param event: Not used.
+        :return: None
+        """
+        AboutDialog(self)
+
+    # Methods---------------------------------------------------------------------------------------------------------------
+
+    def _clear_editor(self) -> None:
+        """
+        Clear the gui to default state.
+        :return: None
+        """
+        self._main_text_field.ClearAll()
+
+    def _update_indicator_count(self) -> None:
+        """
+        Update how many free indicators we have in the status panel.
+        :return: None
+        """
+        free = len(self._available_indicators)
+        # 32 is our maximum number of usable indicators.
+        self._set_status_text(Strings.status_indicators.format(32 - free, free), 3)
+
+    def _apply_style_with_undo(self, start, length, new_style_id) -> None:
+        """
+        Applies a style to a range of text and records it in the native undo stack.
+        :param start:
+        :param length:
+        :param new_style_id:
+        :return:
+        """
+        if length <= 0:
+            return
+        old_styles = [self._main_text_field.GetStyleAt(start + i) for i in range(length)]
+        self._action_token += 1
+        token = self._action_token
+
+        self._style_history[token] = {
+            'start': start,
+            'length': length,
+            'old_styles': old_styles,
+            'new_style_id': new_style_id
+        }
+
+        self._main_text_field.BeginUndoAction()
+        self._main_text_field.StartStyling(start)
+        self._main_text_field.SetStyling(length, new_style_id)
+        # 0 means this action cannot be (merged) with adjacent text typing
+        self._main_text_field.AddUndoAction(token, 0)
+        self._main_text_field.EndUndoAction()
+
+    def _set_status_text(self, text: str, position=0) -> None:
+        """
+        Set a text into a position in status bar and prepend a separator.
+        :param text: Text to set.
+        :param position: Where to set the text, 0 is default
+        :return: None
+        """
+        to_set = f'| {text}'
+        self._status_bar.SetStatusText(to_set, position)
+
+    def _on_fully_loaded(self) -> None:
+        """
+        Runs once the gui is loaded.
+        :return: None
+        """
+        last_file = self._config.get_last_file()
+        if self._show_yes_no_dialog(Strings.warn_load_last_file.format(last_file), wx.ICON_QUESTION):
+            self._load_document(last_file)
+
+    def _disable_editor(self) -> None:
+        """
+        Disable all features.
+        :return: None
+        """
+        self._repetition_selector.Disable()
+        self._min_repeated_word_length_selector.Disable()
+        self._max_repeated_word_length_selector.Disable()
+        self._main_text_field.Disable()
+        for t in self._tools:
+            if t.GetId() not in [wx.ID_NEW, wx.ID_OPEN]:
+                self._toolbar.EnableTool(t.GetId(), False)
+        for i in self._menu_items:
+            if i.GetId() not in [wx.ID_NEW, wx.ID_OPEN, wx.ID_EXIT, wx.ID_ABOUT]:
+                i.Enable(False)
+
+    def _enable_editor(self) -> None:
+        """
+        Enable all features of the editor.
+        :return: None
+        """
+        self._repetition_selector.Enable()
+        self._min_repeated_word_length_selector.Enable()
+        self._max_repeated_word_length_selector.Enable()
+        self._main_text_field.Enable()
+        for t in self._tools:
+            self._toolbar.EnableTool(t.GetId(), True)
+        for i in self._menu_items:
+            i.Enable(True)
+
+    def _open_save_dialog(self) -> str:
+        """
+        Return path to the new file location or empty string.
+        :return: Path to the new file location or empty string.
+        """
+        with wx.FileDialog(self, Strings.dialog_save, wildcard=Constants.html_wildcard,
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return ""
+            return fileDialog.GetPath()
+
+    def _show_error_ok_dialog(self, error: str) -> None:
+        """
+        Display an error dialog with the error text. Set error state into the status bar.
+        :param error: The error to display in the dialog.
+        :return: None
+        """
+        wx.MessageBox(error, Strings.status_warning, wx.OK | wx.ICON_WARNING)
+        self._set_status_text(Strings.status_warning, 1)
+
+    def _show_yes_no_dialog(self, message: str, kind: int) -> bool:
+        """
+        Display a dialog with message and yes/no buttons.
+        :param message: The message to display in the dialog.
+        :return: User choice. True if yes.
+        """
+        dialog = wx.MessageDialog(self, message, Strings.status_warning, wx.YES_NO | kind)
+        if dialog.ShowModal() == wx.ID_YES:
+            return True
+        return False
+
+    def _text_statistics(self) -> None:
+        """
+        Update the status bar with text information.
+        :return: None
+        """
+        lines = self._main_text_field.NumberOfLines
+        words = len(self._main_text_field.GetText().split())
+        chars = self._main_text_field.GetLastPosition()
+        self._set_status_text(Strings.status_doc_info.format(lines, words, chars), 0)
 
     def _append_styled_text(self, text: str, style: str) -> None:
         """
@@ -1264,22 +1317,6 @@ class MainFrame(wx.Frame):
                 converted.append((style, html.escape(text_chunk)))
         return converted
 
-    def _save_file_handler(self, event: wx.CommandEvent) -> None:
-        """
-        Save file.
-        :param event: Not used
-        :return: None
-        """
-        self._save_file()
-
-    def _save_as_file_handler(self, event: wx.CommandEvent) -> None:
-        """
-        Save file.
-        :param event: Not used
-        :return: None
-        """
-        self._save_file(save_as=True)
-
     def _emergency_save(self) -> None:
         """
         User is performing an action that could destroy the document, ask for save.
@@ -1289,32 +1326,3 @@ class MainFrame(wx.Frame):
             if self._show_yes_no_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name),
                                         wx.ICON_ASTERISK):
                 self._save_file()
-
-    def _quit(self, _) -> None:
-        """
-        Quit the program.
-        :param _: Unused
-        :return: None
-        """
-        if self._current_document:
-            self._emergency_save()
-        self.Close()
-
-    # noinspection PyUnusedLocal
-    def _on_exit(self, event: wx.CommandEvent) -> None:
-        """
-        Closing the window with X.
-        :param event: Not used.
-        :return: None
-        """
-        if self._current_document:
-            self._emergency_save()
-        self.Destroy()
-
-    def _about(self, event: wx.CommandEvent) -> None:
-        """
-        Show the About dialog.
-        :param event: Not used.
-        :return: None
-        """
-        AboutDialog(self)

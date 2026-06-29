@@ -502,7 +502,6 @@ class MainFrame(wx.Frame):
         menu.Append(wx.ID_SELECTALL, Strings.menu_item_select_all)
         menu.AppendSeparator()
 
-        # todo if metadata changed we need to save on exit too
         ignore_item = menu.Append(self._id_add_ignore, Strings.menu_item_add_ignored)
         self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_add_ignore)
 
@@ -525,18 +524,25 @@ class MainFrame(wx.Frame):
         limits_item = menu.Append(self._id_limits, Strings.menu_item_limits)
         self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_limits)
 
-        # Disable actions if they aren't valid right now
+        enable = False
+        if len(self._main_text_field.GetSelectedText()):
+            enable = True
+            for ch in "., ;":
+                if ch in self._main_text_field.GetSelectedText().strip().lower():
+                    enable = False
+                    break
+        copy_item.Enable(enable)
+        ignore_item.Enable(enable)
+        name_item.Enable(enable)
+        synonym_item.Enable(enable)
+        limits_item.Enable(enable)
+        ignore_del_item.Enable(enable)
+        name_del_item.Enable(enable)
+
         undo_item.Enable(self._main_text_field.CanUndo())
         redo_item.Enable(self._main_text_field.CanRedo())
         paste_item.Enable(self._main_text_field.CanPaste())
-        selection = bool(len(self._main_text_field.GetSelectedText().strip()))
-        copy_item.Enable(selection)
-        ignore_item.Enable(selection)
-        name_item.Enable(selection)
-        synonym_item.Enable(selection)
-        limits_item.Enable(selection)
-        ignore_del_item.Enable(selection)
-        name_del_item.Enable(selection)
+
 
         self.PopupMenu(menu)
         menu.Destroy()
@@ -550,30 +556,32 @@ class MainFrame(wx.Frame):
         event_id = event.GetId()
         selection = self._main_text_field.GetSelectedText().strip().lower()
         if selection:
-            if ' ' in selection:
-                self._show_error_ok_dialog(Strings.warn_selection)
-                return
-
             selection = selection.lstrip('.').rstrip('.').lstrip(',').rstrip(',')
             if event_id == self._id_add_ignore:
                 words = self._current_document.get_ignored_words()
                 words.add(selection)
                 self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
-                # todo remove from side panel if present and remove indicator.
+                self._current_document.set_modified(True)
+                # todo remove from side panel if present and remove indicator. Rerun marking?
             if event_id == self._id_del_ignore:
                 words = self._current_document.get_ignored_words()
                 words.discard(selection)
                 self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
+                self._current_document.set_modified(True)
             if event_id == self._id_add_names:
                 words = self._current_document.get_names()
                 words.add(selection)
+                self._current_document.set_modified(True)
             if event_id == self._id_del_names:
                 words = self._current_document.get_names()
                 words.discard(selection)
+                self._current_document.set_modified(True)
             if event_id == self._id_synonym:
-                print('synonyms')
+                synonyms = self._current_document.find_synonyms(selection)
+
+                # todo only modify if something changed which may happen on it's own when a word is replaced.
+                # self._current_document.set_modified(True)
             if event_id == self._id_limits:
-                # todo add reset to default limits
                 self._max_repeated_word_length_selector.SetValue(len(selection))
                 self._min_repeated_word_length_selector.SetValue(len(selection))
                 self._handle_marking_selector_handler(event)

@@ -64,30 +64,6 @@ class Document:
         """
         return self._synonyms
 
-    def set_ignored_words(self, words: Set[str]) -> None:
-        """
-        Set new ignored words.
-        :param words: Set of strings.
-        :return: None
-        """
-        self._ignored_words = words
-
-    def set_names(self, names: Set[str]) -> None:
-        """
-        Set new names.
-        :param names: Set of names.
-        :return: None
-        """
-        self._names = names
-
-    def set_synonyms(self, words: List[Set[str]]) -> None:
-        """
-        Set new synonyms.
-        :param words: List of sets of strings
-        :return: None
-        """
-        self._synonyms = words
-
     def get_path(self) -> Path:
         """
         Return current document path.
@@ -139,6 +115,33 @@ class Document:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+    def set_ignored_words(self, words: Set[str]) -> None:
+        """
+        Set new ignored words.
+        :param words: Set of strings.
+        :return: None
+        """
+        self._ignored_words = words
+        self.set_modified(True)
+
+    def set_names(self, names: Set[str]) -> None:
+        """
+        Set new names.
+        :param names: Set of names.
+        :return: None
+        """
+        self._names = names
+        self.set_modified(True)
+
+    def set_synonyms(self, words: List[Set[str]]) -> None:
+        """
+        Set new synonyms.
+        :param words: List of sets of strings
+        :return: None
+        """
+        self._synonyms = words
+        self.set_modified(True)
+
     def set_path(self, path: Path) -> None:
         """
         Set new file path.
@@ -162,6 +165,17 @@ class Document:
         :return: None
         """
         self._is_modified = modified
+
+    def find_synonyms(self, word: str) -> Set[str]:
+        """
+        Look up synonyms for the specified word.
+        :param word: The word to look for.
+        :return: Set of words or empty list.
+        """
+        for group in self._synonyms:
+            if word in group:
+                return group
+        return set()
 
     def split_words(self, parent: SidePanel, plain_text: str) -> None:
         """

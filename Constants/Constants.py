@@ -26,6 +26,11 @@ style_italic: str = "italic"
 style_bold_italic: str = "italic,bold"
 style_break: str = "break"
 
+style_map = {style_default: 0,
+             style_bold: 1,
+             style_italic: 2,
+             style_bold_italic: 3}
+
 about_dialog_width: int = 300
 about_dialog_height: int = 300
 

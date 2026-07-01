@@ -1,4 +1,3 @@
-import html
 import re
 import shutil
 from pathlib import Path
@@ -58,21 +57,18 @@ class MainFrame(wx.Frame):
         self._toolbar: ToolBar = None
         self._tools: List[wx.ToolBarToolBase] = []
         self._menu_items: List[wx.MenuItem] = []
-        self._style_map = {Constants.style_default: 0,
-                           Constants.style_bold: 1,
-                           Constants.style_italic: 2,
-                           Constants.style_bold_italic: 3}
+
         # Used for undo.
         self._style_history = {}
         self._action_token = 0
 
         # Custom IDs
-        self._id_add_ignore = wx.NewIdRef()
-        self._id_add_names = wx.NewIdRef()
-        self._id_del_ignore = wx.NewIdRef()
-        self._id_del_names = wx.NewIdRef()
-        self._id_synonym = wx.NewIdRef()
-        self._id_limits = wx.NewIdRef()
+        self._id_add_ignore = wx.NewId()
+        self._id_add_names = wx.NewId()
+        self._id_del_ignore = wx.NewId()
+        self._id_del_names = wx.NewId()
+        self._id_limits = wx.NewId()
+        self._id_synonym_ids = []
 
         self._side_word_list: SidePanel = None
         self._available_indicators: Set[int] = set()
@@ -388,8 +384,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
         self._main_text_field.SetMarginMask(1, 0)
         self._main_text_field.SetMarginWidth(1, 30)
-        # todo Add a list view and a statistics area.
-        #  show words with 2 or more repetitions and their average distance in lines, on click show lines where they are.
+        # todo add message dialog with text field for status messages and a line for llm communication.
 
         # Initialize word list:
         self._side_word_list = SidePanel(self)
@@ -442,15 +437,13 @@ class MainFrame(wx.Frame):
         font.SetPointSize(Constants.static_box_font_size)
         search_box.GetStaticBox().SetFont(font)
 
-        # todo select word and have a context menu to set lengths in the top bar, ai and synonym suggestions, add to ignored, add to names.
         # todo post save test for names and other problems.
-        # todo Create popup context menu working outside the text area
-        # Side panel context menu.
-        self._menu_side = wx.Menu()
-        self._menu_item_up = wx.MenuItem(self._menu_side, wx.ID_UP, "test")
-        self._menu_side.Append(self._menu_item_up)
         # todo use this for the side panel.
-        self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_sidepanel_handler, self._side_word_list)
+        # Side panel context menu.
+        # self._menu_side = wx.Menu()
+        # self._menu_item_up = wx.MenuItem(self._menu_side, wx.ID_UP, "test")
+        # self._menu_side.Append(self._menu_item_up)
+        # self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_sidepanel_handler, self._side_word_list)
 
         # Main text area context menu.
         self._main_text_field.UsePopUp(stc.STC_POPUP_NEVER)
@@ -493,6 +486,16 @@ class MainFrame(wx.Frame):
         :param event: Unused.
         :return: None
         """
+        self._main_text_field.TargetFromSelection()
+
+        if self._main_text_field.GetSelectionEmpty():
+            # Select the word under the cursor.
+            pos = self._main_text_field.ScreenToClient(wx.GetMousePosition())
+            text_pos = self._main_text_field.PositionFromPoint(pos)
+            word_start = self._main_text_field.WordStartPosition(text_pos, True)
+            word_end = self._main_text_field.WordEndPosition(text_pos, True)
+            self._main_text_field.SetSelection(word_start, word_end)
+
         menu = wx.Menu()
         undo_item = menu.Append(wx.ID_UNDO, Strings.menu_item_undo)
         redo_item = menu.Append(wx.ID_REDO, Strings.menu_item_redo)
@@ -518,9 +521,6 @@ class MainFrame(wx.Frame):
 
         menu.AppendSeparator()
 
-        synonym_item = menu.Append(self._id_synonym, Strings.menu_item_synonym)
-        self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_synonym)
-
         limits_item = menu.Append(self._id_limits, Strings.menu_item_limits)
         self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_limits)
 
@@ -531,10 +531,29 @@ class MainFrame(wx.Frame):
                 if ch in self._main_text_field.GetSelectedText().strip().lower():
                     enable = False
                     break
+
+        if enable:
+            submenu = wx.Menu()
+            selection = self._sanitized_selection()
+            if selection:
+                synonyms = self._current_document.find_synonyms(selection)
+                self._id_synonym_ids.clear()
+                for synonym in synonyms:
+                    new_id = wx.NewId()
+                    self._id_synonym_ids.append(new_id)
+                    submenu_item = wx.MenuItem(menu, new_id, synonym)
+                    submenu.Append(submenu_item)
+                    self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler)
+                if synonyms:
+                    menu.AppendSubMenu(submenu, Strings.menu_item_synonym)
+                else:
+                    # Append a fake disabled synonym button.
+                    synonyms_item = menu.Append(wx.ID_ANY, Strings.menu_item_synonym)
+                    synonyms_item.Enable(False)
+
         copy_item.Enable(enable)
         ignore_item.Enable(enable)
         name_item.Enable(enable)
-        synonym_item.Enable(enable)
         limits_item.Enable(enable)
         ignore_del_item.Enable(enable)
         name_del_item.Enable(enable)
@@ -542,7 +561,6 @@ class MainFrame(wx.Frame):
         undo_item.Enable(self._main_text_field.CanUndo())
         redo_item.Enable(self._main_text_field.CanRedo())
         paste_item.Enable(self._main_text_field.CanPaste())
-
 
         self.PopupMenu(menu)
         menu.Destroy()
@@ -554,15 +572,14 @@ class MainFrame(wx.Frame):
         :return: None
         """
         event_id = event.GetId()
-        selection = self._main_text_field.GetSelectedText().strip().lower()
+        selection = self._sanitized_selection()
         if selection:
-            selection = selection.lstrip('.').rstrip('.').lstrip(',').rstrip(',')
             if event_id == self._id_add_ignore:
                 words = self._current_document.get_ignored_words()
                 words.add(selection)
                 self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
                 self._current_document.set_modified(True)
-                # todo remove from side panel if present and remove indicator. Rerun marking?
+                self._apply_indicators_handler(event)
             if event_id == self._id_del_ignore:
                 words = self._current_document.get_ignored_words()
                 words.discard(selection)
@@ -576,24 +593,16 @@ class MainFrame(wx.Frame):
                 words = self._current_document.get_names()
                 words.discard(selection)
                 self._current_document.set_modified(True)
-            if event_id == self._id_synonym:
-                synonyms = self._current_document.find_synonyms(selection)
-
-                # todo only modify if something changed which may happen on it's own when a word is replaced.
-                # self._current_document.set_modified(True)
+            if event_id in self._id_synonym_ids:
+                item_id = event.GetId()
+                menu = event.GetEventObject()
+                menu_item = menu.FindItemById(item_id)
+                item_text = menu_item.GetItemLabelText()
+                self._main_text_field.ReplaceSelection(item_text)
             if event_id == self._id_limits:
                 self._max_repeated_word_length_selector.SetValue(len(selection))
                 self._min_repeated_word_length_selector.SetValue(len(selection))
                 self._handle_marking_selector_handler(event)
-
-    # noinspection PyUnusedLocal
-    def _on_context_menu_sidepanel_handler(self, event: wx.CommandEvent) -> None:
-        """
-        Display the context pop up menu.
-        :param event: Unused.
-        :return: None
-        """
-        self.PopupMenu(self._menu_side)
 
     # noinspection PyUnusedLocal
     def _focus_to_search_handler(self, event: wx.CommandEvent) -> None:
@@ -782,7 +791,8 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        # todo apply live marking only on current line?
+        # todo all of this has to happen in a thread and be applied to text when done for long texts.
+        # todo apply live marking only on current line to speed up?
         # todo what happens when text is changed/deleted and new word is selected from the side panel?
         # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
         # Clear before reapplying. We always have 0-31 indicators.
@@ -912,18 +922,18 @@ class MainFrame(wx.Frame):
         """
         start_pos = self._main_text_field.GetSelectionStart()
         style = self._main_text_field.GetStyleAt(start_pos)
-        if style == self._style_map[Constants.style_bold]:
+        if style == Constants.style_map[Constants.style_bold]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_default])
-        elif style == self._style_map[Constants.style_italic]:
+                                        Constants.style_map[Constants.style_default])
+        elif style == Constants.style_map[Constants.style_italic]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_bold_italic])
-        elif style == self._style_map[Constants.style_bold_italic]:
+                                        Constants.style_map[Constants.style_bold_italic])
+        elif style == Constants.style_map[Constants.style_bold_italic]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_italic])
+                                        Constants.style_map[Constants.style_italic])
         else:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_bold])
+                                        Constants.style_map[Constants.style_bold])
 
     # noinspection PyUnusedLocal
     def _make_italic_handler(self, event: wx.CommandEvent) -> None:
@@ -934,18 +944,18 @@ class MainFrame(wx.Frame):
         """
         start_pos = self._main_text_field.GetSelectionStart()
         style = self._main_text_field.GetStyleAt(start_pos)
-        if style == self._style_map[Constants.style_italic]:
+        if style == Constants.style_map[Constants.style_italic]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_default])
-        elif style == self._style_map[Constants.style_bold]:
+                                        Constants.style_map[Constants.style_default])
+        elif style == Constants.style_map[Constants.style_bold]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_bold_italic])
-        elif style == self._style_map[Constants.style_bold_italic]:
+                                        Constants.style_map[Constants.style_bold_italic])
+        elif style == Constants.style_map[Constants.style_bold_italic]:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_bold])
+                                        Constants.style_map[Constants.style_bold])
         else:
             self._apply_style_with_undo(start_pos, len(self._main_text_field.GetSelectedText()),
-                                        self._style_map[Constants.style_italic])
+                                        Constants.style_map[Constants.style_italic])
 
     def on_modified_handler(self, event: wx._stc.StyledTextEvent) -> None:
         """
@@ -995,7 +1005,7 @@ class MainFrame(wx.Frame):
         start_pos = self._main_text_field.GetSelectionStart()
         self._main_text_field.StartStyling(start_pos)
         self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
-                                         self._style_map[Constants.style_default])
+                                         Constants.style_map[Constants.style_default])
 
     # noinspection PyUnusedLocal
     def _save_file_handler(self, event: wx.CommandEvent) -> None:
@@ -1047,6 +1057,9 @@ class MainFrame(wx.Frame):
         AboutDialog(self)
 
     # Methods---------------------------------------------------------------------------------------------------------------
+
+    def _sanitized_selection(self) -> str:
+        return self._main_text_field.GetSelectedText().strip().lower().lstrip('.').rstrip('.').lstrip(',').rstrip(',')
 
     def _clear_editor(self) -> None:
         """
@@ -1111,7 +1124,7 @@ class MainFrame(wx.Frame):
         if self._show_yes_no_dialog(Strings.warn_load_last_file.format(last_file), wx.ICON_QUESTION):
             self._load_document(last_file)
 
-    def _disable_editor(self) -> None:
+    def disable_editor(self) -> None:
         """
         Disable all features.
         :return: None
@@ -1127,7 +1140,7 @@ class MainFrame(wx.Frame):
             if i.GetId() not in [wx.ID_NEW, wx.ID_OPEN, wx.ID_EXIT, wx.ID_ABOUT]:
                 i.Enable(False)
 
-    def _enable_editor(self) -> None:
+    def enable_editor(self) -> None:
         """
         Enable all features of the editor.
         :return: None
@@ -1192,7 +1205,7 @@ class MainFrame(wx.Frame):
         start_pos = self._main_text_field.GetLength()
         self._main_text_field.AppendText(text)
         self._main_text_field.StartStyling(start_pos)
-        self._main_text_field.SetStyling(len(text), self._style_map[style])
+        self._main_text_field.SetStyling(len(text), Constants.style_map[style])
 
     def _load_document(self, file_path: Path) -> None:
         """
@@ -1202,7 +1215,7 @@ class MainFrame(wx.Frame):
         """
         # todo Open/Save in background eventually and disable the editor in the meanwhile.
         self._main_text_field.Freeze()
-        self._disable_editor()
+        self.disable_editor()
         self._toolbar.ToggleTool(wx.ID_APPLY, False)
         self._toolbar.Refresh()
         # Clear search
@@ -1247,7 +1260,7 @@ class MainFrame(wx.Frame):
         # on_modified will run while loading and erroneously set modified to True so we need to fix it.
         self._current_document.set_modified(False)
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
-        self._enable_editor()
+        self.enable_editor()
         self._main_text_field.SetFocus()
         wx.CallLater(Constants.statistics_delay, self._text_statistics)
 
@@ -1257,7 +1270,7 @@ class MainFrame(wx.Frame):
         :param save_as: True to show dialog.
         :return: None
         """
-        # todo autosave on timer.
+        # todo autosave on timer when idle?
         # todo metadata raw text editor/parser-checker?
         self._main_text_field.Freeze()
         destination = self._current_document.get_path()
@@ -1266,14 +1279,13 @@ class MainFrame(wx.Frame):
 
         if destination:
             self._current_document.set_path(Path(destination))
-            self._current_document.set_converted(self._convert_document())
             try:
+                # todo here we need to check the result of the thread instead in a handler.
                 if self._current_document.save_document():
                     self._set_status_text(Strings.status_saved, 0)
                     self._set_status_text(self._current_document.get_path().name, 1)
                     self._main_text_field.SetSavePoint()
                     self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
-                    self._current_document.split_words(self._side_word_list, self._main_text_field.GetText())
                     self._config.set_last_file(self._current_document.get_path())
                     self._config.save_config()
                     self._current_document.set_modified(False)
@@ -1289,41 +1301,6 @@ class MainFrame(wx.Frame):
             self._main_text_field.Thaw()
             return
         wx.CallLater(Constants.statistics_delay, self._text_statistics)
-
-    def _convert_document(self) -> List:
-        """
-        Extracts text and styling into the simple dictionary format and stores it in the Document class.
-        :return: List of tuples with style and text information.
-        """
-        converted = []
-
-        length = self._main_text_field.GetTextLength()
-        if length == 0:
-            return converted
-
-        current_style: int = self._main_text_field.GetStyleAt(0)
-        chunk_start: int = 0
-        for pos in range(length):
-            style_at_pos = self._main_text_field.GetStyleAt(pos)
-
-            # When the style changes, save the previous chunk.
-            if style_at_pos != current_style:
-                text_chunk = self._main_text_field.GetTextRange(chunk_start, pos)
-                # Escape HTML characters (<, >, &, etc.)
-                escaped_text = html.escape(text_chunk)
-
-                for style, style_id in self._style_map.items():
-                    if style_id == current_style:
-                        converted.append((style, escaped_text))
-
-                current_style = style_at_pos
-                chunk_start = pos
-        # Save last chunk where the style does not change.
-        text_chunk = self._main_text_field.GetTextRange(chunk_start, length)
-        for style, style_id in self._style_map.items():
-            if style_id == current_style:
-                converted.append((style, html.escape(text_chunk)))
-        return converted
 
     def _emergency_save(self) -> None:
         """

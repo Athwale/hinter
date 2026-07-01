@@ -37,7 +37,7 @@ menu_item_add_ignored: str = "Add to ignored"
 menu_item_add_name: str = "Add to names"
 menu_item_del_ignored: str = "Remove from ignored"
 menu_item_del_name: str = "Remove from names"
-menu_item_synonym: str = "Synonym..."
+menu_item_synonym: str = "Synonym"
 menu_item_limits: str = "Set limits from"
 
 menu_tools: str = "&Tools"

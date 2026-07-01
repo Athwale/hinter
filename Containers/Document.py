@@ -180,7 +180,7 @@ class Document:
     def split_words(self, parent: SidePanel, plain_text: str) -> None:
         """
         Split text into words and fill a dictionary with Word objects containing data about every unique word.
-        :param parent
+        :param parent: Parent side panel where the new words will be added to.
         :param plain_text: Plain text from stc.
         :return: None
         """

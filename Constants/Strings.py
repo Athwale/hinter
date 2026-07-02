@@ -71,13 +71,15 @@ button_cancel: str = "Cancel"
 button_save: str = "Save"
 
 status_warning: str = "Warning"
-status_saved: str = "Saved"
-status_not_saved: str = "Not saved"
+status_saved: str = "Saved: {}"
+status_not_saved: str = "Not saved: {}"
 status_ready: str = "Ready"
 status_no_document: str = "No document"
 status_doc_info: str = "Lines: {}, Words: {}, Chars: {}"
 status_indicators: str = "Indicators: {}, free: {}"
 status_ignored: str = "Ignoring: {} words"
+status_saving: str = "Saving..."
+status_loading: str = "Loading..."
 
 warn_file_not_saved: str = "Save current file: {}?"
 warn_errors: str = "Errors found in HTML:\n\n {}\nCan not continue\nAllowed text tags: <b>, <i>"
@@ -87,8 +89,7 @@ warn_word_format_synonym: str = "Word list has incorrect format. Each line must 
 
 err_file_format: str = "File formatting error"
 err_file_format_metadata: str = "File metadata formatting error"
-err_file_permissions: str = "Can not read file"
-err_file_permissions_save: str = "Permission error, can not save"
+err_file_not_found: str = "File not found"
 
 exception_resource_not_found: str = "Resource file not found"
 

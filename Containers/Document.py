@@ -231,9 +231,12 @@ class Document:
         :raises FormatError if formatting marks are not evenly matched
         :raises AttributeError if format is incorrect
         """
+        if not self._path.exists():
+            raise PermissionError(Strings.err_file_not_found)
+
         self._errors = []
         try:
-            if self._path.exists() and self._path.is_file():
+            if self._path.is_file():
                 with open(self._path, "r", encoding="utf-8") as f:
                     self._raw_html_text = f.read()
                     # Odd behavior where <br/>\n is converted to an empty space at the start of the next line.
@@ -365,11 +368,9 @@ class Document:
                 element.replace_with(bs4.BeautifulSoup(replacement, "html.parser"))
 
         try:
-            if self._path.exists() and self._path.is_file():
-                with open(self._path, "w", encoding="utf-8") as f:
-                    f.write(str(soup))
-                    return True
-            return False
+            with open(self._path, "w", encoding="utf-8") as f:
+                f.write(str(soup))
+                return True
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 

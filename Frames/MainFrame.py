@@ -20,9 +20,11 @@ from Containers.ListItemPanel import ListItemPanel
 from Containers.SidePanel import SidePanel
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.PlainTextEditDialog import PlainTextEditDialog
+from Dialogs.SavingWaitDialog import SavingWaitDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
 from Exceptions.FormatError import FormatError
 from Resources.Fetch import Fetch
+from Threads.SaveFileThread import SaveFileThread
 from Tools.Config import Config
 
 
@@ -86,6 +88,8 @@ class MainFrame(wx.Frame):
 
         self._found_words: List[tuple[tuple[int, int], int]] = []
         self._found_last_index = 0
+
+        self._saving_dialog: SavingWaitDialog = SavingWaitDialog(self)
 
         # Load configuration
         self._config = Config()
@@ -1124,11 +1128,15 @@ class MainFrame(wx.Frame):
         if self._show_yes_no_dialog(Strings.warn_load_last_file.format(last_file), wx.ICON_QUESTION):
             self._load_document(last_file)
 
-    def disable_editor(self) -> None:
+    def _disable_editor(self, everything=False) -> None:
         """
         Disable all features.
+        :param everything: Disable every control in the window.
         :return: None
         """
+        if everything:
+            self.Disable()
+            return
         self._repetition_selector.Disable()
         self._min_repeated_word_length_selector.Disable()
         self._max_repeated_word_length_selector.Disable()
@@ -1145,6 +1153,7 @@ class MainFrame(wx.Frame):
         Enable all features of the editor.
         :return: None
         """
+        self.Enable()
         self._repetition_selector.Enable()
         self._min_repeated_word_length_selector.Enable()
         self._max_repeated_word_length_selector.Enable()
@@ -1215,7 +1224,7 @@ class MainFrame(wx.Frame):
         """
         # todo Open/Save in background eventually and disable the editor in the meanwhile.
         self._main_text_field.Freeze()
-        self.disable_editor()
+        self._disable_editor()
         self._toolbar.ToggleTool(wx.ID_APPLY, False)
         self._toolbar.Refresh()
         # Clear search
@@ -1228,8 +1237,8 @@ class MainFrame(wx.Frame):
         self._current_document = Document(file_path)
         try:
             self._current_document.read_document()
-        except PermissionError as _:
-            self._show_error_ok_dialog(Strings.err_file_permissions)
+        except PermissionError as e:
+            self._show_error_ok_dialog(str(e))
             return
         except AttributeError as _:
             self._show_error_ok_dialog(Strings.err_file_format)
@@ -1271,36 +1280,42 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo autosave on timer when idle?
-        # todo metadata raw text editor/parser-checker?
-        self._main_text_field.Freeze()
+        self._saving_dialog.Show()
+        self._saving_dialog.start(saving=True)
+        self._set_status_text(Strings.status_saving, 0)
+        self._disable_editor(everything=True)
         destination = self._current_document.get_path()
         if self._current_document.is_new() or save_as:
             destination = self._open_save_dialog()
 
         if destination:
             self._current_document.set_path(Path(destination))
-            try:
-                # todo here we need to check the result of the thread instead in a handler.
-                if self._current_document.save_document():
-                    self._set_status_text(Strings.status_saved, 0)
-                    self._set_status_text(self._current_document.get_path().name, 1)
-                    self._main_text_field.SetSavePoint()
-                    self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
-                    self._config.set_last_file(self._current_document.get_path())
-                    self._config.save_config()
-                    self._current_document.set_modified(False)
-                    self._main_text_field.Thaw()
-                else:
-                    self._set_status_text(Strings.status_not_saved, 0)
-            except PermissionError as _:
-                self._show_error_ok_dialog(Strings.err_file_permissions_save)
-                self._set_status_text(Strings.status_not_saved, 0)
+            SaveFileThread(self, self._current_document, self._main_text_field)
         else:
             # Canceled dialog.
-            self._set_status_text(Strings.status_not_saved, 0)
-            self._main_text_field.Thaw()
+            self._set_status_text(Strings.status_not_saved.format('canceled'), 0)
             return
         wx.CallLater(Constants.statistics_delay, self._text_statistics)
+
+    def save_document_callback(self, result: bool) -> None:
+        """
+        Thread callback after saving current document.
+        :param result: True if save was successful.
+        :return: None
+        """
+        if result:
+            self._set_status_text(self._current_document.get_path().name, 1)
+            self._main_text_field.SetSavePoint()
+            self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
+            self._config.set_last_file(self._current_document.get_path())
+            self._config.save_config()
+            self._current_document.set_modified(False)
+            self._set_status_text(Strings.status_saved.format('Ok'), 0)
+            self.enable_editor()
+        else:
+            self._set_status_text(Strings.status_not_saved.format('error'), 0)
+            self._show_error_ok_dialog(Strings.status_not_saved.format('error'))
+        self._saving_dialog.Close()
 
     def _emergency_save(self) -> None:
         """

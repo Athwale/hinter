@@ -35,6 +35,9 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         # Disable all panels by default, assigning indicators will enable them.
         panel = ListItemPanel(self, item, False)
         self._sizer.Add(panel, 0, wx.EXPAND)
+        # This is some sort of hack co we can keep the created panels and the sizer does not complain later when we
+        # re-add them.
+        self._sizer.Detach(panel)
         panel.update_count()
         panel.Show(False)
         return panel
@@ -57,6 +60,7 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
                 item.set_enabled(False)
             if item.get_word_instance().is_selected():
                 # Group selected words at the top.
+                # todo no idea why detach is needed here, but it works with small documents and fails on long documents.
                 self._sizer.Insert(0, item, 0, wx.EXPAND)
                 index += 1
             else:

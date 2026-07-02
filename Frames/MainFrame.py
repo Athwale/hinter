@@ -20,10 +20,10 @@ from Containers.ListItemPanel import ListItemPanel
 from Containers.SidePanel import SidePanel
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.PlainTextEditDialog import PlainTextEditDialog
-from Dialogs.SavingWaitDialog import SavingWaitDialog
+from Dialogs.SaveLoadWaitDialog import SavingWaitDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
-from Exceptions.FormatError import FormatError
 from Resources.Fetch import Fetch
+from Threads.LoadFileThread import LoadFileThread
 from Threads.SaveFileThread import SaveFileThread
 from Tools.Config import Config
 
@@ -89,7 +89,7 @@ class MainFrame(wx.Frame):
         self._found_words: List[tuple[tuple[int, int], int]] = []
         self._found_last_index = 0
 
-        self._saving_dialog: SavingWaitDialog = SavingWaitDialog(self)
+        self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
 
         # Load configuration
         self._config = Config()
@@ -360,6 +360,7 @@ class MainFrame(wx.Frame):
         self._repetition_selector = wx.SpinCtrl(self, id=wx.ID_ANY,
                                                 value=str(Constants.config_min_repetitions_default),
                                                 style=wx.SP_ARROW_KEYS,
+                                                size=wx.Size(120, -1),
                                                 min=Constants.config_min_repetitions,
                                                 max=Constants.config_max_repetitions,
                                                 initial=Constants.config_min_repetitions_default)
@@ -367,6 +368,7 @@ class MainFrame(wx.Frame):
         self._min_repeated_word_length_selector = wx.SpinCtrl(self, id=wx.ID_ANY,
                                                               value=str(Constants.config_min_repetitions_default),
                                                               style=wx.SP_ARROW_KEYS,
+                                                              size=wx.Size(120, -1),
                                                               min=Constants.config_min_len,
                                                               max=Constants.config_max_len,
                                                               initial=Constants.config_min_len_default)
@@ -374,6 +376,7 @@ class MainFrame(wx.Frame):
         self._max_repeated_word_length_selector = wx.SpinCtrl(self, id=wx.ID_ANY,
                                                               value=str(Constants.config_max_len),
                                                               style=wx.SP_ARROW_KEYS,
+                                                              size=wx.Size(120, -1),
                                                               min=Constants.config_min_len,
                                                               max=Constants.config_max_len,
                                                               initial=Constants.config_max_len)
@@ -815,6 +818,7 @@ class MainFrame(wx.Frame):
             return
         else:
             self._current_document.split_words(self._side_word_list, self._main_text_field.GetText())
+
             word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
             repetition_limit = self._repetition_selector.GetValue()
             length_min_limit = self._min_repeated_word_length_selector.GetValue()
@@ -974,7 +978,7 @@ class MainFrame(wx.Frame):
 
         self._found_last_index = 0
         self._found_words.clear()
-        # todo statistics calls are slow on large documents, run in background.
+        # todo solve this, use daemon thread for statistics.
         wx.CallLater(Constants.statistics_delay, self._text_statistics)
 
         if self._current_document:
@@ -1018,7 +1022,7 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        self._save_file()
+        self._save_document()
 
     # noinspection PyUnusedLocal
     def _save_as_file_handler(self, event: wx.CommandEvent) -> None:
@@ -1027,7 +1031,7 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        self._save_file(save_as=True)
+        self._save_document(save_as=True)
 
     # noinspection PyUnusedLocal
     def _quit_handler(self, event: wx.CommandEvent) -> None:
@@ -1199,12 +1203,15 @@ class MainFrame(wx.Frame):
         Update the status bar with text information.
         :return: None
         """
+        # todo this is slow, use thread
+        # todo this is called very often for some reason, might be on modified right after document load, it should run only once a while when nothing is happening.
+        print('a')
         lines = self._main_text_field.NumberOfLines
         words = len(self._main_text_field.GetText().split())
         chars = self._main_text_field.GetLastPosition()
         self._set_status_text(Strings.status_doc_info.format(lines, words, chars), 0)
 
-    def _append_styled_text(self, text: str, style: str) -> None:
+    def append_styled_text(self, text: str, style: str) -> None:
         """
         Add text to text area with style.
         :param text: The text to add.
@@ -1216,36 +1223,47 @@ class MainFrame(wx.Frame):
         self._main_text_field.StartStyling(start_pos)
         self._main_text_field.SetStyling(len(text), Constants.style_map[style])
 
+    def append_new_line(self) -> None:
+        """
+        Add new line to text area.
+        :return: None
+        """
+        self._main_text_field.AppendText('\n')
+
     def _load_document(self, file_path: Path) -> None:
         """
         Load document into editor. Rtf can not be used by richtextctrl yet.
         :param file_path: Document path.
         :return: None
         """
-        # todo Open/Save in background eventually and disable the editor in the meanwhile.
-        self._main_text_field.Freeze()
-        self._disable_editor()
+        self._waiting_dialog.Show()
+        self._waiting_dialog.start(saving=False)
+        self._set_status_text(Strings.status_loading, 0)
+        self._disable_editor(everything=True)
+
+        # Clear tools
         self._toolbar.ToggleTool(wx.ID_APPLY, False)
         self._toolbar.Refresh()
-        # Clear search
         self._found_last_index = 0
         self._search_text_field.SetValue('')
         self._found_words.clear()
         self._side_word_list.clear_list()
         self._selected_words.clear()
         self._coloring_tool_off = True
+
+        # Create a new document container for the file and give it to a thread to load.
         self._current_document = Document(file_path)
-        try:
-            self._current_document.read_document()
-        except PermissionError as e:
-            self._show_error_ok_dialog(str(e))
+        LoadFileThread(self, self._current_document)
+
+    def load_document_callback(self, exp: str) -> None:
+        """
+        Thread callback after loading a new document.
+        :return: None
+        """
+        if exp:
+            self._show_error_ok_dialog(exp)
             return
-        except AttributeError as _:
-            self._show_error_ok_dialog(Strings.err_file_format)
-            return
-        except FormatError as e:
-            self._show_error_ok_dialog(str(e))
-            return
+
         errors = self._current_document.get_errors()
         if errors:
             formatted = ''
@@ -1254,34 +1272,26 @@ class MainFrame(wx.Frame):
             self._show_error_ok_dialog(Strings.warn_errors.format(formatted))
             return
 
-        self._set_status_text(self._current_document.get_path().name, 1)
-        parsed_text = self._current_document.get_parsed_text()
-        for style, content in parsed_text:
-            if style == 'break':
-                self._main_text_field.AppendText('\n')
-            else:
-                self._append_styled_text(content, style)
-
+        # Todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering the text.
         self._main_text_field.EmptyUndoBuffer()
-        self._current_document.split_words(self._side_word_list, self._main_text_field.GetText())
-        self._main_text_field.Thaw()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
+        self._set_status_text(self._current_document.get_path().name, 1)
         # on_modified will run while loading and erroneously set modified to True so we need to fix it.
         self._current_document.set_modified(False)
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
         self.enable_editor()
         self._main_text_field.SetFocus()
-        wx.CallLater(Constants.statistics_delay, self._text_statistics)
+        self._config.set_last_file(self._current_document.get_path())
+        self._config.save_config()
+        self._waiting_dialog.Close()
 
-    def _save_file(self, save_as: bool = False) -> None:
+    def _save_document(self, save_as: bool = False) -> None:
         """
         Save current file and optionally show a save as dialog.
         :param save_as: True to show dialog.
         :return: None
         """
         # todo autosave on timer when idle?
-        self._saving_dialog.Show()
-        self._saving_dialog.start(saving=True)
         self._set_status_text(Strings.status_saving, 0)
         self._disable_editor(everything=True)
         destination = self._current_document.get_path()
@@ -1289,13 +1299,14 @@ class MainFrame(wx.Frame):
             destination = self._open_save_dialog()
 
         if destination:
+            self._waiting_dialog.Show()
+            self._waiting_dialog.start(saving=True)
             self._current_document.set_path(Path(destination))
             SaveFileThread(self, self._current_document, self._main_text_field)
         else:
             # Canceled dialog.
             self._set_status_text(Strings.status_not_saved.format('canceled'), 0)
             return
-        wx.CallLater(Constants.statistics_delay, self._text_statistics)
 
     def save_document_callback(self, result: bool) -> None:
         """
@@ -1315,7 +1326,7 @@ class MainFrame(wx.Frame):
         else:
             self._set_status_text(Strings.status_not_saved.format('error'), 0)
             self._show_error_ok_dialog(Strings.status_not_saved.format('error'))
-        self._saving_dialog.Close()
+        self._waiting_dialog.Close()
 
     def _emergency_save(self) -> None:
         """
@@ -1325,4 +1336,4 @@ class MainFrame(wx.Frame):
         if self._current_document.is_modified():
             if self._show_yes_no_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name),
                                         wx.ICON_ASTERISK):
-                self._save_file()
+                self._save_document()

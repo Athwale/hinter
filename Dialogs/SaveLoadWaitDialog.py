@@ -11,7 +11,7 @@ class SavingWaitDialog(wx.Dialog):
         Display a dialog with a saving file message.
         :param parent: Parent frame.
         """
-        wx.Dialog.__init__(self, parent, title=Strings.status_saving,
+        wx.Dialog.__init__(self, parent, title=Strings.status_loading,
                            size=Size(150, 50), style=wx.BORDER_NONE | wx.STAY_ON_TOP)
         self._main_vertical_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -32,4 +32,5 @@ class SavingWaitDialog(wx.Dialog):
         if saving:
             self._busy_wheel.SetOwnForegroundColour(wx.Colour(0, 0, 255))
             self._label.SetLabelText(Strings.status_saving)
+            self.SetTitle(Strings.status_saving)
         self._busy_wheel.Start()

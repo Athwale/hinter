@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from typing import List, Dict, Set
 
@@ -8,8 +7,6 @@ from bs4 import Tag, NavigableString, BeautifulSoup
 
 from Constants import Constants, Strings
 from Containers.ListItemPanel import ListItemPanel
-from Containers.SidePanel import SidePanel
-from Containers.Word import Word
 from Exceptions.FormatError import FormatError
 from Resources.Fetch import Fetch
 
@@ -28,7 +25,6 @@ class Document:
         self._path: Path = path
         self._raw_html_text: str = ""
         self._converted: List = []
-        self._word_count: int = 0
 
         self._word_data: Dict[bytes, ListItemPanel] = {}
 
@@ -40,8 +36,6 @@ class Document:
         self._ignored_words: Set[str] = set()
         self._names: Set[str] = set()
         self._synonyms: List[Set[str]] = []
-
-        self._word_matcher = re.compile(rb"\b([A-Za-z0-9]+)\b")
 
     def get_ignored_words(self) -> Set[str]:
         """
@@ -84,13 +78,6 @@ class Document:
         :return: The parsed text prepared for loading into gui.
         """
         return self._converted
-
-    def get_word_count(self) -> int:
-        """
-        Return the number of words in last saved text.
-        :return: the number of words in last saved text.
-        """
-        return self._word_count
 
     def get_word_marking_data(self) -> Dict[bytes, ListItemPanel]:
         """
@@ -176,52 +163,6 @@ class Document:
             if word in group:
                 return group
         return set()
-
-    def split_words(self, parent: SidePanel, plain_text: str) -> None:
-        """
-        Split text into words and fill a dictionary with Word objects containing data about every unique word.
-        :param parent: Parent side panel where the new words will be added to.
-        :param plain_text: Plain text from stc.
-        :return: None
-        """
-        plain_text = plain_text.lower()
-        word_spans = list(self._word_matcher.finditer(plain_text.encode('utf-8')))
-        plain_words: Dict[bytes, int] = {}
-        for word in word_spans:
-            # Create a dictionary of unique words and count words at the same time.
-            word_bytes: bytes = word.group()
-            entry = plain_words.get(word_bytes, 0)
-            if entry:
-                plain_words[word_bytes] = entry + 1
-            else:
-                plain_words[word_bytes] = 1
-
-        for word, count in plain_words.items():
-            # All locations where the word occurs in the text.
-            spans = [s for s in word_spans if s.group() == word]
-            # The side panel will own all the items, even the hidden ones.
-            panel = self._word_data.get(word, False)
-            if not panel:
-                new_panel = parent.add_hidden_item(Word(word, spans, count))
-                self._word_data[word] = new_panel
-            else:
-                word_container = panel.get_word_instance()
-                # 0 evaluates as False
-                word_container.set_spans(spans)
-                word_container.set_count(count)
-
-        # Remove words no longer present in text from the dict and the side panel.
-        to_remove = []
-        if len(plain_words.keys()) != len(self._word_data.keys()):
-            # There are words in word_data which are no longer in the text.
-            for w in self._word_data.keys():
-                if not w in plain_words.keys():
-                    to_remove.append(w)
-
-        for w in to_remove:
-            self._word_data.pop(w)
-
-        self._word_count = len(word_spans)
 
     def read_document(self) -> None:
         """

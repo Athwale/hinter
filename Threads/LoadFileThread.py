@@ -18,6 +18,7 @@ class LoadFileThread(Thread):
         :param parent: The Frame that called the thread.
         """
         super().__init__()
+        # Storing parent is thread safe, the methods are called in CallAfter, not directly from the background thread.
         self._parent = parent
         self._document = document
         self.start()

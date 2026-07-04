@@ -1,3 +1,4 @@
+import html
 import re
 import shutil
 from pathlib import Path
@@ -25,6 +26,7 @@ from Dialogs.WordInfoDialog import WordInfoDialog
 from Resources.Fetch import Fetch
 from Threads.LoadFileThread import LoadFileThread
 from Threads.SaveFileThread import SaveFileThread
+from Threads.StatisticsThread import StatisticsThread
 from Tools.Config import Config
 
 
@@ -90,6 +92,9 @@ class MainFrame(wx.Frame):
         self._found_last_index = 0
 
         self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
+        self._statistics_thread: StatisticsThread = None
+        self._statistics_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self._on_statistics_timer, self._statistics_timer)
 
         # Load configuration
         self._config = Config()
@@ -799,9 +804,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo all of this has to happen in a thread and be applied to text when done for long texts.
-        # todo apply live marking only on current line to speed up?
-        # todo what happens when text is changed/deleted and new word is selected from the side panel?
-        # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
+        # todo if a word becomes missing in text, it remains in the side panel while the tool is active. Can we update the list somehow automatically? Timer?
         # Clear before reapplying. We always have 0-31 indicators.
         for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
@@ -817,6 +820,7 @@ class MainFrame(wx.Frame):
             self._coloring_tool_off = True
             return
         else:
+            # todo splitting the document takes time, it has to happen in background.
             self._current_document.split_words(self._side_word_list, self._main_text_field.GetText())
 
             word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
@@ -978,8 +982,6 @@ class MainFrame(wx.Frame):
 
         self._found_last_index = 0
         self._found_words.clear()
-        # todo solve this, use daemon thread for statistics.
-        wx.CallLater(Constants.statistics_delay, self._text_statistics)
 
         if self._current_document:
             self._current_document.set_modified(True)
@@ -1198,17 +1200,23 @@ class MainFrame(wx.Frame):
             return True
         return False
 
-    def _text_statistics(self) -> None:
+    def _on_statistics_timer(self, event: wx.CommandEvent) -> None:
         """
-        Update the status bar with text information.
+        Statistics timer handler. Runs periodically. Runs a background thread that calculates text stats.
+        :param event: Not used.
         :return: None
         """
-        # todo this is slow, use thread
-        # todo this is called very often for some reason, might be on modified right after document load, it should run only once a while when nothing is happening.
-        print('a')
+        if self._statistics_thread is None or not self._statistics_thread.is_alive():
+            self._statistics_thread = StatisticsThread(self, self._main_text_field.GetText())
+            self._statistics_thread.start()
+
+    def text_statistics_callback(self, words: int) -> None:
+        """
+        Thread callback for text statistics. Sets the status bar information.
+        :return: None
+        """
         lines = self._main_text_field.NumberOfLines
-        words = len(self._main_text_field.GetText().split())
-        chars = self._main_text_field.GetLastPosition()
+        chars = self._main_text_field.GetTextLength()
         self._set_status_text(Strings.status_doc_info.format(lines, words, chars), 0)
 
     def append_styled_text(self, text: str, style: str) -> None:
@@ -1247,7 +1255,7 @@ class MainFrame(wx.Frame):
         self._found_last_index = 0
         self._search_text_field.SetValue('')
         self._found_words.clear()
-        self._side_word_list.clear_list()
+        self._side_word_list.wipe_list()
         self._selected_words.clear()
         self._coloring_tool_off = True
 
@@ -1284,6 +1292,8 @@ class MainFrame(wx.Frame):
         self._config.set_last_file(self._current_document.get_path())
         self._config.save_config()
         self._waiting_dialog.Close()
+        self._statistics_timer.Start(Constants.statistics_timer_delay)
+        self._set_status_text(Strings.status_calculating, 0)
 
     def _save_document(self, save_as: bool = False) -> None:
         """
@@ -1302,7 +1312,7 @@ class MainFrame(wx.Frame):
             self._waiting_dialog.Show()
             self._waiting_dialog.start(saving=True)
             self._current_document.set_path(Path(destination))
-            SaveFileThread(self, self._current_document, self._main_text_field)
+            SaveFileThread(self, self._current_document, self._convert_document())
         else:
             # Canceled dialog.
             self._set_status_text(Strings.status_not_saved.format('canceled'), 0)
@@ -1327,6 +1337,41 @@ class MainFrame(wx.Frame):
             self._set_status_text(Strings.status_not_saved.format('error'), 0)
             self._show_error_ok_dialog(Strings.status_not_saved.format('error'))
         self._waiting_dialog.Close()
+
+    def _convert_document(self) -> List:
+        """
+        Extracts text and styling into the simple dictionary format.
+        :return: List of tuples with style and text information.
+        """
+        converted = []
+
+        length = self._main_text_field.GetTextLength()
+        if length == 0:
+            return converted
+
+        current_style: int = self._main_text_field.GetStyleAt(0)
+        chunk_start: int = 0
+        for pos in range(length):
+            style_at_pos = self._main_text_field.GetStyleAt(pos)
+
+            # When the style changes, save the previous chunk.
+            if style_at_pos != current_style:
+                text_chunk = self._main_text_field.GetTextRange(chunk_start, pos)
+                # Escape HTML characters (<, >, &, etc.)
+                escaped_text = html.escape(text_chunk)
+
+                for style, style_id in Constants.style_map.items():
+                    if style_id == current_style:
+                        converted.append((style, escaped_text))
+
+                current_style = style_at_pos
+                chunk_start = pos
+        # Save last chunk where the style does not change.
+        text_chunk = self._main_text_field.GetTextRange(chunk_start, length)
+        for style, style_id in Constants.style_map.items():
+            if style_id == current_style:
+                converted.append((style, html.escape(text_chunk)))
+        return converted
 
     def _emergency_save(self) -> None:
         """

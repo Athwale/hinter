@@ -60,7 +60,6 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
                 item.set_enabled(False)
             if item.get_word_instance().is_selected():
                 # Group selected words at the top.
-                # todo no idea why detach is needed here, but it works with small documents and fails on long documents.
                 self._sizer.Insert(0, item, 0, wx.EXPAND)
                 index += 1
             else:
@@ -75,11 +74,23 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
 
     def clear_list(self) -> None:
         """
-        Clear all items from list.
+        Clear all items from list. But do not delete them.
         :return: None
         """
         for ch in self.GetChildren():
             ch: ListItemPanel
             ch.Show(False)
             self._sizer.Detach(ch)
+        self.Layout()
+
+    def wipe_list(self) -> None:
+        """
+        Delete all items from list.
+        :return: None
+        """
+        for ch in self.GetChildren():
+            ch: ListItemPanel
+            ch.Show(False)
+            self._sizer.Detach(ch)
+            ch.Destroy()
         self.Layout()

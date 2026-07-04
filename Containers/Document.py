@@ -14,7 +14,6 @@ from Resources.Fetch import Fetch
 class Document:
     """
     Carrier class for currently loaded document file.
-    # todo add the metadata to a div? Same file.
     """
 
     def __init__(self, path: Path):
@@ -32,7 +31,6 @@ class Document:
         self._new: bool = True
         self._is_modified = False
 
-        # todo must ignore case
         self._ignored_words: Set[str] = set()
         self._names: Set[str] = set()
         self._synonyms: List[Set[str]] = []

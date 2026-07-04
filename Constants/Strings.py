@@ -80,6 +80,7 @@ status_indicators: str = "Indicators: {}, free: {}"
 status_ignored: str = "Ignoring: {} words"
 status_saving: str = "Saving..."
 status_loading: str = "Loading..."
+status_calculating: str = "Calculating..."
 
 warn_file_not_saved: str = "Save current file: {}?"
 warn_errors: str = "Errors found in HTML:\n\n {}\nCan not continue\nAllowed text tags: <b>, <i>"

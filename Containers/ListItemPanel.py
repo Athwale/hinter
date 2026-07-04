@@ -29,8 +29,7 @@ class ListItemPanel(wx.Panel):
 
         self._check_box = wx.CheckBox(self, -1)
         self._check_box.SetValue(state)
-        self._word_label = wx.StaticText(self, -1, self._word_instance.get_word().decode('utf-8'),
-                                         style=wx.ST_ELLIPSIZE_MIDDLE,
+        self._word_label = wx.StaticText(self, -1, self._word_instance.get_word(), style=wx.ST_ELLIPSIZE_MIDDLE,
                                          size=Size(120, -1))
         self._count = wx.StaticText(self, -1, str(self._word_instance.get_count()), style=wx.ST_ELLIPSIZE_END)
 

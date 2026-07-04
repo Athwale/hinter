@@ -1,6 +1,6 @@
 class Word:
 
-    def __init__(self, word: bytes, spans, count: int):
+    def __init__(self, word: str, spans, count: int):
         """
         Container for word data.
         :param word: The word.
@@ -28,14 +28,14 @@ class Word:
         """
         return self._selected
 
-    def get_word(self) -> bytes:
+    def get_word(self) -> str:
         """
         Get the word.
         :return: The word as bytes.
         """
         return self._word
 
-    def set_word(self, value: bytes):
+    def set_word(self, value: str):
         """
         Set the word.
         :param value: The word as bytes.
@@ -101,7 +101,7 @@ class Word:
         self.set_indicator(-1)
 
     def __str__(self):
-        return (f"Word: {self._word.decode('utf-8')}, count: {self._count}, indicator: "
+        return (f"Word: {self._word}, count: {self._count}, indicator: "
                 f"{self._indicator}, selected: {self.is_selected()}")
 
     # Sorts words by count not by alphabet order.

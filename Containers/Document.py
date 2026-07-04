@@ -1,3 +1,5 @@
+import re
+from collections import defaultdict
 from pathlib import Path
 from typing import List, Dict, Set
 
@@ -80,7 +82,7 @@ class Document:
     def get_word_marking_data(self) -> Dict[bytes, ListItemPanel]:
         """
         Return a dictionary of unique words and their side panel item.
-        :return: a dictionary of unique words and their side panel item.
+        :return: A dictionary of unique words and their side panel item.
         """
         return self._word_data
 

@@ -29,7 +29,7 @@ class WordInfoDialog(wx.Dialog):
 
         content = ''
         for w, p in sorted(panels.items()):
-            content += f'{w.decode('utf-8')} -> {p.get_word_instance().get_count()}<br>'
+            content += f'{w} -> {p.get_word_instance().get_count()}<br>'
 
         self._html_window.SetPage(content)
 

@@ -1,6 +1,7 @@
 import html
 import re
 import shutil
+from collections import defaultdict
 from pathlib import Path
 from typing import List, Dict, Set
 
@@ -19,11 +20,13 @@ from Constants.Constants import EVT_CHECKBOX_CHANGED
 from Containers.Document import Document
 from Containers.ListItemPanel import ListItemPanel
 from Containers.SidePanel import SidePanel
+from Containers.Word import Word
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.PlainTextEditDialog import PlainTextEditDialog
 from Dialogs.SaveLoadWaitDialog import SavingWaitDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
 from Resources.Fetch import Fetch
+from Threads.ColoratorThread import ColoratorThread
 from Threads.LoadFileThread import LoadFileThread
 from Threads.SaveFileThread import SaveFileThread
 from Threads.StatisticsThread import StatisticsThread
@@ -803,8 +806,8 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        # todo all of this has to happen in a thread and be applied to text when done for long texts.
-        # todo if a word becomes missing in text, it remains in the side panel while the tool is active. Can we update the list somehow automatically? Timer?
+        # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
+        #  Can we update the list somehow automatically? Timer?
         # Clear before reapplying. We always have 0-31 indicators.
         for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
@@ -820,76 +823,101 @@ class MainFrame(wx.Frame):
             self._coloring_tool_off = True
             return
         else:
-            # todo splitting the document takes time, it has to happen in background.
-            self._current_document.split_words(self._side_word_list, self._main_text_field.GetText())
-
-            word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
-            repetition_limit = self._repetition_selector.GetValue()
-            length_min_limit = self._min_repeated_word_length_selector.GetValue()
-            length_max_limit = self._max_repeated_word_length_selector.GetValue()
-
-            fitting_words: List[ListItemPanel] = []
-
-            # Filter the words that fit the marking criteria to a new list and work on that.
-            for panel in word_data.values():
-                panel: ListItemPanel
-                word_instance = panel.get_word_instance()
-                word = word_instance.get_word().decode('utf-8')
-                w_count = word_instance.get_count()
-                if w_count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
-                    if word not in self._current_document.get_ignored_words():
-                        if word in self._selected_words:
-                            panel.set_checked(True)
-                        fitting_words.append(panel)
-
-            # Assign indicators to filtered words.
+            # Todo add some spinner
             if self._coloring_tool_off:
-                # The tool is running for the first time, assign indicators to everything top down.
-                indicator_counter = 31
-                # Sort the words from the highest number of repetitions down.
-                for w in sorted(fitting_words, reverse=True):
-                    w: ListItemPanel
-                    w.get_word_instance().set_indicator(indicator_counter)
-                    if self._selected_words:
-                        if w.get_word_instance().is_selected():
-                            w.set_checked(True)
-                    else:
-                        w.set_checked(True)
-                    indicator_counter -= 1
-                    if indicator_counter == -1:
-                        break
-
-            # Display indicators.
-            for w in fitting_words:
-                w: ListItemPanel
-                if w.get_word_instance().has_indicator() and w.is_checked():
-                    indicator = w.get_word_instance().get_indicator()
-                    locations = w.get_word_instance().get_spans()
-                    for word_span in locations:
-                        word_span: re.Match
-                        self._main_text_field.SetIndicatorCurrent(indicator)
-                        self._main_text_field.IndicatorFillRange(word_span.span()[0],
-                                                                 word_span.span()[1] - word_span.span()[0])
-            # Fill word list.
-            if self._coloring_tool_off:
-                # Fill only once when the tool runs the first time.
-                self._side_word_list.add_items(fitting_words)
-                self._coloring_tool_off = False
+                ColoratorThread(self, self._current_document, self._main_text_field.GetText())
             else:
-                if self._available_indicators:
-                    # We have some spare indicators, enable all checkboxes.
-                    for item in self._side_word_list.GetChildren():
-                        item: ListItemPanel
-                        if not item.is_enabled():
-                            item.set_enabled(True)
+                # If the tool run before and is still active, do not recalculate.
+                self.apply_indicators_callback({}, {})
+
+    def apply_indicators_callback(self, plain_words: Dict[bytes, int],
+                                  spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
+        """
+        Thread callback to finish applying indicators once the calculations are made.
+        :return: None
+        """
+        # todo this method is slow on long texts.
+        word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
+        # Update or create word panels
+        # This can not be done in a thread because it is calling a gui method and will segfault.
+        if self._coloring_tool_off:
+            for word, count in plain_words.items():
+                spans = spans_by_word[word]
+
+                panel = word_data.get(word)
+                if panel is None:
+                    new_panel = self._side_word_list.add_hidden_item(Word(word.decode('utf-8'), spans, count))
+                    word_data[word] = new_panel
                 else:
-                    # Disable extra checkboxes.
-                    for item in self._side_word_list.GetChildren():
-                        item: ListItemPanel
-                        if item.get_word_instance().has_indicator():
-                            item.set_enabled(True)
-                        else:
-                            item.set_enabled(False)
+                    word_container = panel.get_word_instance()
+                    word_container.set_spans(spans)
+                    word_container.set_count(count)
+
+        repetition_limit = self._repetition_selector.GetValue()
+        length_min_limit = self._min_repeated_word_length_selector.GetValue()
+        length_max_limit = self._max_repeated_word_length_selector.GetValue()
+
+        # Filter the words that fit the marking criteria to a new list and work on that.
+        fitting_words: List[ListItemPanel] = []
+        for panel in word_data.values():
+            panel: ListItemPanel
+            word_instance = panel.get_word_instance()
+            word = word_instance.get_word()
+            w_count = word_instance.get_count()
+            if w_count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
+                if word not in self._current_document.get_ignored_words():
+                    if word in self._selected_words:
+                        panel.set_checked(True)
+                    fitting_words.append(panel)
+
+        # Assign indicators to filtered words.
+        if self._coloring_tool_off:
+            # The tool is running for the first time, assign indicators to everything top down.
+            indicator_counter = 31
+            # Sort the words from the highest number of repetitions down.
+            for w in sorted(fitting_words, reverse=True):
+                w: ListItemPanel
+                w.get_word_instance().set_indicator(indicator_counter)
+                if self._selected_words:
+                    if w.get_word_instance().is_selected():
+                        w.set_checked(True)
+                else:
+                    w.set_checked(True)
+                indicator_counter -= 1
+                if indicator_counter == -1:
+                    break
+
+        # Display indicators.
+        for w in fitting_words:
+            w: ListItemPanel
+            if w.get_word_instance().has_indicator() and w.is_checked():
+                indicator = w.get_word_instance().get_indicator()
+                locations = w.get_word_instance().get_spans()
+                for word_span in locations:
+                    word_span: re.Match
+                    self._main_text_field.SetIndicatorCurrent(indicator)
+                    self._main_text_field.IndicatorFillRange(word_span.span()[0],
+                                                             word_span.span()[1] - word_span.span()[0])
+        # Fill word list.
+        if self._coloring_tool_off:
+            # Fill only once when the tool runs the first time.
+            self._side_word_list.add_items(fitting_words)
+            self._coloring_tool_off = False
+        else:
+            if self._available_indicators:
+                # We have some spare indicators, enable all checkboxes.
+                for item in self._side_word_list.GetChildren():
+                    item: ListItemPanel
+                    if not item.is_enabled():
+                        item.set_enabled(True)
+            else:
+                # Disable extra checkboxes.
+                for item in self._side_word_list.GetChildren():
+                    item: ListItemPanel
+                    if item.get_word_instance().has_indicator():
+                        item.set_enabled(True)
+                    else:
+                        item.set_enabled(False)
         self._main_text_field.Refresh()
         self._update_indicator_count()
 
@@ -914,7 +942,7 @@ class MainFrame(wx.Frame):
         for item in self._side_word_list.GetChildren():
             item: ListItemPanel
             if item.is_checked():
-                self._selected_words.append(item.get_word_instance().get_word().decode('utf-8'))
+                self._selected_words.append(item.get_word_instance().get_word())
                 if not item.get_word_instance().has_indicator():
                     item.get_word_instance().set_indicator(self._available_indicators.pop())
             else:

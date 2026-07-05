@@ -39,6 +39,7 @@ menu_item_del_ignored: str = "Remove from ignored"
 menu_item_del_name: str = "Remove from names"
 menu_item_synonym: str = "Synonym"
 menu_item_limits: str = "Set limits from"
+menu_item_colorize: str = "Colorize"
 
 menu_tools: str = "&Tools"
 menu_item_word_list: str = "Word list"

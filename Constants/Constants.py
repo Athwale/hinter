@@ -17,8 +17,8 @@ status_proportions: List[int] = [-6, -7, -3, -4]
 main_window_size: Size = Size(1000, 800)
 default_border: int = 3
 
-icon_tool_height: int = 16
-icon_tool_width: int = 16
+icon_tool_height: int = 25
+icon_tool_width: int = 25
 
 style_default: str = "default"
 style_bold: str = "bold"

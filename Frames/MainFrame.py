@@ -211,30 +211,41 @@ class MainFrame(wx.Frame):
         """
         self._toolbar = self.CreateToolBar(style=wx.TB_DEFAULT_STYLE)
 
+
         new_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_NEW, Strings.menu_item_new,
-                                                             wx.ArtProvider.GetBitmap(wx.ART_NEW),
+                                                             self._scale_icon('new.svg',
+                                                                              Constants.icon_tool_width,
+                                                                              Constants.icon_tool_height),
                                                              Strings.menu_item_new)
         self._tools.append(new_tool)
 
         open_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_OPEN, Strings.menu_item_open,
-                                                              wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN),
+                                                              self._scale_icon('open.svg',
+                                                                               Constants.icon_tool_width,
+                                                                               Constants.icon_tool_height),
                                                               Strings.menu_item_open)
         self._tools.append(open_tool)
 
         save_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_SAVE, Strings.menu_item_save,
-                                                              wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE),
+                                                              self._scale_icon('save.svg',
+                                                                               Constants.icon_tool_width,
+                                                                               Constants.icon_tool_height),
                                                               Strings.menu_item_save)
         self._tools.append(save_tool)
 
         self._toolbar.AddSeparator()
 
         undo_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_UNDO, Strings.menu_item_undo,
-                                                              wx.ArtProvider.GetBitmap(wx.ART_UNDO),
+                                                              self._scale_icon('undo.svg',
+                                                                               Constants.icon_tool_width,
+                                                                               Constants.icon_tool_height),
                                                               Strings.menu_item_undo)
         self._tools.append(undo_tool)
 
         redo_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_REDO, Strings.menu_item_redo,
-                                                              wx.ArtProvider.GetBitmap(wx.ART_REDO),
+                                                              self._scale_icon('redo.svg',
+                                                                               Constants.icon_tool_width,
+                                                                               Constants.icon_tool_height),
                                                               Strings.menu_item_redo)
         self._tools.append(redo_tool)
 
@@ -260,10 +271,7 @@ class MainFrame(wx.Frame):
                                                                        bitmap1=self._scale_icon('colorize.svg',
                                                                                                 Constants.icon_tool_width,
                                                                                                 Constants.icon_tool_height),
-                                                                       bmpDisabled=self._scale_icon('colorize.svg',
-                                                                                                    Constants.icon_tool_width,
-                                                                                                    Constants.icon_tool_height),
-                                                                       shortHelp=Strings.menu_item_italic)
+                                                                       shortHelp=Strings.menu_item_colorize)
         self._tools.append(colorize_tool)
         self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
         self._toolbar.Realize()
@@ -828,6 +836,8 @@ class MainFrame(wx.Frame):
                 ColoratorThread(self, self._current_document, self._main_text_field.GetText())
             else:
                 # If the tool run before and is still active, do not recalculate.
+                # todo changing the text and then using the checkboxes messes up the positions. Solve this later.
+                ColoratorThread(self, self._current_document, self._main_text_field.GetText())
                 self.apply_indicators_callback({}, {})
 
     def apply_indicators_callback(self, plain_words: Dict[bytes, int],
@@ -843,7 +853,6 @@ class MainFrame(wx.Frame):
         if self._coloring_tool_off:
             for word, count in plain_words.items():
                 spans = spans_by_word[word]
-
                 panel = word_data.get(word)
                 if panel is None:
                     new_panel = self._side_word_list.add_hidden_item(Word(word.decode('utf-8'), spans, count))
@@ -877,9 +886,10 @@ class MainFrame(wx.Frame):
             # Sort the words from the highest number of repetitions down.
             for w in sorted(fitting_words, reverse=True):
                 w: ListItemPanel
-                w.get_word_instance().set_indicator(indicator_counter)
+                word_instance = w.get_word_instance()
+                word_instance.set_indicator(indicator_counter)
                 if self._selected_words:
-                    if w.get_word_instance().is_selected():
+                    if word_instance.is_selected():
                         w.set_checked(True)
                 else:
                     w.set_checked(True)
@@ -887,17 +897,6 @@ class MainFrame(wx.Frame):
                 if indicator_counter == -1:
                     break
 
-        # Display indicators.
-        for w in fitting_words:
-            w: ListItemPanel
-            if w.get_word_instance().has_indicator() and w.is_checked():
-                indicator = w.get_word_instance().get_indicator()
-                locations = w.get_word_instance().get_spans()
-                for word_span in locations:
-                    word_span: re.Match
-                    self._main_text_field.SetIndicatorCurrent(indicator)
-                    self._main_text_field.IndicatorFillRange(word_span.span()[0],
-                                                             word_span.span()[1] - word_span.span()[0])
         # Fill word list.
         if self._coloring_tool_off:
             # Fill only once when the tool runs the first time.
@@ -914,10 +913,23 @@ class MainFrame(wx.Frame):
                 # Disable extra checkboxes.
                 for item in self._side_word_list.GetChildren():
                     item: ListItemPanel
-                    if item.get_word_instance().has_indicator():
-                        item.set_enabled(True)
-                    else:
-                        item.set_enabled(False)
+                    has_indicator = item.get_word_instance().has_indicator()
+                    item.set_enabled(has_indicator)
+
+        # Display indicators.
+        # todo this is the slowest part
+        # todo can we apply indicators only to the currently visible lines?
+        for w in fitting_words:
+            w: ListItemPanel
+            word_instance = w.get_word_instance()
+            if word_instance.has_indicator() and w.is_checked():
+                indicator = word_instance.get_indicator()
+                locations = word_instance.get_spans()
+                for word_span in locations:
+                    word_span: re.Match
+                    self._main_text_field.SetIndicatorCurrent(indicator)
+                    self._main_text_field.IndicatorFillRange(word_span.span()[0],
+                                                             word_span.span()[1] - word_span.span()[0])
         self._main_text_field.Refresh()
         self._update_indicator_count()
 
@@ -1170,6 +1182,8 @@ class MainFrame(wx.Frame):
         """
         if everything:
             self.Disable()
+            for t in self._tools:
+                self._toolbar.EnableTool(t.GetId(), False)
             return
         self._repetition_selector.Disable()
         self._min_repeated_word_length_selector.Disable()

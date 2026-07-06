@@ -34,7 +34,6 @@ from Tools.Config import Config
 
 
 # todo spell check
-# todo check that names have a capital letter, is not starting a new line.
 # todo ai integration
 
 class MainFrame(wx.Frame):
@@ -274,6 +273,10 @@ class MainFrame(wx.Frame):
                                                                        shortHelp=Strings.menu_item_colorize)
         self._tools.append(colorize_tool)
         self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
+
+        self._busy_wheel = wx.ActivityIndicator(self._toolbar, wx.ID_ANY, size=wx.Size(10, 10))
+        self._toolbar.AddControl(self._busy_wheel, "")
+
         self._toolbar.Realize()
 
     def _init_styles(self) -> None:
@@ -460,7 +463,6 @@ class MainFrame(wx.Frame):
         font.SetPointSize(Constants.static_box_font_size)
         search_box.GetStaticBox().SetFont(font)
 
-        # todo post save test for names and other problems.
         # todo use this for the side panel.
         # Side panel context menu.
         # self._menu_side = wx.Menu()
@@ -831,12 +833,12 @@ class MainFrame(wx.Frame):
             self._coloring_tool_off = True
             return
         else:
-            # Todo add some spinner
             if self._coloring_tool_off:
+                self._busy_wheel.Start()
                 ColoratorThread(self, self._current_document, self._main_text_field.GetText())
             else:
                 # If the tool run before and is still active, do not recalculate.
-                # todo changing the text and then using the checkboxes messes up the positions. Solve this later.
+                # todo changing the text and then using the checkboxes messes up the positions. Solve this later. Start recalculating once idle in background?
                 ColoratorThread(self, self._current_document, self._main_text_field.GetText())
                 self.apply_indicators_callback({}, {})
 
@@ -919,6 +921,8 @@ class MainFrame(wx.Frame):
         # Display indicators.
         # todo this is the slowest part
         # todo can we apply indicators only to the currently visible lines?
+        # Reduce redrawing with freeze.
+        self._main_text_field.Freeze()
         for w in fitting_words:
             w: ListItemPanel
             word_instance = w.get_word_instance()
@@ -930,8 +934,10 @@ class MainFrame(wx.Frame):
                     self._main_text_field.SetIndicatorCurrent(indicator)
                     self._main_text_field.IndicatorFillRange(word_span.span()[0],
                                                              word_span.span()[1] - word_span.span()[0])
+        self._main_text_field.Thaw()
         self._main_text_field.Refresh()
         self._update_indicator_count()
+        self._busy_wheel.Stop()
 
     def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1322,7 +1328,7 @@ class MainFrame(wx.Frame):
             self._show_error_ok_dialog(Strings.warn_errors.format(formatted))
             return
 
-        # Todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering the text.
+        # Todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering the text on main thead.
         self._main_text_field.EmptyUndoBuffer()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._set_status_text(self._current_document.get_path().name, 1)
@@ -1343,7 +1349,6 @@ class MainFrame(wx.Frame):
         :param save_as: True to show dialog.
         :return: None
         """
-        # todo autosave on timer when idle?
         self._set_status_text(Strings.status_saving, 0)
         self._disable_editor(everything=True)
         destination = self._current_document.get_path()
@@ -1354,7 +1359,7 @@ class MainFrame(wx.Frame):
             self._waiting_dialog.Show()
             self._waiting_dialog.start(saving=True)
             self._current_document.set_path(Path(destination))
-            SaveFileThread(self, self._current_document, self._convert_document())
+            SaveFileThread(self, self._current_document, self._convert_document(), self._main_text_field.GetText())
         else:
             # Canceled dialog.
             self._set_status_text(Strings.status_not_saved.format('canceled'), 0)

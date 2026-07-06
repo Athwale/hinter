@@ -54,3 +54,6 @@ config_max_len: int = 100
 
 static_box_font_size: int = 9
 statistics_timer_delay: int = 10000
+
+report_name_lines: str = 'nl'
+report_names_capitalized: str = 'nc'

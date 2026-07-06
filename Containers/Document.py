@@ -22,7 +22,6 @@ class Document:
         :param path: Path to the document.
         """
         self._path: Path = path
-        self._raw_html_text: str = ""
         self._converted: List = []
 
         self._word_data: Dict[bytes, ListItemPanel] = {}
@@ -174,20 +173,19 @@ class Document:
             raise PermissionError(Strings.err_file_not_found)
 
         self._errors = []
+        raw_html_text = ''
         try:
             if self._path.is_file():
                 with open(self._path, "r", encoding="utf-8") as f:
-                    self._raw_html_text = f.read()
+                    raw_html_text = f.read()
                     # Odd behavior where <br/>\n is converted to an empty space at the start of the next line.
-                    self._raw_html_text = self._raw_html_text.replace('<br/>\n', '<br/>')
+                    raw_html_text = raw_html_text.replace('<br/>\n', '<br/>')
                     # Help solve odd formating from OpenOffice.
-                    self._raw_html_text = htmlmin.minify(self._raw_html_text,
-                                                         remove_comments=True,
-                                                         remove_empty_space=True)
+                    raw_html_text = htmlmin.minify(raw_html_text, remove_comments=True, remove_empty_space=True)
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 
-        soup = bs4.BeautifulSoup(self._raw_html_text, features="html.parser")
+        soup = bs4.BeautifulSoup(raw_html_text, features="html.parser")
         body = soup.find(name="body")
         if body is None:
             raise FormatError(Strings.err_file_format)
@@ -262,10 +260,11 @@ class Document:
         :return: True if saved successfully.
         """
         # Create a new html file to fill up from the template.
+        raw_html_text = ''
         with open(Fetch.get_resource_path('template.html'), "r", encoding="utf-8") as f:
-            self._raw_html_text = f.read()
+            raw_html_text = f.read()
 
-        soup = bs4.BeautifulSoup(self._raw_html_text, features="html.parser")
+        soup = bs4.BeautifulSoup(raw_html_text, features="html.parser")
         # We use title because LibreOffice ignores it.
         title = soup.find(name="title")
         meta_string: str = f'ignored:'
@@ -314,4 +313,4 @@ class Document:
             raise PermissionError(e)
 
     def __str__(self):
-        return f"Path: {self._path}\nText: {self._raw_html_text}"
+        return f"Path: {self._path}\nText: {self._converted}"

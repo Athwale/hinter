@@ -96,3 +96,6 @@ err_file_not_found: str = "File not found"
 exception_resource_not_found: str = "Resource file not found"
 
 text_about: str = "About editor:\nhttps://github.com/Athwale/hinter\nAuthor: Athwale"
+
+report_capital_names: str = "Line: {} starts with name: {} - {}..."
+report_names: str = "Line: {} contains uncapitalized name: {} - {}..."

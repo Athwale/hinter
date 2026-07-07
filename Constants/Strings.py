@@ -97,5 +97,8 @@ exception_resource_not_found: str = "Resource file not found"
 
 text_about: str = "About editor:\nhttps://github.com/Athwale/hinter\nAuthor: Athwale"
 
+report_names_not_configured: str = "No names configured for testing"
 report_capital_names: str = "Line: {} starts with name: {} - {}..."
 report_names: str = "Line: {} contains uncapitalized name: {} - {}..."
+report_leftover: str = "Line: {} contains leftover: {} - {}..."
+report_repetition: str = "Line: {} contains repeated word: {} - {}..."

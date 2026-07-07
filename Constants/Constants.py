@@ -57,3 +57,5 @@ statistics_timer_delay: int = 10000
 
 report_name_lines: str = 'nl'
 report_names_capitalized: str = 'nc'
+report_leftover: str = 'left'
+report_repetition: str = 'rep'

@@ -49,7 +49,8 @@ class SaveFileThread(Thread):
         check_functions: List[Callable[[str, int, str], Tuple[str, List[str]]]] = [self._check_name_lines,
                                                                                    self._check_names,
                                                                                    self._check_leftover,
-                                                                                   self._check_repetitions]
+                                                                                   self._check_repetitions,
+                                                                                   self._check_similar_words]
         # Enumerate will not create the whole list in memory.
         # todo use this in more places.
         check_fails: defaultdict[str, List[str]] = defaultdict(list)
@@ -130,5 +131,20 @@ class SaveFileThread(Thread):
             errors.append(Strings.report_repetition.format(line_index, match.group(), stub))
         return Constants.report_repetition, errors
 
-        # todo - similar words shortly, shorty
-        # todo report while running into the main thread?
+    @staticmethod
+    def _check_similar_words(line: str, line_index: int, stub: str) -> Tuple[str, List[str]]:
+        """
+        Check for words that are similar but do not trigger spellcheck.
+        :param line: Line to check.
+        :param line_index: Line number.
+        :param stub: Line stub.
+        :return: List of erros strings.
+        """
+        errors = []
+        word_list = ['shorty', 'shortly']
+        for word in word_list:
+            if word in line:
+                errors.append(Strings.report_similars.format(line_index, word, stub))
+        return Constants.report_similar, errors
+
+        # todo report dynamically while running into a log box/dialog? Split movable window with log box at the bottom.

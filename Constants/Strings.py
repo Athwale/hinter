@@ -99,6 +99,7 @@ text_about: str = "About editor:\nhttps://github.com/Athwale/hinter\nAuthor: Ath
 
 report_names_not_configured: str = "No names configured for testing"
 report_capital_names: str = "Line: {} starts with name: {} - {}..."
-report_names: str = "Line: {} contains uncapitalized name: {} - {}..."
-report_leftover: str = "Line: {} contains leftover: {} - {}..."
-report_repetition: str = "Line: {} contains repeated word: {} - {}..."
+report_names: str = "Line: {} has uncapitalized name: {} - {}..."
+report_leftover: str = "Line: {} has leftover: {} - {}..."
+report_repetition: str = "Line: {} has repeated word: {} - {}..."
+report_similars: str = "Line: {} has word which may be incorrect: {} - {}..."

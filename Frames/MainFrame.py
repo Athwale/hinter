@@ -49,20 +49,24 @@ class MainFrame(wx.Frame):
                                         size=Constants.main_window_size)
 
         self.SetMinSize(Constants.main_window_size)
+
+        self._current_document: Document = None
+
         self._main_text_field: stc.StyledTextCtrl = None
         self._repetition_selector: wx.SpinCtrl = None
         self._min_repeated_word_length_selector: wx.SpinCtrl = None
         self._max_repeated_word_length_selector: wx.SpinCtrl = None
         self._search_text_field: wx.TextCtrl = None
+        self._message_text_field: wx.TextCtrl = None
+        self._input_text_field: wx.TextCtrl = None
         self._search_button_up: wx.BitmapButton = None
         self._search_button_down: wx.BitmapButton = None
         self._search_results: wx.StaticText = None
-
-        self._current_document: Document = None
         self._status_bar: StatusBar = None
         self._toolbar: ToolBar = None
         self._tools: List[wx.ToolBarToolBase] = []
         self._menu_items: List[wx.MenuItem] = []
+        self._side_word_list: SidePanel = None
 
         # Used for undo.
         self._style_history = {}
@@ -76,29 +80,30 @@ class MainFrame(wx.Frame):
         self._id_limits = wx.NewId()
         self._id_synonym_ids = []
 
-        self._side_word_list: SidePanel = None
         self._available_indicators: Set[int] = set()
         self._selected_words: List[str] = []
         self._coloring_tool_off: bool = True
 
+        self._found_words: List[tuple[tuple[int, int], int]] = []
+        self._found_last_index = 0
+
+        self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
+
+        self._statistics_thread: StatisticsThread = None
+        self._statistics_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self._on_statistics_timer, self._statistics_timer)
+
+        # Init layout:
         self._init_menu_bar()
         self._init_tool_bar()
-        self._init_layout()
+        self._init_main_layout()
         self._init_status_bar()
         self._init_styles()
         self._disable_editor()
         self._set_status_text(Strings.status_ready, 0)
         self._set_status_text(Strings.status_no_document, 1)
 
-        self._found_words: List[tuple[tuple[int, int], int]] = []
-        self._found_last_index = 0
-
-        self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
-        self._statistics_thread: StatisticsThread = None
-        self._statistics_timer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self._on_statistics_timer, self._statistics_timer)
-
-        # Load configuration
+        # Load configuration on startup.
         self._config = Config()
         if self._config.get_last_file() != Path():
             wx.CallAfter(self._on_fully_loaded)
@@ -179,27 +184,28 @@ class MainFrame(wx.Frame):
         menubar.Append(about_menu, Strings.menu_about)
 
         # Bind menu item handlers.
+        # File menu:
         self.Bind(wx.EVT_MENU, self._quit_handler, file_menu_item_quit)
         self.Bind(wx.EVT_MENU, self._open_file, file_menu_item_open)
         self.Bind(wx.EVT_MENU, self._save_file_handler, file_menu_item_save)
         self.Bind(wx.EVT_MENU, self._save_as_file_handler, file_menu_item_save_as)
-        self.Bind(wx.EVT_MENU, self._make_bold_handler, edit_menu_item_bold)
-        self.Bind(wx.EVT_MENU, self._make_italic_handler, edit_menu_item_italic)
         self.Bind(wx.EVT_MENU, self._new_file_handler, file_menu_item_new)
-        self.Bind(wx.EVT_MENU, self._about_handler, about_menu_item_about)
-        self.Bind(wx.EVT_MENU, self._undo_handler, edit_menu_item_undo)
-        self.Bind(wx.EVT_MENU, self._redo_handler, edit_menu_item_redo)
-        self.Bind(wx.EVT_MENU, self._clear_styles_handler, edit_menu_item_remove_styles)
 
+        # Tools menu:
         self.Bind(wx.EVT_MENU, self._info_word_counts_handler, tools_menu_item_words)
         self.Bind(wx.EVT_MENU, self._reset_limits_handler, tools_menu_item_reset)
 
+        self.Bind(wx.EVT_MENU, self._clear_styles_handler, edit_menu_item_remove_styles)
+        self.Bind(wx.EVT_MENU, self._undo_handler, edit_menu_item_undo)
+        self.Bind(wx.EVT_MENU, self._redo_handler, edit_menu_item_redo)
+        self.Bind(wx.EVT_MENU, self._make_bold_handler, edit_menu_item_bold)
+        self.Bind(wx.EVT_MENU, self._make_italic_handler, edit_menu_item_italic)
         self.Bind(wx.EVT_MENU, self._edit_words_handler, edit_menu_item_names)
         self.Bind(wx.EVT_MENU, self._edit_words_handler, edit_menu_item_ignored)
         self.Bind(wx.EVT_MENU, self._edit_words_handler, edit_menu_item_synonyms)
 
-        self.Bind(stc.EVT_STC_MODIFIED, self.on_modified_handler)
-        self.Bind(wx.EVT_CLOSE, self._on_exit_handler)
+        # About menu:
+        self.Bind(wx.EVT_MENU, self._about_handler, about_menu_item_about)
 
         self.SetMenuBar(menubar)
 
@@ -209,7 +215,6 @@ class MainFrame(wx.Frame):
         :return: None
         """
         self._toolbar = self.CreateToolBar(style=wx.TB_DEFAULT_STYLE)
-
 
         new_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_NEW, Strings.menu_item_new,
                                                              self._scale_icon('new.svg',
@@ -272,12 +277,26 @@ class MainFrame(wx.Frame):
                                                                                                 Constants.icon_tool_height),
                                                                        shortHelp=Strings.menu_item_colorize)
         self._tools.append(colorize_tool)
-        self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
 
         self._busy_wheel = wx.ActivityIndicator(self._toolbar, wx.ID_ANY, size=wx.Size(10, 10))
         self._toolbar.AddControl(self._busy_wheel, "")
 
+        self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
+
         self._toolbar.Realize()
+
+    @staticmethod
+    def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:
+        """
+        Helper method to prepare icons for toolbar.
+        :param name: Icon file name in Resources.
+        :param width: Desired icon width.
+        :param height: Desired icon height.
+        :return: The icon bitmap
+        """
+        resource_path = Fetch.get_resource_path(name)
+        svg_image = SVGimage.CreateFromFile(resource_path)
+        return svg_image.ConvertToScaledBitmap(wx.Size(width, height))
 
     def _init_styles(self) -> None:
         """
@@ -358,25 +377,20 @@ class MainFrame(wx.Frame):
         self._set_status_text('', 1)
         self._set_status_text('', 2)
 
-    @staticmethod
-    def _scale_icon(name: str, width: int, height: int) -> wx.Bitmap:
-        """
-        Helper method to prepare icons for toolbar.
-        :param name: Icon file name in Resources.
-        :param width: Desired icon width.
-        :param height: Desired icon height.
-        :return: The icon bitmap
-        """
-        resource_path = Fetch.get_resource_path(name)
-        svg_image = SVGimage.CreateFromFile(resource_path)
-        return svg_image.ConvertToScaledBitmap(wx.Size(width, height))
-
-    def _init_layout(self):
+    def _init_main_layout(self):
         """
         Main layout initialization.
         :return:
         """
-        self._repetition_selector = wx.SpinCtrl(self, id=wx.ID_ANY,
+        splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
+        top_panel = wx.Panel(splitter)
+        bottom_panel = wx.Panel(splitter)
+        splitter.SplitHorizontally(top_panel, bottom_panel)
+        splitter.SetMinimumPaneSize(100)
+        splitter.SetSashPosition(250)
+        splitter.SetSashGravity(0.5)
+
+        self._repetition_selector = wx.SpinCtrl(top_panel, id=wx.ID_ANY,
                                                 value=str(Constants.config_min_repetitions_default),
                                                 style=wx.SP_ARROW_KEYS,
                                                 size=wx.Size(120, -1),
@@ -384,7 +398,7 @@ class MainFrame(wx.Frame):
                                                 max=Constants.config_max_repetitions,
                                                 initial=Constants.config_min_repetitions_default)
 
-        self._min_repeated_word_length_selector = wx.SpinCtrl(self, id=wx.ID_ANY,
+        self._min_repeated_word_length_selector = wx.SpinCtrl(top_panel, id=wx.ID_ANY,
                                                               value=str(Constants.config_min_repetitions_default),
                                                               style=wx.SP_ARROW_KEYS,
                                                               size=wx.Size(120, -1),
@@ -392,7 +406,7 @@ class MainFrame(wx.Frame):
                                                               max=Constants.config_max_len,
                                                               initial=Constants.config_min_len_default)
 
-        self._max_repeated_word_length_selector = wx.SpinCtrl(self, id=wx.ID_ANY,
+        self._max_repeated_word_length_selector = wx.SpinCtrl(top_panel, id=wx.ID_ANY,
                                                               value=str(Constants.config_max_len),
                                                               style=wx.SP_ARROW_KEYS,
                                                               size=wx.Size(120, -1),
@@ -400,17 +414,21 @@ class MainFrame(wx.Frame):
                                                               max=Constants.config_max_len,
                                                               initial=Constants.config_max_len)
 
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._repetition_selector)
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._min_repeated_word_length_selector)
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._main_text_field)
+        self._search_text_field = wx.TextCtrl(top_panel, style=wx.TE_PROCESS_ENTER)
+        self._search_button_up = wx.BitmapButton(top_panel, -1, wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_GO_UP)))
+        self._search_button_down = wx.BitmapButton(top_panel, -1,
+                                                   wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_GO_DOWN)))
+        self._search_results = wx.StaticText(top_panel, -1, label=Strings.label_search_results.format(0, 0))
 
-        self._main_text_field = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE)
+        self._main_text_field = stc.StyledTextCtrl(top_panel, style=wx.TE_MULTILINE)
         self._main_text_field.SetWrapMode(1)
         self._main_text_field.SetCodePage(wx.stc.STC_CP_UTF8)
         self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
         self._main_text_field.SetMarginMask(1, 0)
         self._main_text_field.SetMarginWidth(1, 30)
-        # todo add message dialog with text field for status messages and a line for llm communication.
+
+        self._message_text_field = wx.TextCtrl(bottom_panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
+        self._input_text_field = wx.TextCtrl(bottom_panel, style=wx.TE_PROCESS_ENTER)
 
         # Initialize word list:
         self._side_word_list = SidePanel(self)
@@ -420,48 +438,35 @@ class MainFrame(wx.Frame):
         side_word_border_sizer.GetStaticBox().SetFont(font)
         side_word_border_sizer.Add(self._side_word_list, 1, wx.EXPAND)
 
-        self._search_text_field = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
-        self._search_button_up = wx.BitmapButton(self, -1, wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_GO_UP)))
-        self._search_button_down = wx.BitmapButton(self, -1, wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_GO_DOWN)))
-        self._search_results = wx.StaticText(self, -1, label=Strings.label_search_results.format(0, 0))
-
-        self.Bind(EVT_CHECKBOX_CHANGED, self._word_list_handler)
-
-        self.Bind(wx.EVT_BUTTON, self._search_up_handler, self._search_button_up)
-        self.Bind(wx.EVT_BUTTON, self._search_down_handler, self._search_button_down)
-
-        self.Bind(wx.EVT_TEXT, self._search_handler, self._search_text_field)
-        self.Bind(wx.EVT_TEXT_ENTER, self._search_enter_handler, self._search_text_field)
         # Initialize search shortcut into accelerator table
         new_id = wx.NewId()
         self.Bind(wx.EVT_MENU, self._focus_to_search_handler, id=new_id)
         accel_tbl = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('F'), new_id)])
         self.SetAcceleratorTable(accel_tbl)
 
-        main_vertical_box = wx.BoxSizer(wx.VERTICAL)
-        main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
-        toolbar_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
-
-        coloring_repetitions_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_coloring_box_rep)
+        coloring_repetitions_box = wx.StaticBoxSizer(wx.HORIZONTAL, top_panel, Strings.label_coloring_box_rep)
         font = coloring_repetitions_box.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
         coloring_repetitions_box.GetStaticBox().SetFont(font)
 
-        coloring_len_min_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_coloring_box_min_len)
+        coloring_len_min_box = wx.StaticBoxSizer(wx.HORIZONTAL, top_panel, Strings.label_coloring_box_min_len)
         font = coloring_len_min_box.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
         coloring_len_min_box.GetStaticBox().SetFont(font)
 
-        coloring_len_max_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_coloring_box_max_len)
+        coloring_len_max_box = wx.StaticBoxSizer(wx.HORIZONTAL, top_panel, Strings.label_coloring_box_max_len)
         font = coloring_len_max_box.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
         coloring_len_max_box.GetStaticBox().SetFont(font)
 
-        search_box = wx.StaticBoxSizer(wx.HORIZONTAL, self, Strings.label_search_box)
+        search_box = wx.StaticBoxSizer(wx.HORIZONTAL, top_panel, Strings.label_search_box)
         search_box.SetMinSize(width=350, height=-1)
         font = search_box.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
         search_box.GetStaticBox().SetFont(font)
+
+        # Main text area context menu.
+        self._main_text_field.UsePopUp(stc.STC_POPUP_NEVER)
 
         # todo use this for the side panel.
         # Side panel context menu.
@@ -470,21 +475,35 @@ class MainFrame(wx.Frame):
         # self._menu_side.Append(self._menu_item_up)
         # self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_sidepanel_handler, self._side_word_list)
 
-        # Main text area context menu.
-        self._main_text_field.UsePopUp(stc.STC_POPUP_NEVER)
+        self.Bind(stc.EVT_STC_MODIFIED, self.on_modified_handler)
+        self.Bind(wx.EVT_CLOSE, self._on_exit_handler)
+
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._repetition_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._min_repeated_word_length_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._main_text_field)
+
+        self.Bind(EVT_CHECKBOX_CHANGED, self._word_list_handler)
+
+        self.Bind(wx.EVT_BUTTON, self._search_up_handler, self._search_button_up)
+        self.Bind(wx.EVT_BUTTON, self._search_down_handler, self._search_button_down)
+
+        self.Bind(wx.EVT_TEXT, self._search_handler, self._search_text_field)
+        self.Bind(wx.EVT_TEXT_ENTER, self._search_enter_handler, self._search_text_field)
+
         self.Bind(wx.EVT_CONTEXT_MENU, self._on_main_text_right_click, self._main_text_field)
         self.Bind(wx.EVT_MENU, lambda _on_copy: self._main_text_field.Copy(), id=wx.ID_COPY)
         self.Bind(wx.EVT_MENU, lambda _on_paste: self._main_text_field.Paste(), id=wx.ID_PASTE)
         self.Bind(wx.EVT_MENU, lambda _on_select_all: self._main_text_field.SelectAll(), id=wx.ID_SELECTALL)
 
-        coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
+        # Assemble
+        main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
+        toolbar_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
 
+        coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
         coloring_len_min_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT,
                                  Constants.default_border)
-
         coloring_len_max_box.Add(self._max_repeated_word_length_selector, 0, wx.LEFT,
                                  Constants.default_border)
-
         search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
         search_box.Add(self._search_button_up, 0, wx.LEFT, Constants.default_border)
         search_box.Add(self._search_button_down, 0, wx.LEFT, Constants.default_border)
@@ -493,15 +512,27 @@ class MainFrame(wx.Frame):
         toolbar_horizontal_box.Add(coloring_repetitions_box, 0, wx.LEFT | wx.RIGHT, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_min_box, 0, wx.LEFT, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_max_box, 0, wx.LEFT, Constants.default_border)
-        toolbar_horizontal_box.Add(search_box, 0, wx.LEFT, Constants.default_border)
+        toolbar_horizontal_box.Add(search_box, 1, wx.LEFT, Constants.default_border)
 
-        main_vertical_box.Add(toolbar_horizontal_box, 0)
-        main_vertical_box.Add(main_horizontal_box, 1, wx.EXPAND)
-        main_horizontal_box.Add(self._main_text_field, 4, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
+        top_panel_sizer = wx.BoxSizer(wx.VERTICAL)
+        bottom_panel_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        top_panel.SetSizer(top_panel_sizer)
+        bottom_panel.SetSizer(bottom_panel_sizer)
+
+        main_horizontal_box.Add(splitter, 1, wx.EXPAND)
+
+        top_panel_sizer.Add(toolbar_horizontal_box, 0, wx.EXPAND)
+        top_panel_sizer.Add(self._main_text_field, 4, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
+
+        bottom_panel_sizer.Add(self._message_text_field, 1, wx.EXPAND)
+        bottom_panel_sizer.Add(self._input_text_field, 0, wx.EXPAND)
+
         main_horizontal_box.Add(side_word_border_sizer, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT,
                                 Constants.default_border)
 
-        self.SetSizer(main_vertical_box)
+        self.SetSizer(main_horizontal_box)
+        # todo post message method for the log field, append to bottom, add some initial stuff like document loaded. Color messages.
 
     # Handlers ---------------------------------------------------------------------------------------------------------
     # noinspection PyUnusedLocal

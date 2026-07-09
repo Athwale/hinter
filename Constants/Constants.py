@@ -60,3 +60,8 @@ report_names_capitalized: str = 'nc'
 report_leftover: str = 'left'
 report_repetition: str = 'rep'
 report_similar: str = 'sim'
+
+msg_reply: int = 0
+msg_info: int = 1
+msg_warn: int = 2
+msg_err: int = 3

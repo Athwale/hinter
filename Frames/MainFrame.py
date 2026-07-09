@@ -1,6 +1,7 @@
 import html
 import re
 import shutil
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import List, Dict, Set
@@ -57,7 +58,7 @@ class MainFrame(wx.Frame):
         self._min_repeated_word_length_selector: wx.SpinCtrl = None
         self._max_repeated_word_length_selector: wx.SpinCtrl = None
         self._search_text_field: wx.TextCtrl = None
-        self._message_text_field: wx.TextCtrl = None
+        self._log_text_field: wx.TextCtrl = None
         self._input_text_field: wx.TextCtrl = None
         self._search_button_up: wx.BitmapButton = None
         self._search_button_down: wx.BitmapButton = None
@@ -67,6 +68,7 @@ class MainFrame(wx.Frame):
         self._tools: List[wx.ToolBarToolBase] = []
         self._menu_items: List[wx.MenuItem] = []
         self._side_word_list: SidePanel = None
+        self._splitter: wx.SplitterWindow = None
 
         # Used for undo.
         self._style_history = {}
@@ -89,6 +91,8 @@ class MainFrame(wx.Frame):
 
         self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
 
+        self._log_up: bool = False
+
         self._statistics_thread: StatisticsThread = None
         self._statistics_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._on_statistics_timer, self._statistics_timer)
@@ -107,6 +111,9 @@ class MainFrame(wx.Frame):
         self._config = Config()
         if self._config.get_last_file() != Path():
             wx.CallAfter(self._on_fully_loaded)
+
+        # todo
+        self.post_message(Strings.msg_init, Constants.msg_info)
 
     # Layout ---------------------------------------------------------------------------------------------------------------
     def _init_menu_bar(self) -> None:
@@ -172,6 +179,9 @@ class MainFrame(wx.Frame):
         tools_menu_item_reset = tools_menu.Append(wx.ID_RESET, Strings.menu_item_reset,
                                                   Strings.menu_item_reset_hint)
         self._menu_items.append(tools_menu_item_reset)
+        tools_menu_item_log = tools_menu.Append(wx.ID_UP, Strings.menu_item_log,
+                                                Strings.menu_item_log_hint)
+        self._menu_items.append(tools_menu_item_log)
 
         # About menu:
         about_menu = wx.Menu()
@@ -191,10 +201,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._save_as_file_handler, file_menu_item_save_as)
         self.Bind(wx.EVT_MENU, self._new_file_handler, file_menu_item_new)
 
-        # Tools menu:
-        self.Bind(wx.EVT_MENU, self._info_word_counts_handler, tools_menu_item_words)
-        self.Bind(wx.EVT_MENU, self._reset_limits_handler, tools_menu_item_reset)
-
+        # Edit menu:
         self.Bind(wx.EVT_MENU, self._clear_styles_handler, edit_menu_item_remove_styles)
         self.Bind(wx.EVT_MENU, self._undo_handler, edit_menu_item_undo)
         self.Bind(wx.EVT_MENU, self._redo_handler, edit_menu_item_redo)
@@ -203,6 +210,11 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._edit_words_handler, edit_menu_item_names)
         self.Bind(wx.EVT_MENU, self._edit_words_handler, edit_menu_item_ignored)
         self.Bind(wx.EVT_MENU, self._edit_words_handler, edit_menu_item_synonyms)
+
+        # Tools menu:
+        self.Bind(wx.EVT_MENU, self._info_word_counts_handler, tools_menu_item_words)
+        self.Bind(wx.EVT_MENU, self._reset_limits_handler, tools_menu_item_reset)
+        self.Bind(wx.EVT_MENU, self._log_handler, tools_menu_item_log)
 
         # About menu:
         self.Bind(wx.EVT_MENU, self._about_handler, about_menu_item_about)
@@ -280,6 +292,14 @@ class MainFrame(wx.Frame):
 
         self._busy_wheel = wx.ActivityIndicator(self._toolbar, wx.ID_ANY, size=wx.Size(10, 10))
         self._toolbar.AddControl(self._busy_wheel, "")
+
+        log_tool: wx.ToolBarToolBase = self._toolbar.AddCheckTool(toolId=wx.ID_UP,
+                                                                  label=Strings.menu_item_log,
+                                                                  bitmap1=self._scale_icon('up.svg',
+                                                                                           Constants.icon_tool_width,
+                                                                                           Constants.icon_tool_height),
+                                                                  shortHelp=Strings.menu_item_log_hint)
+        self._tools.append(log_tool)
 
         self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
 
@@ -382,13 +402,13 @@ class MainFrame(wx.Frame):
         Main layout initialization.
         :return:
         """
-        splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
-        top_panel = wx.Panel(splitter)
-        bottom_panel = wx.Panel(splitter)
-        splitter.SplitHorizontally(top_panel, bottom_panel)
-        splitter.SetMinimumPaneSize(100)
-        splitter.SetSashPosition(250)
-        splitter.SetSashGravity(0.5)
+        self._splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
+        top_panel = wx.Panel(self._splitter)
+        bottom_panel = wx.Panel(self._splitter)
+        self._splitter.SplitHorizontally(top_panel, bottom_panel)
+        self._splitter.SetMinimumPaneSize(100)
+        self._splitter.SetSashPosition(self.GetSize().height)
+        self._splitter.SetSashGravity(0.5)
 
         self._repetition_selector = wx.SpinCtrl(top_panel, id=wx.ID_ANY,
                                                 value=str(Constants.config_min_repetitions_default),
@@ -427,8 +447,10 @@ class MainFrame(wx.Frame):
         self._main_text_field.SetMarginMask(1, 0)
         self._main_text_field.SetMarginWidth(1, 30)
 
-        self._message_text_field = wx.TextCtrl(bottom_panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
         self._input_text_field = wx.TextCtrl(bottom_panel, style=wx.TE_PROCESS_ENTER)
+        self._log_text_field = wx.TextCtrl(bottom_panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH)
+        small_font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False)
+        self._log_text_field.SetFont(small_font)
 
         # Initialize word list:
         self._side_word_list = SidePanel(self)
@@ -520,19 +542,18 @@ class MainFrame(wx.Frame):
         top_panel.SetSizer(top_panel_sizer)
         bottom_panel.SetSizer(bottom_panel_sizer)
 
-        main_horizontal_box.Add(splitter, 1, wx.EXPAND)
+        main_horizontal_box.Add(self._splitter, 1, wx.EXPAND)
 
         top_panel_sizer.Add(toolbar_horizontal_box, 0, wx.EXPAND)
         top_panel_sizer.Add(self._main_text_field, 4, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
 
-        bottom_panel_sizer.Add(self._message_text_field, 1, wx.EXPAND)
-        bottom_panel_sizer.Add(self._input_text_field, 0, wx.EXPAND)
+        bottom_panel_sizer.Add(self._log_text_field, 1, wx.EXPAND)
+        bottom_panel_sizer.Add(self._input_text_field, 0, wx.EXPAND | wx.BOTTOM, Constants.default_border)
 
         main_horizontal_box.Add(side_word_border_sizer, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT,
                                 Constants.default_border)
 
         self.SetSizer(main_horizontal_box)
-        # todo post message method for the log field, append to bottom, add some initial stuff like document loaded. Color messages.
 
     # Handlers ---------------------------------------------------------------------------------------------------------
     # noinspection PyUnusedLocal
@@ -822,6 +843,19 @@ class MainFrame(wx.Frame):
         :return: None
         """
         WordInfoDialog(self, self._current_document.get_word_marking_data())
+
+    # noinspection PyUnusedLocal
+    def _log_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Show log by moving the divider up.
+        :param event: Not used.
+        :return: None
+        """
+        if self._log_up:
+            self._splitter.SetSashPosition(self.GetSize().height, True)
+        else:
+            self._splitter.SetSashPosition(10, True)
+        self._log_up = not self._log_up
 
     # noinspection PyUnusedLocal
     def _open_file(self, event: wx.CommandEvent) -> None:
@@ -1373,6 +1407,7 @@ class MainFrame(wx.Frame):
         self._waiting_dialog.Close()
         self._statistics_timer.Start(Constants.statistics_timer_delay)
         self._set_status_text(Strings.status_calculating, 0)
+        self.post_message(Strings.msg_loaded.format(self._current_document.get_path()), Constants.msg_info)
 
     def _save_document(self, save_as: bool = False) -> None:
         """
@@ -1415,6 +1450,39 @@ class MainFrame(wx.Frame):
             self._set_status_text(Strings.status_not_saved.format('error'), 0)
             self._show_error_ok_dialog(Strings.status_not_saved.format('error'))
         self._waiting_dialog.Close()
+        self.post_divider()
+        self.post_message(Strings.msg_saved.format(self._current_document.get_path()), Constants.msg_info)
+
+    def post_message(self, message: str, severity: int) -> None:
+        """
+        Print a message into the status/log box.
+        :param message: The message.
+        :param severity: Style of message affecting color and warning type.
+        :return: None
+        """
+        # todo equip stuff with log messages
+        # todo post save checks into the log and show a dialog about it
+        stamp = time.strftime('%H:%M')
+        if severity == Constants.msg_reply:
+            self._log_text_field.SetForegroundColour(wx.BLACK)
+            self._log_text_field.AppendText(f"{stamp} [R]: {message}\n")
+        elif severity == Constants.msg_info:
+            self._log_text_field.SetForegroundColour(wx.BLUE)
+            self._log_text_field.AppendText(f"{stamp} [I]: {message}\n")
+        elif severity == Constants.msg_warn:
+            self._log_text_field.SetForegroundColour(wx.Colour(252, 119, 3))
+            self._log_text_field.AppendText(f"{stamp} [W]: {message}\n")
+        elif severity == Constants.msg_err:
+            self._log_text_field.SetForegroundColour(wx.RED)
+            self._log_text_field.AppendText(f"{stamp} [E]: {message}\n")
+
+    def post_divider(self) -> None:
+        """
+        Post a divider into the log field.
+        :return: None
+        """
+        self._log_text_field.SetForegroundColour(wx.BLACK)
+        self._log_text_field.AppendText(f"{179 * '-'}\n")
 
     def _convert_document(self) -> List:
         """

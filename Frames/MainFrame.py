@@ -85,13 +85,12 @@ class MainFrame(wx.Frame):
         self._available_indicators: Set[int] = set()
         self._selected_words: List[str] = []
         self._coloring_tool_off: bool = True
+        self._log_up: bool = False
 
         self._found_words: List[tuple[tuple[int, int], int]] = []
         self._found_last_index = 0
 
         self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
-
-        self._log_up: bool = False
 
         self._statistics_thread: StatisticsThread = None
         self._statistics_timer = wx.Timer(self)
@@ -111,9 +110,7 @@ class MainFrame(wx.Frame):
         self._config = Config()
         if self._config.get_last_file() != Path():
             wx.CallAfter(self._on_fully_loaded)
-
-        # todo
-        self.post_message(Strings.msg_init, Constants.msg_info)
+        self.post_message(Strings.msg_init, Constants.msg_ok)
 
     # Layout ---------------------------------------------------------------------------------------------------------------
     def _init_menu_bar(self) -> None:
@@ -851,11 +848,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        if self._log_up:
-            self._splitter.SetSashPosition(self.GetSize().height, True)
-        else:
-            self._splitter.SetSashPosition(10, True)
-        self._log_up = not self._log_up
+        self.move_log()
 
     # noinspection PyUnusedLocal
     def _open_file(self, event: wx.CommandEvent) -> None:
@@ -1363,11 +1356,17 @@ class MainFrame(wx.Frame):
         self._disable_editor(everything=True)
 
         # Clear tools
+        self._log_up = False
+        self._toolbar.ToggleTool(wx.ID_UP, False)
+        self._splitter.SetSashPosition(self.GetSize().height, True)
+
         self._toolbar.ToggleTool(wx.ID_APPLY, False)
         self._toolbar.Refresh()
+
         self._found_last_index = 0
         self._search_text_field.SetValue('')
         self._found_words.clear()
+
         self._side_word_list.wipe_list()
         self._selected_words.clear()
         self._coloring_tool_off = True
@@ -1407,6 +1406,7 @@ class MainFrame(wx.Frame):
         self._waiting_dialog.Close()
         self._statistics_timer.Start(Constants.statistics_timer_delay)
         self._set_status_text(Strings.status_calculating, 0)
+        self.post_divider()
         self.post_message(Strings.msg_loaded.format(self._current_document.get_path()), Constants.msg_info)
 
     def _save_document(self, save_as: bool = False) -> None:
@@ -1445,13 +1445,58 @@ class MainFrame(wx.Frame):
             self._config.save_config()
             self._current_document.set_modified(False)
             self._set_status_text(Strings.status_saved.format('Ok'), 0)
+            self.post_divider()
+            self.post_message(Strings.msg_saved.format(self._current_document.get_path()), Constants.msg_info)
             self.enable_editor()
         else:
             self._set_status_text(Strings.status_not_saved.format('error'), 0)
             self._show_error_ok_dialog(Strings.status_not_saved.format('error'))
+            self.post_divider()
+            self.post_message(Strings.msg_save_fail.format(self._current_document.get_path()), Constants.msg_err)
         self._waiting_dialog.Close()
-        self.post_divider()
-        self.post_message(Strings.msg_saved.format(self._current_document.get_path()), Constants.msg_info)
+
+    def document_test_callback(self, result: defaultdict[str, List[str]]) -> None:
+        """
+        Callback for document tests which prints the messages into log box and shows it.
+        :param result: Dictionary of errors.
+        :return: None
+        """
+        if self._log_text_field.GetNumberOfLines() > Constants.max_log_length:
+            self._log_text_field.Clear()
+            self.post_message(Strings.report_log_cleared, Constants.msg_info)
+
+        open_log: bool = False
+        for message_type in [Constants.report_name_lines,
+                             Constants.report_names_capitalized,
+                             Constants.report_leftover,
+                             Constants.report_repetition,
+                             Constants.report_similar]:
+            if message_type in result:
+                open_log = True
+                for err in result[message_type]:
+                    self.post_message(err, Constants.msg_warn)
+        if not open_log:
+            self.post_message(Strings.report_ok, Constants.msg_ok)
+        else:
+            self._toolbar.ToggleTool(wx.ID_UP, True)
+            self.move_log(up=True)
+
+    def move_log(self, up: bool = False) -> None:
+        """
+        Move the log splitter up or down based on the state of the button.
+        :param up: If true the log will move up regardless of current position.
+        :return: None
+        """
+        if up:
+            self._splitter.SetSashPosition(10, True)
+            self._log_up = True
+            return
+
+        if self._log_up:
+            self._splitter.SetSashPosition(self.GetSize().height, True)
+        else:
+            self._splitter.SetSashPosition(10, True)
+        self._log_up = not self._log_up
 
     def post_message(self, message: str, severity: int) -> None:
         """
@@ -1461,7 +1506,6 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo equip stuff with log messages
-        # todo post save checks into the log and show a dialog about it
         stamp = time.strftime('%H:%M')
         if severity == Constants.msg_reply:
             self._log_text_field.SetForegroundColour(wx.BLACK)
@@ -1470,11 +1514,14 @@ class MainFrame(wx.Frame):
             self._log_text_field.SetForegroundColour(wx.BLUE)
             self._log_text_field.AppendText(f"{stamp} [I]: {message}\n")
         elif severity == Constants.msg_warn:
-            self._log_text_field.SetForegroundColour(wx.Colour(252, 119, 3))
+            self._log_text_field.SetForegroundColour(Constants.color_orange)
             self._log_text_field.AppendText(f"{stamp} [W]: {message}\n")
         elif severity == Constants.msg_err:
             self._log_text_field.SetForegroundColour(wx.RED)
             self._log_text_field.AppendText(f"{stamp} [E]: {message}\n")
+        elif severity == Constants.msg_ok:
+            self._log_text_field.SetForegroundColour(Constants.color_green)
+            self._log_text_field.AppendText(f"{stamp} [OK]: {message}\n")
 
     def post_divider(self) -> None:
         """

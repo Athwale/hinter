@@ -10,9 +10,13 @@ config_file: Path = Path.home() / '.config' / 'w-hinter.conf'
 
 color_grey: wx.Colour = wx.Colour(158, 162, 168)
 color_black: wx.Colour = wx.Colour(0, 0, 0)
+color_orange: wx.Colour = wx.Colour(252, 119, 3)
+color_green: wx.Colour = wx.Colour(36, 145, 69)
 
 status_places: int = 4
 status_proportions: List[int] = [-6, -7, -3, -4]
+
+max_log_length: int = 5
 
 main_window_size: Size = Size(1000, 800)
 default_border: int = 3
@@ -65,3 +69,4 @@ msg_reply: int = 0
 msg_info: int = 1
 msg_warn: int = 2
 msg_err: int = 3
+msg_ok: int = 4

@@ -99,7 +99,10 @@ exception_resource_not_found: str = "Resource file not found"
 
 text_about: str = "About editor:\nhttps://github.com/Athwale/hinter\nAuthor: Athwale"
 
-report_names_not_configured: str = "No names configured for testing"
+report_ok: str = "No errors"
+report_log_cleared: str = 'Log length exceeded, log cleared'
+report_names_not_configured_lines: str = "No names configured for line beginning test"
+report_names_not_configured_caps: str = "No names configured for capital letter test"
 report_capital_names: str = "Line: {} starts with name: {} - {}..."
 report_names: str = "Line: {} has uncapitalized name: {} - {}..."
 report_leftover: str = "Line: {} has leftover: {} - {}..."
@@ -108,4 +111,5 @@ report_similars: str = "Line: {} has word which may be incorrect: {} - {}..."
 
 msg_init: str = "Initialized OK"
 msg_saved: str = "Document saved: {}"
+msg_save_fail: str = "Document save fail: {}"
 msg_loaded: str = "Document loaded: {}"

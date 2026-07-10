@@ -45,25 +45,28 @@ class SaveFileThread(Thread):
                 wx.CallAfter(self._parent.save_document_callback, False)
         except PermissionError as _:
             wx.CallAfter(self._parent.save_document_callback, False)
+            return
 
-        check_functions: List[Callable[[str, int, str], Tuple[str, List[str]]]] = [self._check_name_lines,
-                                                                                   self._check_names,
-                                                                                   self._check_leftover,
+        check_fails: defaultdict[str, List[str]] = defaultdict(list)
+        check_functions: List[Callable[[str, int, str], Tuple[str, List[str]]]] = [self._check_leftover,
                                                                                    self._check_repetitions,
                                                                                    self._check_similar_words]
+        if self._document.get_names():
+            check_functions.append(self._check_names)
+            check_functions.append(self._check_name_lines)
+        else:
+            check_fails[Constants.report_names_capitalized] = [Strings.report_names_not_configured_lines]
+            check_fails[Constants.report_name_lines] = [Strings.report_names_not_configured_caps]
         # Enumerate will not create the whole list in memory.
         # todo use this in more places.
-        check_fails: defaultdict[str, List[str]] = defaultdict(list)
+
         for counter, line in enumerate(self._plain_text.splitlines(), start=1):
             stub = line[0:25] if len(line) >= 25 else line
             for f in check_functions:
                 test_type, test_result = f(line, counter, stub)
                 if test_result:
                     check_fails[test_type].extend(test_result)
-
-        for t, e in check_fails.items():
-            for err in e:
-                print(t, err)
+        wx.CallAfter(self._parent.document_test_callback, check_fails)
 
     def _check_name_lines(self, line: str, line_index: int, stub: str) -> Tuple[str, List[str]]:
         """
@@ -89,13 +92,10 @@ class SaveFileThread(Thread):
         """
         errors = []
         names = self._document.get_names()
-        if not names:
-            errors.append(Strings.report_names_not_configured)
-        else:
-            for name in names:
-                # Names in names are not capitalized already, so we just look for them.
-                if name in line:
-                    errors.append(Strings.report_names.format(line_index, name, stub))
+        for name in names:
+            # Names in names are not capitalized already, so we just look for them.
+            if name in line:
+                errors.append(Strings.report_names.format(line_index, name, stub))
         return Constants.report_names_capitalized, errors
 
     @staticmethod
@@ -146,5 +146,3 @@ class SaveFileThread(Thread):
             if word in line:
                 errors.append(Strings.report_similars.format(line_index, word, stub))
         return Constants.report_similar, errors
-
-        # todo report dynamically while running into a log box/dialog? Split movable window with log box at the bottom.

@@ -57,9 +57,8 @@ class SaveFileThread(Thread):
         else:
             check_fails[Constants.report_names_capitalized] = [Strings.report_names_not_configured_lines]
             check_fails[Constants.report_name_lines] = [Strings.report_names_not_configured_caps]
-        # Enumerate will not create the whole list in memory.
-        # todo use this in more places.
 
+        # Enumerate will not create the whole list in memory.
         for counter, line in enumerate(self._plain_text.splitlines(), start=1):
             stub = line[0:25] if len(line) >= 25 else line
             for f in check_functions:

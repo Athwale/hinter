@@ -94,7 +94,7 @@ class MainFrame(wx.Frame):
 
         self._statistics_thread: StatisticsThread = None
         self._statistics_timer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self._on_statistics_timer, self._statistics_timer)
+        self.Bind(wx.EVT_TIMER, self._on_statistics_timer_handler, self._statistics_timer)
 
         # Init layout:
         self._init_menu_bar()
@@ -487,13 +487,6 @@ class MainFrame(wx.Frame):
         # Main text area context menu.
         self._main_text_field.UsePopUp(stc.STC_POPUP_NEVER)
 
-        # todo use this for the side panel.
-        # Side panel context menu.
-        # self._menu_side = wx.Menu()
-        # self._menu_item_up = wx.MenuItem(self._menu_side, wx.ID_UP, "test")
-        # self._menu_side.Append(self._menu_item_up)
-        # self.Bind(wx.EVT_CONTEXT_MENU, self._on_context_menu_sidepanel_handler, self._side_word_list)
-
         self.Bind(stc.EVT_STC_MODIFIED, self.on_modified_handler)
         self.Bind(wx.EVT_CLOSE, self._on_exit_handler)
 
@@ -875,7 +868,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
-        #  Can we update the list somehow automatically? Timer?
+        #  Can we update the list somehow automatically? Precalculate on idle?
         # Clear before reapplying. We always have 0-31 indicators.
         for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
@@ -1170,6 +1163,17 @@ class MainFrame(wx.Frame):
         """
         AboutDialog(self)
 
+    # noinspection PyUnusedLocal
+    def _on_statistics_timer_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Statistics timer handler. Runs periodically. Runs a background thread that calculates text stats.
+        :param event: Not used.
+        :return: None
+        """
+        if self._statistics_thread is None or not self._statistics_thread.is_alive():
+            self._statistics_thread = StatisticsThread(self, self._main_text_field.GetText())
+            self._statistics_thread.start()
+
     # Methods---------------------------------------------------------------------------------------------------------------
 
     def _sanitized_selection(self) -> str:
@@ -1305,16 +1309,6 @@ class MainFrame(wx.Frame):
         if dialog.ShowModal() == wx.ID_YES:
             return True
         return False
-
-    def _on_statistics_timer(self, event: wx.CommandEvent) -> None:
-        """
-        Statistics timer handler. Runs periodically. Runs a background thread that calculates text stats.
-        :param event: Not used.
-        :return: None
-        """
-        if self._statistics_thread is None or not self._statistics_thread.is_alive():
-            self._statistics_thread = StatisticsThread(self, self._main_text_field.GetText())
-            self._statistics_thread.start()
 
     def text_statistics_callback(self, words: int) -> None:
         """
@@ -1505,7 +1499,6 @@ class MainFrame(wx.Frame):
         :param severity: Style of message affecting color and warning type.
         :return: None
         """
-        # todo equip stuff with log messages
         stamp = time.strftime('%H:%M')
         if severity == Constants.msg_reply:
             self._log_text_field.SetForegroundColour(wx.BLACK)

@@ -1,4 +1,7 @@
 from pathlib import Path
+from typing import Tuple
+
+import wx
 
 from Constants import Constants, Strings
 
@@ -16,7 +19,8 @@ class Config:
         self._last_file: Path = Path()
         self._position_x: int = 0
         self._position_y: int = 0
-        self._size: str = f"{Constants.main_window_size.width},{Constants.main_window_size.height}"
+        self._width: int = Constants.main_window_size.width
+        self._height: int = Constants.main_window_size.height
 
         if not self._config_file.exists():
             # Create a new default file.
@@ -30,7 +34,6 @@ class Config:
         :raises PermissionError if file access is not possible.
         """
         # todo handle exceptions and test.
-        # todo load size and position
         try:
             if self._config_file.exists() and self._config_file.is_file():
                 with open(self._config_file, 'r', encoding="utf-8") as config:
@@ -38,6 +41,22 @@ class Config:
                         if line.startswith('last-file:'):
                             file = line.split(":")[1].replace('\n', '').strip()
                             self._last_file = Path(file)
+                        if line.startswith('position:'):
+                            self._position_x, self._position_y = line.split(":")[1].replace('\n', '').strip().split(',')
+                            try:
+                                self._position_x = int(self._position_x)
+                                self._position_y = int(self._position_y)
+                            except ValueError as _:
+                                self._position_x = 0
+                                self._position_y = 0
+                        if line.startswith('size:'):
+                            self._width, self._height = line.split(":")[1].replace('\n', '').strip().split(',')
+                            try:
+                                self._width = int(self._width)
+                                self._height = int(self._height)
+                            except ValueError as _:
+                                self._width = Constants.main_window_size.width
+                                self._height = Constants.main_window_size.height
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 
@@ -55,6 +74,39 @@ class Config:
         :return: None
         """
         self._last_file = file
+
+    def get_size(self) -> wx.Size:
+        """
+        Return last saved or default window size.
+        :return: Last saved or default window size.
+        """
+        return wx.Size(self._width, self._height)
+
+    def set_size(self, size: wx.Size) -> None:
+        """
+        Set new window size.
+        :param size: Size object.
+        :return: None
+        """
+        self._width = size.width
+        self._height = size.height
+
+    def get_position(self) -> Tuple[int, int]:
+        """
+        Return a tuple of last known window position.
+        :return: (x, y)
+        """
+        return self._position_x, self._position_y
+
+    def set_position(self, x: int, y: int) -> None:
+        """
+        Set new window position to save.
+        :param x: X
+        :param y: Y
+        :return: None
+        """
+        self._position_x = x
+        self._position_y = y
 
     def save_config(self) -> None:
         """
@@ -78,4 +130,4 @@ class Config:
             config.write(f"# Config file for {Strings.app_title.format('')}\n")
             config.write(f"last-file: {self._last_file}\n")
             config.write(f"position: {self._position_x},{self._position_y}\n")
-            config.write(f"size: {self._size}\n")
+            config.write(f"size: {self._width},{self._height}\n")

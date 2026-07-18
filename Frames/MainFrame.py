@@ -46,10 +46,7 @@ class MainFrame(wx.Frame):
         """
         User interface constructor.
         """
-        super(MainFrame, self).__init__(None, title=Strings.app_title.format(Strings.status_no_document),
-                                        size=Constants.main_window_size)
-
-        self.SetMinSize(Constants.main_window_size)
+        super(MainFrame, self).__init__(None, title=Strings.app_title.format(Strings.status_no_document))
 
         self._current_document: Document = None
 
@@ -111,6 +108,15 @@ class MainFrame(wx.Frame):
         if self._config.get_last_file() != Path():
             wx.CallAfter(self._on_fully_loaded)
         self.post_message(Strings.msg_init, Constants.msg_ok)
+
+        # Load last window position and size. Position does not work under wayland.
+        self.SetPosition(self._config.get_position())
+        size = self._config.get_size()
+        if size == (-1, -1):
+            self.Maximize()
+        else:
+            self.SetSize(size)
+        self.SetMinClientSize(Constants.main_window_size)
 
     # Layout ---------------------------------------------------------------------------------------------------------------
     def _init_menu_bar(self) -> None:
@@ -1150,6 +1156,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        self._save_config()
         if self._current_document:
             self._emergency_save()
         self.Destroy()
@@ -1395,13 +1402,21 @@ class MainFrame(wx.Frame):
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
         self.enable_editor()
         self._main_text_field.SetFocus()
-        self._config.set_last_file(self._current_document.get_path())
-        self._config.save_config()
         self._waiting_dialog.Close()
         self._statistics_timer.Start(Constants.statistics_timer_delay)
         self._set_status_text(Strings.status_calculating, 0)
         self.post_divider()
         self.post_message(Strings.msg_loaded.format(self._current_document.get_path()), Constants.msg_info)
+
+    def _save_config(self) -> None:
+        """
+        Back up application state.
+        :return: None
+        """
+        self._config.set_last_file(self._current_document.get_path())
+        self._config.set_position(self.GetPosition().x, self.GetPosition().y)
+        self._config.set_size(self.GetSize())
+        self._config.save_config()
 
     def _save_document(self, save_as: bool = False) -> None:
         """
@@ -1435,8 +1450,6 @@ class MainFrame(wx.Frame):
             self._set_status_text(self._current_document.get_path().name, 1)
             self._main_text_field.SetSavePoint()
             self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
-            self._config.set_last_file(self._current_document.get_path())
-            self._config.save_config()
             self._current_document.set_modified(False)
             self._set_status_text(Strings.status_saved.format('Ok'), 0)
             self.post_divider()

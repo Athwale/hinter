@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Tuple
 
 import wx
 
@@ -91,12 +90,12 @@ class Config:
         self._width = size.width
         self._height = size.height
 
-    def get_position(self) -> Tuple[int, int]:
+    def get_position(self) -> wx.Point:
         """
         Return a tuple of last known window position.
-        :return: (x, y)
+        :return: Point(x, y)
         """
-        return self._position_x, self._position_y
+        return wx.Point(self._position_x, self._position_y)
 
     def set_position(self, x: int, y: int) -> None:
         """

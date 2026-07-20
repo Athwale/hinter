@@ -104,18 +104,21 @@ class MainFrame(wx.Frame):
         self._set_status_text(Strings.status_no_document, 1)
 
         # Load configuration on startup.
-        self._config = Config()
-        if self._config.get_last_file() != Path():
-            wx.CallAfter(self._on_fully_loaded)
-        self.post_message(Strings.msg_init, Constants.msg_ok)
+        try:
+            self._config = Config()
+            if self._config.get_last_file() != Path():
+                wx.CallAfter(self._on_fully_loaded)
+            self.post_message(Strings.msg_init, Constants.msg_ok)
 
-        # Load last window position and size. Position does not work under wayland.
-        self.SetPosition(self._config.get_position())
-        size = self._config.get_size()
-        if size == (-1, -1):
-            self.Maximize()
-        else:
-            self.SetSize(size)
+            # Load last window position and size. Position does not work under wayland.
+            self.SetPosition(self._config.get_position())
+            size = self._config.get_size()
+            if size == (-1, -1):
+                self.Maximize()
+            else:
+                self.SetSize(size)
+        except PermissionError as _:
+            self._show_error_ok_dialog(Strings.err_config_file)
         self.SetMinClientSize(Constants.main_window_size)
 
     # Layout ---------------------------------------------------------------------------------------------------------------
@@ -1413,10 +1416,13 @@ class MainFrame(wx.Frame):
         Back up application state.
         :return: None
         """
-        self._config.set_last_file(self._current_document.get_path())
-        self._config.set_position(self.GetPosition().x, self.GetPosition().y)
-        self._config.set_size(self.GetSize())
-        self._config.save_config()
+        try:
+            self._config.set_last_file(self._current_document.get_path())
+            self._config.set_position(self.GetPosition().x, self.GetPosition().y)
+            self._config.set_size(self.GetSize())
+            self._config.save_config()
+        except (AttributeError, PermissionError) as _:
+            self._show_error_ok_dialog(Strings.err_config_file)
 
     def _save_document(self, save_as: bool = False) -> None:
         """

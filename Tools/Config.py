@@ -32,7 +32,6 @@ class Config:
         :return: None
         :raises PermissionError if file access is not possible.
         """
-        # todo handle exceptions and test.
         try:
             if self._config_file.exists() and self._config_file.is_file():
                 with open(self._config_file, 'r', encoding="utf-8") as config:
@@ -113,7 +112,6 @@ class Config:
         :return: None
         :raises PermissionError if file access is not possible.=
         """
-        # todo test exceptions.
         try:
             if self._config_file.exists() and self._config_file.is_file():
                 self._save()

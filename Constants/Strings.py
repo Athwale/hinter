@@ -94,6 +94,7 @@ warn_word_format_synonym: str = "Word list has incorrect format. Each line must 
 err_file_format: str = "File formatting error"
 err_file_format_metadata: str = "File metadata formatting error"
 err_file_not_found: str = "File not found"
+err_config_file: str = f"Config file permission error"
 
 exception_resource_not_found: str = "Resource file not found"
 

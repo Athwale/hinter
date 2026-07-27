@@ -48,7 +48,7 @@ class MainFrame(wx.Frame):
         """
         super(MainFrame, self).__init__(None, title=Strings.app_title.format(Strings.status_no_document))
 
-        self._current_document: Document = None
+        self._current_document: Document | None = None
 
         self._main_text_field: stc.StyledTextCtrl = None
         self._repetition_selector: wx.SpinCtrl = None
@@ -803,6 +803,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        assert self._current_document is not None
         button_id = event.GetId()
         dialog = None
         if button_id == self._id_ignored:

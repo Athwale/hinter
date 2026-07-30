@@ -50,22 +50,22 @@ class MainFrame(wx.Frame):
 
         self._current_document: Document | None = None
 
-        self._main_text_field: stc.StyledTextCtrl = None
-        self._repetition_selector: wx.SpinCtrl = None
-        self._min_repeated_word_length_selector: wx.SpinCtrl = None
-        self._max_repeated_word_length_selector: wx.SpinCtrl = None
-        self._search_text_field: wx.TextCtrl = None
-        self._log_text_field: wx.TextCtrl = None
-        self._input_text_field: wx.TextCtrl = None
-        self._search_button_up: wx.BitmapButton = None
-        self._search_button_down: wx.BitmapButton = None
-        self._search_results: wx.StaticText = None
-        self._status_bar: StatusBar = None
-        self._toolbar: ToolBar = None
+        self._main_text_field: stc.StyledTextCtrl | None = None
+        self._repetition_selector: wx.SpinCtrl | None = None
+        self._min_repeated_word_length_selector: wx.SpinCtrl | None = None
+        self._max_repeated_word_length_selector: wx.SpinCtrl | None = None
+        self._search_text_field: wx.TextCtrl | None = None
+        self._log_text_field: wx.TextCtrl | None = None
+        self._input_text_field: wx.TextCtrl | None = None
+        self._search_button_up: wx.BitmapButton | None = None
+        self._search_button_down: wx.BitmapButton | None = None
+        self._search_results: wx.StaticText | None = None
+        self._status_bar: StatusBar | None = None
+        self._toolbar: ToolBar | None = None
         self._tools: List[wx.ToolBarToolBase] = []
         self._menu_items: List[wx.MenuItem] = []
-        self._side_word_list: SidePanel = None
-        self._splitter: wx.SplitterWindow = None
+        self._side_word_list: SidePanel | None = None
+        self._splitter: wx.SplitterWindow | None = None
 
         # Used for undo.
         self._style_history = {}
@@ -89,7 +89,7 @@ class MainFrame(wx.Frame):
 
         self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
 
-        self._statistics_thread: StatisticsThread = None
+        self._statistics_thread: StatisticsThread | None = None
         self._statistics_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._on_statistics_timer_handler, self._statistics_timer)
 
@@ -233,6 +233,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         self._toolbar = self.CreateToolBar(style=wx.TB_DEFAULT_STYLE)
+        assert self._toolbar is not None
 
         new_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_NEW, Strings.menu_item_new,
                                                              self._scale_icon('new.svg',
@@ -324,72 +325,6 @@ class MainFrame(wx.Frame):
         svg_image = SVGimage.CreateFromFile(resource_path)
         return svg_image.ConvertToScaledBitmap(wx.Size(width, height))
 
-    def _init_styles(self) -> None:
-        """
-        Init default stc styles.
-        :return: None
-        """
-        self._main_text_field.StyleSetFaceName(stc.STC_STYLE_DEFAULT, "Courier New")
-        self._main_text_field.StyleSetSize(stc.STC_STYLE_DEFAULT, 12)
-        self._main_text_field.StyleSetForeground(stc.STC_STYLE_DEFAULT, wx.Colour(0, 0, 0))
-        self._main_text_field.StyleSetBackground(stc.STC_STYLE_DEFAULT, wx.Colour(255, 255, 255))
-        self._main_text_field.StyleSetBold(stc.STC_STYLE_DEFAULT, False)
-        self._main_text_field.StyleSetItalic(stc.STC_STYLE_DEFAULT, False)
-
-        # Apply style.
-        self._main_text_field.StyleClearAll()
-
-        self._main_text_field.StyleSetSpec(1, Constants.style_bold)
-        self._main_text_field.StyleSetSpec(2, Constants.style_italic)
-        self._main_text_field.StyleSetSpec(3, Constants.style_bold_italic)
-
-        # todo use one with wx.stc.STC_INDIC_SQUIGGLE for spellcheck
-        indicator_number = 0
-        alpha = {1: 60, 2: 150}
-        colors = {
-            1: wx.Colour(255, 0, 0),  # Red
-            2: wx.Colour(0, 0, 255),  # Blue
-            3: wx.Colour(0, 128, 0),  # Green
-            4: wx.Colour(255, 127, 0),  # Orange
-            5: wx.Colour(128, 0, 128),  # Purple
-            6: wx.Colour(139, 69, 19),  # Brown
-            7: wx.Colour(255, 0, 255),  # Magenta
-            8: wx.Colour(0, 128, 128),  # Teal
-            9: wx.Colour(93, 89, 94),
-            10: wx.Colour(50, 84, 54),
-            11: wx.Colour(0, 239, 247),
-        }
-        for a, a_val in alpha.items():
-            for c, c_val in colors.items():
-                if (a, c) in [(1, 10)]:
-                    # Skip combinations that are not distinct enough.
-                    continue
-                self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_FULLBOX)
-                self._main_text_field.IndicatorSetForeground(indicator_number, c_val)
-                self._main_text_field.IndicatorSetAlpha(indicator_number, a_val)
-                self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, a_val)
-                indicator_number += 1
-        for c, c_val in colors.items():
-            if c in (9, 10):
-                continue
-            # Possibly wx.stc.STC_INDIC_COMPOSITIONTHICK
-            self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_TEXTFORE)
-            self._main_text_field.IndicatorSetForeground(indicator_number, c_val)
-            self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
-            self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
-            indicator_number += 1
-
-        # We have indicators 0-29 and can have 0-31, add two thick underlines
-        self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
-        self._main_text_field.IndicatorSetForeground(indicator_number, wx.Colour(255, 0, 0))
-        self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
-        self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
-        indicator_number += 1
-        self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
-        self._main_text_field.IndicatorSetForeground(indicator_number, wx.Colour(0, 255, 0))
-        self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
-        self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
-
     def _init_status_bar(self) -> None:
         """
         Set up status bar for the frame.
@@ -397,6 +332,7 @@ class MainFrame(wx.Frame):
         """
         # Create a status bar with 3 fields
         self._status_bar = self.CreateStatusBar(Constants.status_places)
+        assert self._status_bar is not None
         self._status_bar.SetStatusWidths(Constants.status_proportions)
         # Initialize status bar
         self._set_status_text('', 0)
@@ -409,6 +345,8 @@ class MainFrame(wx.Frame):
         :return:
         """
         self._splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
+        assert self._splitter is not None
+
         top_panel = wx.Panel(self._splitter)
         bottom_panel = wx.Panel(self._splitter)
         self._splitter.SplitHorizontally(top_panel, bottom_panel)
@@ -447,6 +385,8 @@ class MainFrame(wx.Frame):
         self._search_results = wx.StaticText(top_panel, -1, label=Strings.label_search_results.format(0, 0))
 
         self._main_text_field = stc.StyledTextCtrl(top_panel, style=wx.TE_MULTILINE)
+        assert self._main_text_field is not None
+
         self._main_text_field.SetWrapMode(1)
         self._main_text_field.SetCodePage(wx.stc.STC_CP_UTF8)
         self._main_text_field.SetMarginType(1, wx.stc.STC_MARGIN_NUMBER)
@@ -455,11 +395,13 @@ class MainFrame(wx.Frame):
 
         self._input_text_field = wx.TextCtrl(bottom_panel, style=wx.TE_PROCESS_ENTER)
         self._log_text_field = wx.TextCtrl(bottom_panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH)
+        assert self._log_text_field is not None
         small_font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False)
         self._log_text_field.SetFont(small_font)
 
         # Initialize word list:
         self._side_word_list = SidePanel(self)
+        assert self._side_word_list is not None
         side_word_border_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, Strings.label_words)
         font = side_word_border_sizer.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
@@ -520,6 +462,15 @@ class MainFrame(wx.Frame):
         main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
         toolbar_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
 
+        assert self._repetition_selector is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+        assert self._search_text_field is not None
+        assert self._search_button_up is not None
+        assert self._search_button_down is not None
+        assert self._search_results is not None
+        assert self._input_text_field is not None
+
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
         coloring_len_min_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT,
                                  Constants.default_border)
@@ -553,6 +504,73 @@ class MainFrame(wx.Frame):
                                 Constants.default_border)
 
         self.SetSizer(main_horizontal_box)
+
+    def _init_styles(self) -> None:
+        """
+        Init default stc styles.
+        :return: None
+        """
+        assert self._main_text_field is not None
+        self._main_text_field.StyleSetFaceName(stc.STC_STYLE_DEFAULT, "Courier New")
+        self._main_text_field.StyleSetSize(stc.STC_STYLE_DEFAULT, 12)
+        self._main_text_field.StyleSetForeground(stc.STC_STYLE_DEFAULT, wx.Colour(0, 0, 0))
+        self._main_text_field.StyleSetBackground(stc.STC_STYLE_DEFAULT, wx.Colour(255, 255, 255))
+        self._main_text_field.StyleSetBold(stc.STC_STYLE_DEFAULT, False)
+        self._main_text_field.StyleSetItalic(stc.STC_STYLE_DEFAULT, False)
+
+        # Apply style.
+        self._main_text_field.StyleClearAll()
+
+        self._main_text_field.StyleSetSpec(1, Constants.style_bold)
+        self._main_text_field.StyleSetSpec(2, Constants.style_italic)
+        self._main_text_field.StyleSetSpec(3, Constants.style_bold_italic)
+
+        # todo use one with wx.stc.STC_INDIC_SQUIGGLE for spellcheck
+        indicator_number = 0
+        alpha = {1: 60, 2: 150}
+        colors = {
+            1: wx.Colour(255, 0, 0),  # Red
+            2: wx.Colour(0, 0, 255),  # Blue
+            3: wx.Colour(0, 128, 0),  # Green
+            4: wx.Colour(255, 127, 0),  # Orange
+            5: wx.Colour(128, 0, 128),  # Purple
+            6: wx.Colour(139, 69, 19),  # Brown
+            7: wx.Colour(255, 0, 255),  # Magenta
+            8: wx.Colour(0, 128, 128),  # Teal
+            9: wx.Colour(93, 89, 94),
+            10: wx.Colour(50, 84, 54),
+            11: wx.Colour(0, 239, 247),
+        }
+        for a, a_val in alpha.items():
+            for c, c_val in colors.items():
+                if (a, c) in [(1, 10)]:
+                    # Skip combinations that are not distinct enough.
+                    continue
+                self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_FULLBOX)
+                self._main_text_field.IndicatorSetForeground(indicator_number, c_val)
+                self._main_text_field.IndicatorSetAlpha(indicator_number, a_val)
+                self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, a_val)
+                indicator_number += 1
+        for c, c_val in colors.items():
+            if c in (9, 10):
+                continue
+            # Possibly wx.stc.STC_INDIC_COMPOSITIONTHICK
+            self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_TEXTFORE)
+            self._main_text_field.IndicatorSetForeground(indicator_number, c_val)
+            self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
+            self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
+            indicator_number += 1
+
+        # We have indicators 0-29 and can have 0-31, add two thick underlines
+        self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
+        self._main_text_field.IndicatorSetForeground(indicator_number, wx.Colour(255, 0, 0))
+        self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
+        self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
+        indicator_number += 1
+        self._main_text_field.IndicatorSetStyle(indicator_number, wx.stc.STC_INDIC_COMPOSITIONTHICK)
+        self._main_text_field.IndicatorSetForeground(indicator_number, wx.Colour(0, 255, 0))
+        self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
+        self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
 
     # Handlers ---------------------------------------------------------------------------------------------------------
     # noinspection PyUnusedLocal
@@ -877,6 +895,9 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
+        assert self._current_document is not None
+        assert self._main_text_field is not None
+
         # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
         #  Can we update the list somehow automatically? Precalculate on idle?
         # Clear before reapplying. We always have 0-31 indicators.
@@ -1378,6 +1399,7 @@ class MainFrame(wx.Frame):
 
         # Create a new document container for the file and give it to a thread to load.
         self._current_document = Document(file_path)
+        assert self._current_document is not None
         LoadFileThread(self, self._current_document)
 
     def load_document_callback(self, exp: str) -> None:
@@ -1431,6 +1453,7 @@ class MainFrame(wx.Frame):
         :param save_as: True to show dialog.
         :return: None
         """
+        assert self._current_document is not None
         self._set_status_text(Strings.status_saving, 0)
         self._disable_editor(everything=True)
         destination = self._current_document.get_path()

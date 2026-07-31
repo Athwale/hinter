@@ -22,15 +22,7 @@ class PlainTextEditDialog(wx.Dialog):
         self._list_type = word_list
 
         self._main_vertical_sizer = wx.BoxSizer(wx.VERTICAL)
-        self._horizontal_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self._vertical_sizer = wx.BoxSizer(wx.VERTICAL)
-        self._information_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Text field sizer
-        self._text_sub_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self._field_text = wx.TextCtrl(self, -1, style=wx.TE_MULTILINE)
-        self._text_sub_sizer.Add(self._field_text, 1, flag=wx.EXPAND)
-        self._information_sizer.Add(self._text_sub_sizer, 1, flag=wx.EXPAND)
 
         # Buttons
         self._button_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -44,10 +36,8 @@ class PlainTextEditDialog(wx.Dialog):
         self._button_sizer.Add(grouping_sizer, flag=wx.ALIGN_CENTER_HORIZONTAL)
 
         # Putting the sizers together
-        self._vertical_sizer.Add(self._information_sizer, 1, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP,
+        self._main_vertical_sizer.Add(self._field_text, 1, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP,
                                  border=Constants.default_border)
-        self._horizontal_sizer.Add(self._vertical_sizer, 1, flag=wx.EXPAND)
-        self._main_vertical_sizer.Add(self._horizontal_sizer, 1, flag=wx.EXPAND)
         self._main_vertical_sizer.Add(self._button_sizer, 0, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.TOP,
                                       border=Constants.default_border)
         self.SetSizer(self._main_vertical_sizer)
@@ -114,7 +104,7 @@ class PlainTextEditDialog(wx.Dialog):
 
     def _display_dialog_contents(self) -> None:
         """
-        Display the image that this dialog edits in the gui.
+        Load words into the dialog text field.
         :return: None
         """
         if self._list_type == Strings.menu_item_edit_words_ignored_hint:

@@ -12,7 +12,7 @@ class WordInfoDialog(wx.Dialog):
 
     def __init__(self, parent, panels: Dict[bytes, ListItemPanel]):
         """
-        Display a dialog with a message with the text being selectable.
+        Display a dialog with a word list and counts.
         :param parent: Parent frame.
         :param panels: Dictionary of [bytes, ListItemPanel]
         """
@@ -33,8 +33,11 @@ class WordInfoDialog(wx.Dialog):
 
         self._html_window.SetPage(content)
 
-        self._main_vertical_sizer.Add(self._html_window, 1, flag=wx.EXPAND)
-        self._main_vertical_sizer.Add(self._close_button, flag=wx.EXPAND)
+        self._main_vertical_sizer.Add(self._html_window, 1, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.TOP,
+                                      border=Constants.default_border)
+        self._main_vertical_sizer.Add(self._close_button,
+                                      flag=wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.ALIGN_CENTER_HORIZONTAL,
+                                      border=Constants.default_border)
         self.SetSizer(self._main_vertical_sizer)
 
         self.ShowModal()

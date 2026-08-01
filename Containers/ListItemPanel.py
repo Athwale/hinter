@@ -49,6 +49,7 @@ class ListItemPanel(wx.Panel):
 
         self.Bind(wx.EVT_CHECKBOX, self._on_checkbox, self._check_box)
 
+    # noinspection PyUnusedLocal
     def _on_checkbox(self, event: wx.CommandEvent) -> None:
         # Pass the event into the main window.
         self._word_instance.set_selected(self._check_box.GetValue())

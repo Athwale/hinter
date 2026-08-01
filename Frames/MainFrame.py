@@ -23,6 +23,7 @@ from Containers.ListItemPanel import ListItemPanel
 from Containers.SidePanel import SidePanel
 from Containers.Word import Word
 from Dialogs.AboutDialog import AboutDialog
+from Dialogs.LLMConfigDialog import LLMConfigDialog
 from Dialogs.PlainTextEditDialog import PlainTextEditDialog
 from Dialogs.SaveLoadWaitDialog import SavingWaitDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
@@ -188,6 +189,9 @@ class MainFrame(wx.Frame):
         tools_menu_item_log = tools_menu.Append(wx.ID_UP, Strings.menu_item_log,
                                                 Strings.menu_item_log_hint)
         self._menu_items.append(tools_menu_item_log)
+        tools_menu_item_llm = tools_menu.Append(wx.ID_SETUP, Strings.menu_item_config,
+                                                Strings.menu_item_config_hint)
+        self._menu_items.append(tools_menu_item_llm)
 
         # About menu:
         about_menu = wx.Menu()
@@ -221,6 +225,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._info_word_counts_handler, tools_menu_item_words)
         self.Bind(wx.EVT_MENU, self._reset_limits_handler, tools_menu_item_reset)
         self.Bind(wx.EVT_MENU, self._log_handler, tools_menu_item_log)
+        self.Bind(wx.EVT_MENU, self._llm_handler, tools_menu_item_llm)
 
         # About menu:
         self.Bind(wx.EVT_MENU, self._about_handler, about_menu_item_about)
@@ -818,7 +823,7 @@ class MainFrame(wx.Frame):
     def _edit_words_handler(self, event: wx.CommandEvent) -> None:
         """
         Open a dialog for word list editing.
-        :param event: Not used.
+        :param event: Used to open the correct dialog.
         :return: None
         """
         assert self._current_document is not None
@@ -833,6 +838,16 @@ class MainFrame(wx.Frame):
         if dialog:
             dialog.ShowModal()
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
+
+    # noinspection PyUnusedLocal
+    def _llm_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Open a dialog for LLM configuration.
+        :param event: Not used.
+        :return: None
+        """
+        dialog = LLMConfigDialog(self)
+        dialog.ShowModal()
 
     # noinspection PyUnusedLocal
     def _new_file_handler(self, event: wx.CommandEvent) -> None:

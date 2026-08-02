@@ -9,12 +9,14 @@ CheckboxChangedEvent, EVT_CHECKBOX_CHANGED = wx.lib.newevent.NewCommandEvent()
 config_file: Path = Path.home() / '.config' / 'w-hinter.conf'
 
 color_grey: wx.Colour = wx.Colour(158, 162, 168)
-color_black: wx.Colour = wx.Colour(0, 0, 0)
+color_grey_dark: wx.Colour = wx.Colour(82, 84, 82)
 color_orange: wx.Colour = wx.Colour(252, 119, 3)
 color_green: wx.Colour = wx.Colour(36, 145, 69)
 
-llm_default_url: str = 'http://127.0.0.1/'
+llm_default_url: str = 'http://127.0.0.1:8080/v1/chat/completions'
 llm_default_port: int = 8080
+llm_system_prompt: str = ('You are an enthusiastic writer striving for the best quality stories.'
+                          ' Your communication style is friendly and informative.')
 
 status_places: int = 4
 status_proportions: List[int] = [-6, -7, -3, -4]
@@ -43,6 +45,8 @@ about_dialog_height: int = 300
 
 words_dialog_width: int = 400
 words_dialog_height: int = 900
+
+min_chat_height: int = 150
 
 plain_text_dialog_width: int = 400
 plain_text_dialog_height: int = 600
@@ -73,3 +77,4 @@ msg_info: int = 1
 msg_warn: int = 2
 msg_err: int = 3
 msg_ok: int = 4
+msg_query: int = 5

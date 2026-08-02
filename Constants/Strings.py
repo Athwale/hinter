@@ -73,8 +73,8 @@ label_word: str = "Word"
 label_words: str = "Word"
 label_selected: str = "✓"
 label_count: str = "Count"
-label_url_port: str = "LLM URL and Port:"
-label_url_port_wrong: str = "Enter a valid URL:port combination."
+label_url_port: str = "LLM (URL:Port):"
+label_system_prompt: str = "System prompt:"
 
 button_close: str = "Close"
 button_cancel: str = "Cancel"
@@ -102,6 +102,7 @@ err_file_format: str = "File formatting error"
 err_file_format_metadata: str = "File metadata formatting error"
 err_file_not_found: str = "File not found"
 err_config_file: str = f"Config file permission error"
+err_connection: str = "Connection error"
 
 exception_resource_not_found: str = "Resource file not found"
 

@@ -21,6 +21,7 @@ class Config:
         self._width: int = Constants.main_window_size.width
         self._height: int = Constants.main_window_size.height
         self._llm_url: str = Constants.llm_default_url
+        self._llm_system_prompt: str = Constants.llm_system_prompt
 
         if not self._config_file.exists():
             # Create a new default file.
@@ -59,6 +60,8 @@ class Config:
                         if line.startswith('llm_url:'):
                             url = line.split(" ")[1].replace('\n', '').strip()
                             self._llm_url = url
+                        if line.startswith('llm_system_prompt:'):
+                            self._llm_system_prompt = line.split(":")[1].replace('\n', '').strip()
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 
@@ -91,6 +94,21 @@ class Config:
         :return: LLM url.
         """
         return self._llm_url
+
+    def set_llm_system_prompt(self, prompt: str) -> None:
+        """
+        Set new LLM system prompt.
+        :param prompt. New system prompt
+        :return: None
+        """
+        self._llm_system_prompt = prompt
+
+    def get_llm_system_prompt(self) -> str:
+        """
+        Get LLM system prompt.
+        :return: LLM system prompt.
+        """
+        return self._llm_system_prompt
 
     def get_size(self) -> wx.Size:
         """
@@ -147,4 +165,5 @@ class Config:
             config.write(f"last-file: {self._last_file}\n")
             config.write(f"position: {self._position_x},{self._position_y}\n")
             config.write(f"size: {self._width},{self._height}\n")
-            config.write(f"llm_url: {self._llm_url}\n")
+            config.write(f"llm_url: {self._llm_url}\n"),
+            config.write(f"llm_system_prompt: {self._llm_system_prompt}\n")

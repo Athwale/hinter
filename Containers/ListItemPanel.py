@@ -114,7 +114,7 @@ class ListItemPanel(wx.Panel):
         """
         if state:
             self._check_box.Enable(True)
-            self._word_label.SetForegroundColour(Constants.color_black)
+            self._word_label.SetForegroundColour(wx.BLACK)
         else:
             self._check_box.Enable(False)
             self._word_label.SetForegroundColour(Constants.color_grey)

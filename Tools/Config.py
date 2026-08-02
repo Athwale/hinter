@@ -20,6 +20,7 @@ class Config:
         self._position_y: int = 0
         self._width: int = Constants.main_window_size.width
         self._height: int = Constants.main_window_size.height
+        self._llm_url: str = Constants.llm_default_url
 
         if not self._config_file.exists():
             # Create a new default file.
@@ -55,6 +56,9 @@ class Config:
                             except ValueError as _:
                                 self._width = Constants.main_window_size.width
                                 self._height = Constants.main_window_size.height
+                        if line.startswith('llm_url:'):
+                            url = line.split(" ")[1].replace('\n', '').strip()
+                            self._llm_url = url
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 
@@ -72,6 +76,21 @@ class Config:
         :return: None
         """
         self._last_file = file
+
+    def set_llm_url(self, url: str) -> None:
+        """
+        Set new LLM url.
+        :param url: Network url.
+        :return: None
+        """
+        self._llm_url = url
+
+    def get_llm_url(self) -> str:
+        """
+        Get LLM url.
+        :return: LLM url.
+        """
+        return self._llm_url
 
     def get_size(self) -> wx.Size:
         """
@@ -128,3 +147,4 @@ class Config:
             config.write(f"last-file: {self._last_file}\n")
             config.write(f"position: {self._position_x},{self._position_y}\n")
             config.write(f"size: {self._width},{self._height}\n")
+            config.write(f"llm_url: {self._llm_url}\n")

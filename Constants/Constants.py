@@ -13,6 +13,9 @@ color_black: wx.Colour = wx.Colour(0, 0, 0)
 color_orange: wx.Colour = wx.Colour(252, 119, 3)
 color_green: wx.Colour = wx.Colour(36, 145, 69)
 
+llm_default_url: str = 'http://127.0.0.1/'
+llm_default_port: int = 8080
+
 status_places: int = 4
 status_proportions: List[int] = [-6, -7, -3, -4]
 

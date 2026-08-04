@@ -1,4 +1,5 @@
 import html
+import json
 import re
 import shutil
 import time
@@ -6,6 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import List, Dict, Set
 
+import requests
 import wx
 import wx.dataview as dv
 import wx.grid
@@ -36,7 +38,6 @@ from Tools.Config import Config
 
 
 # todo spell check
-# todo ai integration
 
 class MainFrame(wx.Frame):
     """
@@ -71,6 +72,10 @@ class MainFrame(wx.Frame):
         # Used for undo.
         self._style_history = {}
         self._action_token = 0
+
+        # Used for llm input history.
+        self._llm_history = ['' for _ in range(Constants.llm_history_size)]
+        self._llm_history_index = Constants.llm_history_size - 1
 
         # Custom IDs
         self._id_add_ignore = wx.NewId()
@@ -189,9 +194,13 @@ class MainFrame(wx.Frame):
         tools_menu_item_log = tools_menu.Append(wx.ID_UP, Strings.menu_item_log,
                                                 Strings.menu_item_log_hint)
         self._menu_items.append(tools_menu_item_log)
-        tools_menu_item_llm = tools_menu.Append(wx.ID_SETUP, Strings.menu_item_config,
-                                                Strings.menu_item_config_hint)
-        self._menu_items.append(tools_menu_item_llm)
+        tools_menu.AppendSeparator()
+        tools_menu_item_llm_config = tools_menu.Append(wx.ID_SETUP, Strings.menu_item_config_llm,
+                                                       Strings.menu_item_config_llm_hint)
+        self._menu_items.append(tools_menu_item_llm_config)
+        tools_menu_item_llm_connect = tools_menu.Append(wx.ID_EXECUTE, Strings.menu_item_connect_llm,
+                                                        Strings.menu_item_connect_llm_hint)
+        self._menu_items.append(tools_menu_item_llm_connect)
 
         # About menu:
         about_menu = wx.Menu()
@@ -225,7 +234,8 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._info_word_counts_handler, tools_menu_item_words)
         self.Bind(wx.EVT_MENU, self._reset_limits_handler, tools_menu_item_reset)
         self.Bind(wx.EVT_MENU, self._log_handler, tools_menu_item_log)
-        self.Bind(wx.EVT_MENU, self._llm_handler, tools_menu_item_llm)
+        self.Bind(wx.EVT_MENU, self._llm_config_handler, tools_menu_item_llm_config)
+        self.Bind(wx.EVT_MENU, self._llm_test_handler, tools_menu_item_llm_connect)
 
         # About menu:
         self.Bind(wx.EVT_MENU, self._about_handler, about_menu_item_about)
@@ -355,7 +365,7 @@ class MainFrame(wx.Frame):
         top_panel = wx.Panel(self._splitter)
         bottom_panel = wx.Panel(self._splitter)
         self._splitter.SplitHorizontally(top_panel, bottom_panel)
-        self._splitter.SetMinimumPaneSize(100)
+        self._splitter.SetMinimumPaneSize(Constants.min_chat_height)
         self._splitter.SetSashPosition(self.GetSize().height)
         self._splitter.SetSashGravity(0.5)
 
@@ -463,6 +473,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, lambda _on_paste: self._main_text_field.Paste(), id=wx.ID_PASTE)
         self.Bind(wx.EVT_MENU, lambda _on_select_all: self._main_text_field.SelectAll(), id=wx.ID_SELECTALL)
 
+        self.Bind(wx.EVT_TEXT_ENTER, self._llm_input_field_send_handler, self._input_text_field)
+        self._input_text_field.Bind(wx.EVT_KEY_DOWN, self._llm_input_field_key_handler)
+
         # Assemble
         main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
         toolbar_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
@@ -486,7 +499,7 @@ class MainFrame(wx.Frame):
         search_box.Add(self._search_button_down, 0, wx.LEFT, Constants.default_border)
         search_box.Add(self._search_results, 0, wx.LEFT | wx.CENTER, Constants.default_border)
 
-        toolbar_horizontal_box.Add(coloring_repetitions_box, 0, wx.LEFT | wx.RIGHT, Constants.default_border)
+        toolbar_horizontal_box.Add(coloring_repetitions_box, 0, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_min_box, 0, wx.LEFT, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_max_box, 0, wx.LEFT, Constants.default_border)
         toolbar_horizontal_box.Add(search_box, 1, wx.LEFT, Constants.default_border)
@@ -497,13 +510,13 @@ class MainFrame(wx.Frame):
         top_panel.SetSizer(top_panel_sizer)
         bottom_panel.SetSizer(bottom_panel_sizer)
 
-        main_horizontal_box.Add(self._splitter, 1, wx.EXPAND)
+        main_horizontal_box.Add(self._splitter, 1, wx.EXPAND | wx.LEFT, Constants.default_border)
 
         top_panel_sizer.Add(toolbar_horizontal_box, 0, wx.EXPAND)
-        top_panel_sizer.Add(self._main_text_field, 4, wx.EXPAND | wx.BOTTOM | wx.LEFT, Constants.default_border)
+        top_panel_sizer.Add(self._main_text_field, 4, wx.EXPAND, Constants.default_border)
 
         bottom_panel_sizer.Add(self._log_text_field, 1, wx.EXPAND)
-        bottom_panel_sizer.Add(self._input_text_field, 0, wx.EXPAND | wx.BOTTOM, Constants.default_border)
+        bottom_panel_sizer.Add(self._input_text_field, 0, wx.EXPAND | wx.BOTTOM | wx.TOP, Constants.default_border)
 
         main_horizontal_box.Add(side_word_border_sizer, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT,
                                 Constants.default_border)
@@ -807,6 +820,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        assert self._main_text_field is not None
         self._main_text_field.Undo()
         self._main_text_field.Refresh()
 
@@ -817,6 +831,7 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        assert self._main_text_field is not None
         self._main_text_field.Redo()
         self._main_text_field.Refresh()
 
@@ -840,14 +855,89 @@ class MainFrame(wx.Frame):
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
 
     # noinspection PyUnusedLocal
-    def _llm_handler(self, event: wx.CommandEvent) -> None:
+    def _llm_input_field_key_handler(self, event: wx.KeyEvent) -> None:
+        """
+        Scroll through llm chat input history.
+        :param event: Not used.
+        :return: None
+        """
+        assert self._input_text_field is not None
+        key = event.GetKeyCode()
+        if key == wx.WXK_UP:
+            if self._llm_history:
+                self._input_text_field.SetValue(self._llm_history[self._llm_history_index])
+                if self._llm_history_index > 0:
+                    self._llm_history_index -= 1
+        elif key == wx.WXK_DOWN:
+            if self._llm_history:
+                self._input_text_field.SetValue(self._llm_history[self._llm_history_index])
+                if self._llm_history_index < Constants.llm_history_size - 1:
+                    self._llm_history_index += 1
+        else:
+            # Reset on any other key press.
+            self._llm_history_index = Constants.llm_history_size - 1
+            event.Skip()
+
+    # noinspection PyUnusedLocal
+    def _llm_input_field_send_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Send message to LLM.
+        :param event: Not used.
+        :return: None
+        """
+        assert self._input_text_field is not None
+        content = self._input_text_field.GetValue()
+        self.post_message(content, Constants.msg_query)
+
+        if content.strip():
+            self._llm_history.append(content)
+            if len(self._llm_history) > Constants.llm_history_size:
+                self._llm_history.pop(0)
+            self._send_to_llm(content)
+        self._input_text_field.Clear()
+
+    def _send_to_llm(self, prompt: str) -> str | None:
+        """
+        Send a prompt to LLM on url and get a string response.
+        :param prompt: The string to send.
+        :return: String or None
+        """
+        # todo run in thread in background
+        # todo spinner next to input line.
+        # This does not retain context, that would have to be passed along inside messages.
+        messages = [{"role": "system", "content": self._config.get_llm_system_prompt()},
+                    {"role": "user", "content": prompt}]
+        try:
+            response = requests.post(self._config.get_llm_url(), json={"messages": messages})
+            # Raise HTTPError for bad responses (4xx or 5xx)
+            response.raise_for_status()
+            result = response.json()
+            content = result['choices'][0]['message']['content']
+            self.post_message(content, Constants.msg_reply)
+        except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+            self.post_message(Strings.msg_llm_connection_ok.format('ERROR', str(e)),
+                              Constants.msg_err)
+
+    # noinspection PyUnusedLocal
+    def _llm_config_handler(self, event: wx.CommandEvent) -> None:
         """
         Open a dialog for LLM configuration.
         :param event: Not used.
         :return: None
         """
-        dialog = LLMConfigDialog(self)
+        dialog = LLMConfigDialog(self, self._config)
         dialog.ShowModal()
+        self.post_message(Strings.msg_llm_connection_config.format(self._config.get_llm_url()),
+                          Constants.msg_info)
+        self._test_llm_connection()
+
+    def _llm_test_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Try connecting to the LLM and print into log.
+        :param event: Not used.
+        :return: None
+        """
+        self._test_llm_connection()
 
     # noinspection PyUnusedLocal
     def _new_file_handler(self, event: wx.CommandEvent) -> None:
@@ -1288,6 +1378,7 @@ class MainFrame(wx.Frame):
         last_file = self._config.get_last_file()
         if self._show_yes_no_dialog(Strings.warn_load_last_file.format(last_file), wx.ICON_QUESTION):
             self._load_document(last_file)
+        self._test_llm_connection()
 
     def _disable_editor(self, everything=False) -> None:
         """
@@ -1557,7 +1648,11 @@ class MainFrame(wx.Frame):
         :param severity: Style of message affecting color and warning type.
         :return: None
         """
+        assert self._log_text_field is not None
         stamp = time.strftime('%H:%M')
+        if severity == Constants.msg_query:
+            self._log_text_field.SetForegroundColour(Constants.color_grey_dark)
+            self._log_text_field.AppendText(f"{stamp} [Q]: {message}\n")
         if severity == Constants.msg_reply:
             self._log_text_field.SetForegroundColour(wx.BLACK)
             self._log_text_field.AppendText(f"{stamp} [R]: {message}\n")
@@ -1622,7 +1717,25 @@ class MainFrame(wx.Frame):
         User is performing an action that could destroy the document, ask for save.
         :return: None
         """
+        assert self._current_document is not None
         if self._current_document.is_modified():
             if self._show_yes_no_dialog(Strings.warn_file_not_saved.format(self._current_document.get_path().name),
                                         wx.ICON_ASTERISK):
                 self._save_document()
+
+    def _test_llm_connection(self) -> bool:
+        """
+        Return True if communication with the llm server is online. Print into log.
+        :return: True if communication with the llm server is online.
+        """
+        try:
+            code = requests.get("http://127.0.0.1:8080/v1/models").status_code
+            if code == 200:
+                self.post_message(Strings.msg_llm_connection_ok.format('OK', str(code)),
+                                  Constants.msg_ok)
+                return True
+        except requests.exceptions.ConnectionError as _:
+            code = Strings.err_connection
+        self.post_message(Strings.msg_llm_connection_ok.format('ERROR', code),
+                          Constants.msg_err)
+        return False

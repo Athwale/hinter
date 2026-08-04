@@ -17,6 +17,7 @@ llm_default_url: str = 'http://127.0.0.1:8080/v1/chat/completions'
 llm_default_port: int = 8080
 llm_system_prompt: str = ('You are an enthusiastic writer striving for the best quality stories.'
                           ' Your communication style is friendly and informative.')
+llm_history_size: int = 3
 
 status_places: int = 4
 status_proportions: List[int] = [-6, -7, -3, -4]

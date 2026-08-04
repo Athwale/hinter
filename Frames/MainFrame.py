@@ -1,5 +1,4 @@
 import html
-import json
 import re
 import shutil
 import time
@@ -31,6 +30,7 @@ from Dialogs.SaveLoadWaitDialog import SavingWaitDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
 from Resources.Fetch import Fetch
 from Threads.ColoratorThread import ColoratorThread
+from Threads.LLMThread import LLMThread
 from Threads.LoadFileThread import LoadFileThread
 from Threads.SaveFileThread import SaveFileThread
 from Threads.StatisticsThread import StatisticsThread
@@ -43,7 +43,6 @@ class MainFrame(wx.Frame):
     """
     Main user interface class.
     """
-
     def __init__(self):
         """
         User interface constructor.
@@ -68,6 +67,8 @@ class MainFrame(wx.Frame):
         self._menu_items: List[wx.MenuItem] = []
         self._side_word_list: SidePanel | None = None
         self._splitter: wx.SplitterWindow | None = None
+        self._coloring_spinner: wx.ActivityIndicator | None = None
+        self._ai_spinner: wx.ActivityIndicator | None = None
 
         # Used for undo.
         self._style_history = {}
@@ -96,6 +97,7 @@ class MainFrame(wx.Frame):
         self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
 
         self._statistics_thread: StatisticsThread | None = None
+        self._llm_thread: LLMThread | None = None
         self._statistics_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._on_statistics_timer_handler, self._statistics_timer)
 
@@ -312,8 +314,8 @@ class MainFrame(wx.Frame):
                                                                        shortHelp=Strings.menu_item_colorize)
         self._tools.append(colorize_tool)
 
-        self._busy_wheel = wx.ActivityIndicator(self._toolbar, wx.ID_ANY, size=wx.Size(10, 10))
-        self._toolbar.AddControl(self._busy_wheel, "")
+        self._coloring_spinner = wx.ActivityIndicator(self._toolbar, wx.ID_ANY, size=wx.Size(10, 10))
+        self._toolbar.AddControl(self._coloring_spinner, "")
 
         log_tool: wx.ToolBarToolBase = self._toolbar.AddCheckTool(toolId=wx.ID_UP,
                                                                   label=Strings.menu_item_log,
@@ -414,6 +416,8 @@ class MainFrame(wx.Frame):
         small_font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False)
         self._log_text_field.SetFont(small_font)
 
+        self._ai_spinner = wx.ActivityIndicator(bottom_panel, wx.ID_ANY, size=wx.Size(20, 20))
+
         # Initialize word list:
         self._side_word_list = SidePanel(self)
         assert self._side_word_list is not None
@@ -450,6 +454,17 @@ class MainFrame(wx.Frame):
         font.SetPointSize(Constants.static_box_font_size)
         search_box.GetStaticBox().SetFont(font)
 
+        assert self._main_text_field is not None
+        assert self._repetition_selector is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+        assert self._search_text_field is not None
+        assert self._search_button_up is not None
+        assert self._search_button_down is not None
+        assert self._search_results is not None
+        assert self._input_text_field is not None
+        assert self._ai_spinner is not None
+
         # Main text area context menu.
         self._main_text_field.UsePopUp(stc.STC_POPUP_NEVER)
 
@@ -480,15 +495,6 @@ class MainFrame(wx.Frame):
         main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
         toolbar_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
 
-        assert self._repetition_selector is not None
-        assert self._min_repeated_word_length_selector is not None
-        assert self._max_repeated_word_length_selector is not None
-        assert self._search_text_field is not None
-        assert self._search_button_up is not None
-        assert self._search_button_down is not None
-        assert self._search_results is not None
-        assert self._input_text_field is not None
-
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
         coloring_len_min_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT,
                                  Constants.default_border)
@@ -506,6 +512,7 @@ class MainFrame(wx.Frame):
 
         top_panel_sizer = wx.BoxSizer(wx.VERTICAL)
         bottom_panel_sizer = wx.BoxSizer(wx.VERTICAL)
+        input_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         top_panel.SetSizer(top_panel_sizer)
         bottom_panel.SetSizer(bottom_panel_sizer)
@@ -516,7 +523,9 @@ class MainFrame(wx.Frame):
         top_panel_sizer.Add(self._main_text_field, 4, wx.EXPAND, Constants.default_border)
 
         bottom_panel_sizer.Add(self._log_text_field, 1, wx.EXPAND)
-        bottom_panel_sizer.Add(self._input_text_field, 0, wx.EXPAND | wx.BOTTOM | wx.TOP, Constants.default_border)
+        input_sizer.Add(self._input_text_field, 1, wx.EXPAND | wx.BOTTOM | wx.TOP, Constants.default_border)
+        input_sizer.Add(self._ai_spinner, 0, wx.EXPAND)
+        bottom_panel_sizer.Add(input_sizer, 0, wx.EXPAND)
 
         main_horizontal_box.Add(side_word_border_sizer, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT,
                                 Constants.default_border)
@@ -885,38 +894,22 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        # todo copy selected text into prompt, synonym asking, limit tokens?...
         assert self._input_text_field is not None
-        content = self._input_text_field.GetValue()
-        self.post_message(content, Constants.msg_query)
+        assert self._ai_spinner is not None
 
-        if content.strip():
-            self._llm_history.append(content)
-            if len(self._llm_history) > Constants.llm_history_size:
-                self._llm_history.pop(0)
-            self._send_to_llm(content)
-        self._input_text_field.Clear()
+        user_prompt = self._input_text_field.GetValue()
 
-    def _send_to_llm(self, prompt: str) -> str | None:
-        """
-        Send a prompt to LLM on url and get a string response.
-        :param prompt: The string to send.
-        :return: String or None
-        """
-        # todo run in thread in background
-        # todo spinner next to input line.
-        # This does not retain context, that would have to be passed along inside messages.
-        messages = [{"role": "system", "content": self._config.get_llm_system_prompt()},
-                    {"role": "user", "content": prompt}]
-        try:
-            response = requests.post(self._config.get_llm_url(), json={"messages": messages})
-            # Raise HTTPError for bad responses (4xx or 5xx)
-            response.raise_for_status()
-            result = response.json()
-            content = result['choices'][0]['message']['content']
-            self.post_message(content, Constants.msg_reply)
-        except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
-            self.post_message(Strings.msg_llm_connection_ok.format('ERROR', str(e)),
-                              Constants.msg_err)
+        if user_prompt.strip():
+            if self._llm_thread is None or not self._llm_thread.is_alive():
+                self.post_message(user_prompt, Constants.msg_query)
+                self._llm_history.append(user_prompt)
+                if len(self._llm_history) > Constants.llm_history_size:
+                    self._llm_history.pop(0)
+                self._ai_spinner.Start()
+                self._llm_thread = LLMThread(self, user_prompt, self._config.get_llm_system_prompt(),
+                                             self._config.get_llm_url())
+                self._input_text_field.Clear()
 
     # noinspection PyUnusedLocal
     def _llm_config_handler(self, event: wx.CommandEvent) -> None:
@@ -1021,7 +1014,7 @@ class MainFrame(wx.Frame):
             return
         else:
             if self._coloring_tool_off:
-                self._busy_wheel.Start()
+                self._coloring_spinner.Start()
                 ColoratorThread(self, self._current_document, self._main_text_field.GetText())
             else:
                 # If the tool run before and is still active, do not recalculate.
@@ -1124,7 +1117,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.Thaw()
         self._main_text_field.Refresh()
         self._update_indicator_count()
-        self._busy_wheel.Stop()
+        self._coloring_spinner.Stop()
 
     def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1451,11 +1444,27 @@ class MainFrame(wx.Frame):
     def text_statistics_callback(self, words: int) -> None:
         """
         Thread callback for text statistics. Sets the status bar information.
+        :param words: Number of words.
         :return: None
         """
         lines = self._main_text_field.NumberOfLines
         chars = self._main_text_field.GetTextLength()
         self._set_status_text(Strings.status_doc_info.format(lines, words, chars), 0)
+
+    def llm_response_callback(self, reply: str, error: bool) -> None:
+        """
+        Thread callback for text statistics. Sets the status bar information.
+        :param reply: Reply from LLM call.
+        :param error: True if error occurred.
+        :return: None
+        """
+        assert self._ai_spinner is not None
+
+        self._ai_spinner.Stop()
+        if error:
+            self.post_message(reply, Constants.msg_err)
+        else:
+            self.post_message(reply, Constants.msg_reply)
 
     def append_styled_text(self, text: str, style: str) -> None:
         """

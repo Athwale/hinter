@@ -33,7 +33,7 @@ class LLMThread(Thread):
         Send a prompt to LLM on url and get a string response.
         :return: None
         """
-        # TODO more parameters?
+        # todo limit tokens and other settings, heat and so on...
         # This does not retain context, that would have to be passed along inside messages.
         messages = [{"role": "system", "content": self._system_prompt},
                     {"role": "user", "content": self._prompt}]

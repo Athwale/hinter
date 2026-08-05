@@ -16,7 +16,8 @@ color_green: wx.Colour = wx.Colour(36, 145, 69)
 llm_default_url: str = 'http://127.0.0.1:8080/v1/chat/completions'
 llm_default_port: int = 8080
 llm_system_prompt: str = ('You are an enthusiastic writer striving for the best quality stories.'
-                          ' Your communication style is friendly and informative.')
+                          ' Your communication style is friendly and informative and concise.'
+                          ' You write output in plain text without using markup.')
 llm_history_size: int = 3
 
 status_places: int = 4

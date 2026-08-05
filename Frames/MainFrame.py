@@ -84,6 +84,8 @@ class MainFrame(wx.Frame):
         self._id_del_ignore = wx.NewId()
         self._id_del_names = wx.NewId()
         self._id_limits = wx.NewId()
+        self._id_llm_synonym = wx.NewId()
+        self._id_llm_copy = wx.NewId()
         self._id_synonym_ids = []
 
         self._available_indicators: Set[int] = set()
@@ -607,6 +609,9 @@ class MainFrame(wx.Frame):
         :param event: Unused.
         :return: None
         """
+        assert self._main_text_field is not None
+        assert self._current_document is not None
+
         self._main_text_field.TargetFromSelection()
 
         if self._main_text_field.GetSelectionEmpty():
@@ -647,7 +652,12 @@ class MainFrame(wx.Frame):
 
         enable = False
         if len(self._main_text_field.GetSelectedText()):
+            # Enable the copy to prompt item if anything is selected.
+            menu.Append(self._id_llm_copy, Strings.menu_item_copy_llm)
+            self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_llm_copy)
+
             enable = True
+            # Enable menu items if one word is selected without word separators
             for ch in "., ;":
                 if ch in self._main_text_field.GetSelectedText().strip().lower():
                     enable = False
@@ -672,6 +682,9 @@ class MainFrame(wx.Frame):
                     synonyms_item = menu.Append(wx.ID_ANY, Strings.menu_item_synonym)
                     synonyms_item.Enable(False)
 
+                menu.Append(self._id_llm_synonym, Strings.menu_item_synonym_llm)
+                self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_llm_synonym)
+
         copy_item.Enable(enable)
         ignore_item.Enable(enable)
         name_item.Enable(enable)
@@ -692,6 +705,12 @@ class MainFrame(wx.Frame):
         :param event: Used to get ID to distinguish button.
         :return: None
         """
+        assert self._main_text_field is not None
+        assert self._current_document is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+        assert self._input_text_field is not None
+
         event_id = event.GetId()
         selection = self._sanitized_selection()
         if selection:
@@ -724,6 +743,13 @@ class MainFrame(wx.Frame):
                 self._max_repeated_word_length_selector.SetValue(len(selection))
                 self._min_repeated_word_length_selector.SetValue(len(selection))
                 self._handle_marking_selector_handler(event)
+            if event_id == self._id_llm_synonym:
+                self._input_text_field.SetValue(Strings.llm_ask_synonym.format(selection))
+                self._llm_input_field_send_handler(event)
+            if event_id == self._id_llm_copy:
+                self._input_text_field.AppendText(self._main_text_field.GetSelectedText())
+                self._input_text_field.SetFocus()
+                self._input_text_field.SelectNone()
 
     # noinspection PyUnusedLocal
     def _focus_to_search_handler(self, event: wx.CommandEvent) -> None:
@@ -894,7 +920,6 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # todo copy selected text into prompt, synonym asking, limit tokens?...
         assert self._input_text_field is not None
         assert self._ai_spinner is not None
 

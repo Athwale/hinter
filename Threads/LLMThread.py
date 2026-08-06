@@ -33,12 +33,14 @@ class LLMThread(Thread):
         Send a prompt to LLM on url and get a string response.
         :return: None
         """
-        # todo limit tokens and other settings, heat and so on...
         # This does not retain context, that would have to be passed along inside messages.
         messages = [{"role": "system", "content": self._system_prompt},
                     {"role": "user", "content": self._prompt}]
         try:
-            response = requests.post(self._llm_url, json={"messages": messages})
+            # todo limit tokens and other settings, heat and so on... frequency_penalty, n, presence_penalty, top_p, verbosity
+            response = requests.post(self._llm_url, json={"messages": messages,
+                                                          "max_completion_tokens": 50,
+                                                          "temperature": 0.7})
             # Raise HTTPError for bad responses (4xx or 5xx)
             response.raise_for_status()
             result = response.json()

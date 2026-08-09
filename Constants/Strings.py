@@ -77,6 +77,12 @@ label_selected: str = "✓"
 label_count: str = "Count"
 label_url_port: str = "LLM (URL:Port):"
 label_system_prompt: str = "System prompt:"
+label_max_tokens: str = 'Max tokens'
+label_num_responses: str = 'Number of responses'
+label_temp: str = 'Temperature'
+label_presence_penalty: str = 'Presence penalty'
+label_frequency_penalty: str = 'Frequency penalty'
+label_verbosity: str = 'Verbosity'
 
 button_close: str = "Close"
 button_cancel: str = "Cancel"

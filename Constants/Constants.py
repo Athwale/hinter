@@ -65,6 +65,25 @@ config_min_len: int = 1
 config_min_len_default: int = 3
 config_max_len: int = 100
 
+config_llm_tokens_min: int = 100
+config_llm_tokens_max: int = 1000000
+config_llm_tokens_default: int = 500
+config_llm_responses_min: int = 1
+config_llm_responses_max: int = 100
+config_llm_responses_default: int = 1
+config_llm_temp_min: float = 0.0
+config_llm_temp_max: float = 2.0
+config_llm_temp_default: float = 0.5
+config_llm_presence_pen_min: float = -2.0
+config_llm_presence_pen_max: float = 2.0
+config_llm_presence_pen_default: float = 1
+config_llm_frequency_pen_min: float = -2.0
+config_llm_frequency_pen_max: float = 2.0
+config_llm_frequency_pen_default: float = 1
+config_llm_verbosity_default: int = 2
+config_llm_verbosity_min: int = 1
+config_llm_verbosity_max: int = 3
+
 static_box_font_size: int = 9
 statistics_timer_delay: int = 10000
 

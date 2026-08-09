@@ -20,8 +20,15 @@ class Config:
         self._position_y: int = 0
         self._width: int = Constants.main_window_size.width
         self._height: int = Constants.main_window_size.height
+
         self._llm_url: str = Constants.llm_default_url
         self._llm_system_prompt: str = Constants.llm_system_prompt
+        self._llm_tokens: int = Constants.config_llm_tokens_default
+        self._llm_responses: int = Constants.config_llm_responses_default
+        self._llm_temperature: float = Constants.config_llm_temp_default
+        self._llm_presence_p: float = Constants.config_llm_presence_pen_default
+        self._llm_frequency_p: float = Constants.config_llm_frequency_pen_default
+        self._llm_verbosity: int = Constants.config_llm_verbosity_default
 
         if not self._config_file.exists():
             # Create a new default file.
@@ -143,6 +150,8 @@ class Config:
         self._position_x = x
         self._position_y = y
 
+    # ------------------------------------------------------------------------------------------------------------------
+
     def save_config(self) -> None:
         """
         Save config file.
@@ -165,5 +174,12 @@ class Config:
             config.write(f"last-file: {self._last_file}\n")
             config.write(f"position: {self._position_x},{self._position_y}\n")
             config.write(f"size: {self._width},{self._height}\n")
-            config.write(f"llm_url: {self._llm_url}\n"),
+
+            config.write(f"llm_url: {self._llm_url}\n")
             config.write(f"llm_system_prompt: {self._llm_system_prompt}\n")
+            config.write(f"llm_tokens: {self._llm_system_prompt}\n")
+            config.write(f"llm_responses: {self._llm_system_prompt}\n")
+            config.write(f"llm_temperature: {self._llm_system_prompt}\n")
+            config.write(f"llm_presence_p: {self._llm_system_prompt}\n")
+            config.write(f"llm_frequency_p: {self._llm_system_prompt}\n")
+            config.write(f"llm_verbosity: {self._llm_system_prompt}\n")

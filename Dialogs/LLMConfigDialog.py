@@ -26,6 +26,100 @@ class LLMConfigDialog(wx.Dialog):
         self._field_system_prompt = wx.TextCtrl(self, -1, style=wx.TE_MULTILINE, size=wx.Size(-1, 100))
         self._label_system_prompt = wx.StaticText(self, -1, label=Strings.label_system_prompt)
 
+        # Values
+        values_sizer = wx.BoxSizer(wx.VERTICAL)
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        size = wx.Size(180, -1)
+        # Max number of tokens to generate.
+        self._max_tokens = wx.SpinCtrl(self, id=wx.ID_ANY,
+                                       value=str(Constants.config_llm_tokens_default),
+                                       style=wx.SP_ARROW_KEYS,
+                                       size=size,
+                                       min=Constants.config_llm_tokens_min,
+                                       max=Constants.config_llm_tokens_max,
+                                       initial=Constants.config_llm_tokens_default)
+        max_tokens_label = wx.StaticText(self, -1, Strings.label_max_tokens)
+        item_sizer.Add(self._max_tokens)
+        item_sizer.Add(max_tokens_label, 0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=Constants.default_border)
+        values_sizer.Add(item_sizer, flag=wx.BOTTOM, border=Constants.default_border)
+
+        # Number of responses to generate.
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._n = wx.SpinCtrl(self, id=wx.ID_ANY,
+                              value=str(Constants.config_llm_responses_default),
+                              style=wx.SP_ARROW_KEYS,
+                              size=size,
+                              min=Constants.config_llm_responses_min,
+                              max=Constants.config_llm_responses_max,
+                              initial=Constants.config_llm_responses_default)
+        max_tokens_label = wx.StaticText(self, -1, Strings.label_num_responses)
+        item_sizer.Add(self._n)
+        item_sizer.Add(max_tokens_label, 0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=Constants.default_border)
+        values_sizer.Add(item_sizer, flag=wx.BOTTOM, border=Constants.default_border)
+
+        # Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more
+        # focused and deterministic.
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._temperature = wx.SpinCtrlDouble(self, id=wx.ID_ANY,
+                                              value=str(Constants.config_llm_temp_default),
+                                              style=wx.SP_ARROW_KEYS,
+                                              size=size,
+                                              min=Constants.config_llm_temp_min,
+                                              max=Constants.config_llm_temp_max,
+                                              initial=Constants.config_llm_temp_default,
+                                              inc=0.1)
+        max_tokens_label = wx.StaticText(self, -1, Strings.label_temp)
+        item_sizer.Add(self._temperature)
+        item_sizer.Add(max_tokens_label, 0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=Constants.default_border)
+        values_sizer.Add(item_sizer, flag=wx.BOTTOM, border=Constants.default_border)
+
+        # Positive values penalize new tokens based on whether they appear in the text so far, increasing the model’s
+        # likelihood to talk about new topics.
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._presence_penalty = wx.SpinCtrlDouble(self, id=wx.ID_ANY,
+                                                   value=str(Constants.config_llm_presence_pen_default),
+                                                   style=wx.SP_ARROW_KEYS,
+                                                   size=size,
+                                                   min=Constants.config_llm_presence_pen_min,
+                                                   max=Constants.config_llm_presence_pen_max,
+                                                   initial=Constants.config_llm_presence_pen_default,
+                                                   inc=0.1)
+        max_tokens_label = wx.StaticText(self, -1, Strings.label_presence_penalty)
+        item_sizer.Add(self._presence_penalty)
+        item_sizer.Add(max_tokens_label, 0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=Constants.default_border)
+        values_sizer.Add(item_sizer, flag=wx.BOTTOM, border=Constants.default_border)
+
+        # Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the
+        # model’s likelihood to repeat the same line verbatim.
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._frequency_penalty = wx.SpinCtrlDouble(self, id=wx.ID_ANY,
+                                                    value=str(Constants.config_llm_frequency_pen_default),
+                                                    style=wx.SP_ARROW_KEYS,
+                                                    size=size,
+                                                    min=Constants.config_llm_frequency_pen_min,
+                                                    max=Constants.config_llm_frequency_pen_max,
+                                                    initial=Constants.config_llm_frequency_pen_default,
+                                                    inc=0.1)
+        max_tokens_label = wx.StaticText(self, -1, Strings.label_frequency_penalty)
+        item_sizer.Add(self._frequency_penalty)
+        item_sizer.Add(max_tokens_label, 0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=Constants.default_border)
+        values_sizer.Add(item_sizer, flag=wx.BOTTOM, border=Constants.default_border)
+
+        # Verbosity
+        # todo transform into the api string format
+        item_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._n = wx.SpinCtrl(self, id=wx.ID_ANY,
+                              value=str(Constants.config_llm_verbosity_default),
+                              style=wx.SP_ARROW_KEYS,
+                              size=size,
+                              min=Constants.config_llm_verbosity_min,
+                              max=Constants.config_llm_verbosity_max,
+                              initial=Constants.config_llm_verbosity_default)
+        max_tokens_label = wx.StaticText(self, -1, Strings.label_verbosity)
+        item_sizer.Add(self._n)
+        item_sizer.Add(max_tokens_label, 0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=Constants.default_border)
+        values_sizer.Add(item_sizer, flag=wx.BOTTOM, border=Constants.default_border)
+
         # Buttons
         self._button_sizer = wx.BoxSizer(wx.VERTICAL)
         grouping_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -45,6 +139,8 @@ class LLMConfigDialog(wx.Dialog):
         self._main_vertical_sizer.Add(self._label_system_prompt, 0, flag=wx.LEFT | wx.RIGHT | wx.TOP,
                                       border=Constants.default_border)
         self._main_vertical_sizer.Add(self._field_system_prompt, 0, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP,
+                                      border=Constants.default_border)
+        self._main_vertical_sizer.Add(values_sizer, 0, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.TOP,
                                       border=Constants.default_border)
         self._main_vertical_sizer.Add(self._button_sizer, 0, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.TOP,
                                       border=Constants.default_border)

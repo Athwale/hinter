@@ -37,7 +37,7 @@ class LLMThread(Thread):
         messages = [{"role": "system", "content": self._system_prompt},
                     {"role": "user", "content": self._prompt}]
         try:
-            # todo limit tokens and other settings, heat and so on... frequency_penalty, n, presence_penalty, top_p, verbosity
+            # todo limit tokens and other settings, heat and so on... frequency_penalty, n, presence_penalty, verbosity, max_completion_tokens, temperature
             response = requests.post(self._llm_url, json={"messages": messages,
                                                           "max_completion_tokens": 50,
                                                           "temperature": 0.7})

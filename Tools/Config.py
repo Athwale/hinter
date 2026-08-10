@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Tuple
 
 import wx
 
@@ -64,11 +65,43 @@ class Config:
                             except ValueError as _:
                                 self._width = Constants.main_window_size.width
                                 self._height = Constants.main_window_size.height
+
                         if line.startswith('llm_url:'):
                             url = line.split(" ")[1].replace('\n', '').strip()
                             self._llm_url = url
                         if line.startswith('llm_system_prompt:'):
+                            # Todo what if we have more : in the string.
                             self._llm_system_prompt = line.split(":")[1].replace('\n', '').strip()
+                        if line.startswith('llm_tokens:'):
+                            try:
+                                self._llm_tokens = int(line.split(":")[1].replace('\n', '').strip())
+                            except ValueError as _:
+                                self._llm_tokens = Constants.config_llm_tokens_default
+                        if line.startswith('llm_responses:'):
+                            try:
+                                self._llm_responses = int(line.split(":")[1].replace('\n', '').strip())
+                            except ValueError as _:
+                                self._llm_responses = Constants.config_llm_responses_default
+                        if line.startswith('llm_temperature:'):
+                            try:
+                                self._llm_temperature = float(line.split(":")[1].replace('\n', '').strip())
+                            except ValueError as _:
+                                self._llm_temperature = Constants.config_llm_temp_default
+                        if line.startswith('llm_presence_p:'):
+                            try:
+                                self._llm_presence_p = float(line.split(":")[1].replace('\n', '').strip())
+                            except ValueError as _:
+                                self._llm_presence_p = Constants.config_llm_presence_pen_default
+                        if line.startswith('llm_frequency_p:'):
+                            try:
+                                self._llm_frequency_p = float(line.split(":")[1].replace('\n', '').strip())
+                            except ValueError as _:
+                                self._llm_frequency_p = Constants.config_llm_frequency_pen_default
+                        if line.startswith('llm_verbosity:'):
+                            try:
+                                self._llm_verbosity = int(line.split(":")[1].replace('\n', '').strip())
+                            except ValueError as _:
+                                self._llm_verbosity = Constants.config_llm_verbosity_default
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 
@@ -105,10 +138,11 @@ class Config:
     def set_llm_system_prompt(self, prompt: str) -> None:
         """
         Set new LLM system prompt.
-        :param prompt. New system prompt
+        :param prompt: New system prompt
         :return: None
         """
-        self._llm_system_prompt = prompt
+        new_prompt = ' '.join(line.strip() for line in prompt.split('\n'))
+        self._llm_system_prompt = new_prompt
 
     def get_llm_system_prompt(self) -> str:
         """
@@ -116,6 +150,102 @@ class Config:
         :return: LLM system prompt.
         """
         return self._llm_system_prompt
+
+    def set_llm_tokens(self, tokens: int) -> None:
+        """
+        Set new LLM max tokens.
+        :param tokens: Max tokens.
+        :return: None
+        """
+        self._llm_tokens = tokens
+
+    def get_llm_tokens(self) -> int:
+        """
+        Get LLM max tokens.
+        :return: LLM max tokens.
+        """
+        return self._llm_tokens
+
+    def set_llm_responses(self, responses: int) -> None:
+        """
+        Set new LLM number of responses.
+        :param responses: Number of responses.
+        :return: None
+        """
+        self._llm_responses = responses
+
+    def get_llm_responses(self) -> int:
+        """
+        Get LLM number of responses.
+        :return: LLM number of responses.
+        """
+        return self._llm_responses
+
+    def set_llm_temperature(self, temperature: float) -> None:
+        """
+        Set new LLM temperature.
+        :param temperature: Temperature value.
+        :return: None
+        """
+        self._llm_temperature = temperature
+
+    def get_llm_temperature(self) -> float:
+        """
+        Get LLM temperature.
+        :return: LLM temperature.
+        """
+        return self._llm_temperature
+
+    def set_llm_presence_p(self, presence_p: float) -> None:
+        """
+        Set new LLM presence penalty.
+        :param presence_p: Presence penalty value.
+        :return: None
+        """
+        self._llm_presence_p = presence_p
+
+    def get_llm_presence_p(self) -> float:
+        """
+        Get LLM presence penalty.
+        :return: LLM presence penalty.
+        """
+        return self._llm_presence_p
+
+    def set_llm_frequency_p(self, frequency_p: float) -> None:
+        """
+        Set new LLM frequency penalty.
+        :param frequency_p: Frequency penalty value.
+        :return: None
+        """
+        self._llm_frequency_p = frequency_p
+
+    def get_llm_frequency_p(self) -> float:
+        """
+        Get LLM frequency penalty.
+        :return: LLM frequency penalty.
+        """
+        return self._llm_frequency_p
+
+    def set_llm_verbosity(self, verbosity: int) -> None:
+        """
+        Set new LLM verbosity.
+        :param verbosity: Verbosity level.
+        :return: None
+        """
+        self._llm_verbosity = verbosity
+
+    def get_llm_verbosity(self) -> Tuple[int, str]:
+        """
+        Get LLM verbosity.
+        :return: LLM verbosity level.
+        """
+        if self._llm_verbosity == 2:
+            return 2, 'medium'
+
+        if self._llm_verbosity == 3:
+            return 3, 'high'
+
+        return 1, 'low'
 
     def get_size(self) -> wx.Size:
         """
@@ -177,9 +307,9 @@ class Config:
 
             config.write(f"llm_url: {self._llm_url}\n")
             config.write(f"llm_system_prompt: {self._llm_system_prompt}\n")
-            config.write(f"llm_tokens: {self._llm_system_prompt}\n")
-            config.write(f"llm_responses: {self._llm_system_prompt}\n")
-            config.write(f"llm_temperature: {self._llm_system_prompt}\n")
-            config.write(f"llm_presence_p: {self._llm_system_prompt}\n")
-            config.write(f"llm_frequency_p: {self._llm_system_prompt}\n")
-            config.write(f"llm_verbosity: {self._llm_system_prompt}\n")
+            config.write(f"llm_tokens: {self._llm_tokens}\n")
+            config.write(f"llm_responses: {self._llm_responses}\n")
+            config.write(f"llm_temperature: {self._llm_temperature}\n")
+            config.write(f"llm_presence_p: {self._llm_presence_p}\n")
+            config.write(f"llm_frequency_p: {self._llm_frequency_p}\n")
+            config.write(f"llm_verbosity: {self._llm_verbosity}\n")

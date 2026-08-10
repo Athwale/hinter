@@ -106,7 +106,6 @@ class LLMConfigDialog(wx.Dialog):
         values_sizer.Add(item_sizer, flag=wx.BOTTOM, border=Constants.default_border)
 
         # Verbosity
-        # todo transform into the api string format
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self._n = wx.SpinCtrl(self, id=wx.ID_ANY,
                               value=str(Constants.config_llm_verbosity_default),
@@ -183,3 +182,4 @@ class LLMConfigDialog(wx.Dialog):
         """
         self._field_url.SetValue(self._config.get_llm_url())
         self._field_system_prompt.SetValue(self._config.get_llm_system_prompt())
+        # todo load from config and save into config

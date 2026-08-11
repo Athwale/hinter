@@ -107,7 +107,7 @@ class LLMConfigDialog(wx.Dialog):
 
         # Verbosity
         item_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self._n = wx.SpinCtrl(self, id=wx.ID_ANY,
+        self._verbosity = wx.SpinCtrl(self, id=wx.ID_ANY,
                               value=str(Constants.config_llm_verbosity_default),
                               style=wx.SP_ARROW_KEYS,
                               size=size,
@@ -169,6 +169,12 @@ class LLMConfigDialog(wx.Dialog):
                 return
             self._config.set_llm_url(url)
             self._config.set_llm_system_prompt(self._field_system_prompt.GetValue())
+            self._config.set_llm_tokens(self._max_tokens.GetValue())
+            self._config.set_llm_responses(self._n.GetValue())
+            self._config.set_llm_frequency_p(self._frequency_penalty.GetValue())
+            self._config.set_llm_presence_p(self._presence_penalty.GetValue())
+            self._config.set_llm_temperature(self._temperature.GetValue())
+            self._config.set_llm_verbosity(self._verbosity.GetValue())
             self._config.save_config()
             event.Skip()
         elif event.GetId() == wx.ID_CANCEL:
@@ -182,4 +188,9 @@ class LLMConfigDialog(wx.Dialog):
         """
         self._field_url.SetValue(self._config.get_llm_url())
         self._field_system_prompt.SetValue(self._config.get_llm_system_prompt())
-        # todo load from config and save into config
+        self._max_tokens.SetValue(self._config.get_llm_tokens())
+        self._n.SetValue(self._config.get_llm_responses())
+        self._frequency_penalty.SetValue(self._config.get_llm_frequency_p())
+        self._presence_penalty.SetValue(self._config.get_llm_presence_p())
+        self._temperature.SetValue(self._config.get_llm_temperature())
+        self._verbosity.SetValue(self._config.get_llm_verbosity()[0])

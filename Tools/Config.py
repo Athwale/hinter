@@ -69,9 +69,9 @@ class Config:
                         if line.startswith('llm_url:'):
                             url = line.split(" ")[1].replace('\n', '').strip()
                             self._llm_url = url
-                        if line.startswith('llm_system_prompt:'):
-                            # Todo what if we have more : in the string.
-                            self._llm_system_prompt = line.split(":")[1].replace('\n', '').strip()
+                        if line.startswith('llm_system_prompt;'):
+                            self._llm_system_prompt = ' '.join(line.strip() for line in line.replace('\n', '')
+                                                               .split(';')[1:])
                         if line.startswith('llm_tokens:'):
                             try:
                                 self._llm_tokens = int(line.split(":")[1].replace('\n', '').strip())
@@ -306,7 +306,7 @@ class Config:
             config.write(f"size: {self._width},{self._height}\n")
 
             config.write(f"llm_url: {self._llm_url}\n")
-            config.write(f"llm_system_prompt: {self._llm_system_prompt}\n")
+            config.write(f"llm_system_prompt; {self._llm_system_prompt}\n")
             config.write(f"llm_tokens: {self._llm_tokens}\n")
             config.write(f"llm_responses: {self._llm_responses}\n")
             config.write(f"llm_temperature: {self._llm_temperature}\n")

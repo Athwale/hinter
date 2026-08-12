@@ -43,6 +43,7 @@ class MainFrame(wx.Frame):
     """
     Main user interface class.
     """
+
     def __init__(self):
         """
         User interface constructor.
@@ -932,8 +933,16 @@ class MainFrame(wx.Frame):
                 if len(self._llm_history) > Constants.llm_history_size:
                     self._llm_history.pop(0)
                 self._ai_spinner.Start()
-                self._llm_thread = LLMThread(self, user_prompt, self._config.get_llm_system_prompt(),
-                                             self._config.get_llm_url())
+                self._llm_thread = LLMThread(self,
+                                             user_prompt,
+                                             self._config.get_llm_system_prompt(),
+                                             self._config.get_llm_url(),
+                                             self._config.get_llm_tokens(),
+                                             self._config.get_llm_responses(),
+                                             self._config.get_llm_frequency_p(),
+                                             self._config.get_llm_presence_p(),
+                                             self._config.get_llm_temperature(),
+                                             self._config.get_llm_verbosity()[1])
                 self._input_text_field.Clear()
 
     # noinspection PyUnusedLocal
@@ -1476,7 +1485,7 @@ class MainFrame(wx.Frame):
         chars = self._main_text_field.GetTextLength()
         self._set_status_text(Strings.status_doc_info.format(lines, words, chars), 0)
 
-    def llm_response_callback(self, reply: str, error: bool) -> None:
+    def llm_response_callback(self, reply: List[str], error: bool) -> None:
         """
         Thread callback for text statistics. Sets the status bar information.
         :param reply: Reply from LLM call.
@@ -1485,11 +1494,13 @@ class MainFrame(wx.Frame):
         """
         assert self._ai_spinner is not None
 
+        # TODO if only one answer, do not add number
         self._ai_spinner.Stop()
-        if error:
-            self.post_message(reply, Constants.msg_err)
-        else:
-            self.post_message(reply, Constants.msg_reply)
+        for i, message in enumerate(reply):
+            if error:
+                self.post_message(f'{i}: {message}', Constants.msg_err)
+            else:
+                self.post_message(f'{i}: {message}', Constants.msg_reply)
 
     def append_styled_text(self, text: str, style: str) -> None:
         """

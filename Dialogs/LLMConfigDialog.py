@@ -115,7 +115,7 @@ class LLMConfigDialog(wx.Dialog):
                               max=Constants.config_llm_verbosity_max,
                               initial=Constants.config_llm_verbosity_default)
         max_tokens_label = wx.StaticText(self, -1, Strings.label_verbosity)
-        item_sizer.Add(self._n)
+        item_sizer.Add(self._verbosity)
         item_sizer.Add(max_tokens_label, 0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=Constants.default_border)
         values_sizer.Add(item_sizer, flag=wx.BOTTOM, border=Constants.default_border)
 

@@ -130,7 +130,7 @@ msg_init: str = "Initialized OK"
 msg_saved: str = "Document saved: {}"
 msg_save_fail: str = "Document save fail: {}"
 msg_loaded: str = "Document loaded: {}"
-msg_llm_connection_config: str = "LLM configuration set: {}"
+msg_llm_connection_config: str = "LLM configuration set and saved: {}"
 msg_llm_connection_ok: str = "LLM connection: {}: ({})"
 
 llm_ask_synonym: str = "List synonyms for: {}"

@@ -1481,6 +1481,7 @@ class MainFrame(wx.Frame):
         :param words: Number of words.
         :return: None
         """
+        assert self._main_text_field is not None
         lines = self._main_text_field.NumberOfLines
         chars = self._main_text_field.GetTextLength()
         self._set_status_text(Strings.status_doc_info.format(lines, words, chars), 0)
@@ -1493,14 +1494,18 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._ai_spinner is not None
-
-        # TODO if only one answer, do not add number
         self._ai_spinner.Stop()
         for i, message in enumerate(reply):
             if error:
-                self.post_message(f'{i}: {message}', Constants.msg_err)
+                if len(reply) > 1:
+                    self.post_message(f'{i}: {message}', Constants.msg_err)
+                else:
+                    self.post_message(f'{message}', Constants.msg_err)
             else:
-                self.post_message(f'{i}: {message}', Constants.msg_reply)
+                if len(reply) > 1:
+                    self.post_message(f'{i}: {message}', Constants.msg_reply)
+                else:
+                    self.post_message(f'{message}', Constants.msg_reply)
 
     def append_styled_text(self, text: str, style: str) -> None:
         """

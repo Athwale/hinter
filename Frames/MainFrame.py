@@ -555,7 +555,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.StyleSetSpec(2, Constants.style_italic)
         self._main_text_field.StyleSetSpec(3, Constants.style_bold_italic)
 
-        # todo use one with wx.stc.STC_INDIC_SQUIGGLE for spellcheck
+        # todo use one with wx.stc.STC_INDIC_SQUIGGLE for spellcheck?
         indicator_number = 0
         alpha = {1: 60, 2: 150}
         colors = {
@@ -1054,7 +1054,7 @@ class MainFrame(wx.Frame):
                 # If the tool run before and is still active, do not recalculate.
                 # todo changing the text and then using the checkboxes messes up the positions. Solve this later. Start recalculating once idle in background?
                 ColoratorThread(self, self._current_document, self._main_text_field.GetText())
-                self.apply_indicators_callback({}, {})
+                self.apply_indicators_callback({}, defaultdict())
 
     def apply_indicators_callback(self, plain_words: Dict[bytes, int],
                                   spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
@@ -1532,6 +1532,11 @@ class MainFrame(wx.Frame):
         :param file_path: Document path.
         :return: None
         """
+        assert self._toolbar is not None
+        assert self._splitter is not None
+        assert self._search_text_field is not None
+        assert self._side_word_list is not None
+
         self._waiting_dialog.Show()
         self._waiting_dialog.start(saving=False)
         self._set_status_text(Strings.status_loading, 0)
@@ -1563,6 +1568,9 @@ class MainFrame(wx.Frame):
         Thread callback after loading a new document.
         :return: None
         """
+        assert self._current_document is not None
+        assert self._main_text_field is not None
+
         if exp:
             self._show_error_ok_dialog(exp)
             return
@@ -1632,6 +1640,9 @@ class MainFrame(wx.Frame):
         :param result: True if save was successful.
         :return: None
         """
+        assert self._current_document is not None
+        assert self._main_text_field is not None
+
         if result:
             self._set_status_text(self._current_document.get_path().name, 1)
             self._main_text_field.SetSavePoint()
@@ -1654,6 +1665,9 @@ class MainFrame(wx.Frame):
         :param result: Dictionary of errors.
         :return: None
         """
+        assert self._log_text_field is not None
+        assert self._toolbar is not None
+
         if self._log_text_field.GetNumberOfLines() > Constants.max_log_length:
             self._log_text_field.Clear()
             self.post_message(Strings.report_log_cleared, Constants.msg_info)
@@ -1680,6 +1694,8 @@ class MainFrame(wx.Frame):
         :param up: If true the log will move up regardless of current position.
         :return: None
         """
+        assert self._splitter is not None
+
         if up:
             self._splitter.SetSashPosition(10, True)
             self._log_up = True
@@ -1724,6 +1740,8 @@ class MainFrame(wx.Frame):
         Post a divider into the log field.
         :return: None
         """
+        assert self._log_text_field is not None
+
         self._log_text_field.SetForegroundColour(wx.BLACK)
         self._log_text_field.AppendText(f"{179 * '-'}\n")
 
@@ -1732,6 +1750,8 @@ class MainFrame(wx.Frame):
         Extracts text and styling into the simple dictionary format.
         :return: List of tuples with style and text information.
         """
+        assert self._main_text_field is not None
+
         converted = []
 
         length = self._main_text_field.GetTextLength()

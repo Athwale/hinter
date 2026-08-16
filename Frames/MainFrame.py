@@ -72,8 +72,8 @@ class MainFrame(wx.Frame):
         self._ai_spinner: wx.ActivityIndicator | None = None
 
         # Used for undo.
-        self._style_history = {}
-        self._action_token = 0
+        self._style_history: Dict = {}
+        self._action_token: int = 0
 
         # Used for llm input history.
         self._llm_history = ['' for _ in range(Constants.llm_history_size)]
@@ -759,6 +759,7 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
+        assert self._search_text_field is not None
         self._search_text_field.SetFocus()
 
     def _reset_limits_handler(self, event: wx.CommandEvent) -> None:
@@ -767,6 +768,10 @@ class MainFrame(wx.Frame):
         :param event: Passed along
         :return: None
         """
+        assert self._repetition_selector is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+
         self._repetition_selector.SetValue(Constants.config_min_repetitions_default)
         self._min_repeated_word_length_selector.SetValue(Constants.config_min_len_default)
         self._max_repeated_word_length_selector.SetValue(Constants.config_max_len)
@@ -779,6 +784,10 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
+        assert self._search_text_field is not None
+        assert self._search_results is not None
+        assert self._main_text_field is not None
+
         text = self._search_text_field.GetValue()
         if text:
             last_found_pos = 0
@@ -810,6 +819,9 @@ class MainFrame(wx.Frame):
         :param event: Used to detect direction.
         :return: None
         """
+        assert self._main_text_field is not None
+        assert self._search_results is not None
+
         try:
             if self._found_words:
                 if event.GetString() == 'up':
@@ -958,6 +970,7 @@ class MainFrame(wx.Frame):
                           Constants.msg_info)
         self._test_llm_connection()
 
+    # noinspection PyUnusedLocal
     def _llm_test_handler(self, event: wx.CommandEvent) -> None:
         """
         Try connecting to the LLM and print into log.
@@ -992,6 +1005,8 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        assert self._current_document is not None
+
         WordInfoDialog(self, self._current_document.get_word_marking_data())
 
     # noinspection PyUnusedLocal
@@ -1027,8 +1042,11 @@ class MainFrame(wx.Frame):
         :param event: Not used
         :return: None
         """
-        assert self._current_document is not None
         assert self._main_text_field is not None
+        assert self._side_word_list is not None
+        assert self._toolbar is not None
+        assert self._coloring_spinner is not None
+        assert self._current_document is not None
 
         # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
         #  Can we update the list somehow automatically? Precalculate on idle?
@@ -1063,6 +1081,14 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # todo this method is slow on long texts.
+        assert self._current_document is not None
+        assert self._side_word_list is not None
+        assert self._repetition_selector is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+        assert self._main_text_field is not None
+        assert self._coloring_spinner is not None
+
         word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
         # Update or create word panels
         # This can not be done in a thread because it is calling a gui method and will segfault.
@@ -1159,6 +1185,8 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        assert self._toolbar is not None
+
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if colorize_tool.IsToggled():
             self._apply_indicators_handler(event)
@@ -1170,6 +1198,8 @@ class MainFrame(wx.Frame):
         :param event: Passed along.
         :return: None
         """
+        assert self._side_word_list is not None
+
         self._selected_words.clear()
         for item in self._side_word_list.GetChildren():
             item: ListItemPanel
@@ -1192,6 +1222,8 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        assert self._main_text_field is not None
+
         start_pos = self._main_text_field.GetSelectionStart()
         style = self._main_text_field.GetStyleAt(start_pos)
         if style == Constants.style_map[Constants.style_bold]:
@@ -1214,6 +1246,8 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        assert self._main_text_field is not None
+
         start_pos = self._main_text_field.GetSelectionStart()
         style = self._main_text_field.GetStyleAt(start_pos)
         if style == Constants.style_map[Constants.style_italic]:
@@ -1235,6 +1269,8 @@ class MainFrame(wx.Frame):
         :param event: Used to get modification data.
         :return: None
         """
+        assert self._main_text_field is not None
+
         # The even contains a bit mask of what happened, we need to compare it with &.
         mod_type: int = event.GetModificationType()
         if mod_type & stc.STC_MOD_CHANGEINDICATOR:
@@ -1251,10 +1287,12 @@ class MainFrame(wx.Frame):
 
         if mod_type & stc.STC_MOD_CONTAINER:
             token = event.GetToken()
+            # action: {'start': 1576, 'length': 3, 'old_styles': [1, 1, 1], 'new_style_id': 3}
             action = self._style_history.get(token)
             if not action:
                 return
 
+            action: Dict
             start = action['start']
             length = action['length']
             if mod_type & stc.STC_PERFORMED_UNDO:
@@ -1272,6 +1310,8 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        assert self._main_text_field is not None
+
         start_pos = self._main_text_field.GetSelectionStart()
         self._main_text_field.StartStyling(start_pos)
         self._main_text_field.SetStyling(len(self._main_text_field.GetSelectedText()),
@@ -1299,7 +1339,7 @@ class MainFrame(wx.Frame):
     def _quit_handler(self, event: wx.CommandEvent) -> None:
         """
         Quit the program.
-        :param _: Unused
+        :param event: Unused
         :return: None
         """
         if self._current_document:
@@ -1334,13 +1374,22 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
+        assert self._main_text_field is not None
+
         if self._statistics_thread is None or not self._statistics_thread.is_alive():
             self._statistics_thread = StatisticsThread(self, self._main_text_field.GetText())
+            assert self._statistics_thread is not None
             self._statistics_thread.start()
 
     # Methods---------------------------------------------------------------------------------------------------------------
 
     def _sanitized_selection(self) -> str:
+        """
+        Strip characters from text selection.
+        :return: Stripped prepared string.
+        """
+        assert self._main_text_field is not None
+
         return self._main_text_field.GetSelectedText().strip().lower().lstrip('.').rstrip('.').lstrip(',').rstrip(',')
 
     def _clear_editor(self) -> None:
@@ -1348,6 +1397,8 @@ class MainFrame(wx.Frame):
         Clear the gui to default state.
         :return: None
         """
+        assert self._main_text_field is not None
+
         self._main_text_field.ClearAll()
 
     def _update_indicator_count(self) -> None:
@@ -1367,6 +1418,8 @@ class MainFrame(wx.Frame):
         :param new_style_id:
         :return:
         """
+        assert self._main_text_field is not None
+
         if length <= 0:
             return
         old_styles = [self._main_text_field.GetStyleAt(start + i) for i in range(length)]
@@ -1394,6 +1447,8 @@ class MainFrame(wx.Frame):
         :param position: Where to set the text, 0 is default
         :return: None
         """
+        assert self._status_bar is not None
+
         to_set = f'| {text}'
         self._status_bar.SetStatusText(to_set, position)
 
@@ -1413,6 +1468,12 @@ class MainFrame(wx.Frame):
         :param everything: Disable every control in the window.
         :return: None
         """
+        assert self._toolbar is not None
+        assert self._repetition_selector is not None
+        assert self._main_text_field is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+
         if everything:
             self.Disable()
             for t in self._tools:
@@ -1434,6 +1495,12 @@ class MainFrame(wx.Frame):
         Enable all features of the editor.
         :return: None
         """
+        assert self._toolbar is not None
+        assert self._repetition_selector is not None
+        assert self._main_text_field is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+
         self.Enable()
         self._repetition_selector.Enable()
         self._min_repeated_word_length_selector.Enable()
@@ -1514,6 +1581,8 @@ class MainFrame(wx.Frame):
         :param style: Style name.
         :return: None
         """
+        assert self._main_text_field is not None
+
         start_pos = self._main_text_field.GetLength()
         self._main_text_field.AppendText(text)
         self._main_text_field.StartStyling(start_pos)
@@ -1524,6 +1593,8 @@ class MainFrame(wx.Frame):
         Add new line to text area.
         :return: None
         """
+        assert self._main_text_field is not None
+
         self._main_text_field.AppendText('\n')
 
     def _load_document(self, file_path: Path) -> None:
@@ -1603,6 +1674,8 @@ class MainFrame(wx.Frame):
         Back up application state.
         :return: None
         """
+        assert self._current_document is not None
+
         try:
             self._config.set_last_file(self._current_document.get_path())
             self._config.set_position(self.GetPosition().x, self.GetPosition().y)
@@ -1618,6 +1691,8 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._current_document is not None
+        assert self._main_text_field is not None
+
         self._set_status_text(Strings.status_saving, 0)
         self._disable_editor(everything=True)
         destination = self._current_document.get_path()

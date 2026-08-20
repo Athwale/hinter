@@ -476,7 +476,7 @@ class MainFrame(wx.Frame):
 
         self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._repetition_selector)
         self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._min_repeated_word_length_selector)
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._main_text_field)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._max_repeated_word_length_selector)
 
         self.Bind(EVT_CHECKBOX_CHANGED, self._word_list_handler)
 
@@ -1069,18 +1069,20 @@ class MainFrame(wx.Frame):
                 self._coloring_spinner.Start()
                 ColoratorThread(self, self._current_document, self._main_text_field.GetText())
             else:
-                # If the tool run before and is still active, do not recalculate.
-                # todo changing the text and then using the checkboxes messes up the positions. Solve this later. Start recalculating once idle in background?
+                # This runs when we are using the list check boxes and spinners.
+                # todo changing the text and then using the checkboxes messes up the positions.
+                #  Every position after the changed text must be updated.
+                #  Solve this later. Start recalculating once idle in background?
                 ColoratorThread(self, self._current_document, self._main_text_field.GetText())
-                self.apply_indicators_callback({}, defaultdict())
 
     def apply_indicators_callback(self, plain_words: Dict[bytes, int],
                                   spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
         """
+        # todo this method is slow on long texts.
         Thread callback to finish applying indicators once the calculations are made.
         :return: None
         """
-        # todo this method is slow on long texts.
+        print('a')
         assert self._current_document is not None
         assert self._side_word_list is not None
         assert self._repetition_selector is not None

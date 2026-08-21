@@ -103,6 +103,8 @@ class MainFrame(wx.Frame):
         self._llm_thread: LLMThread | None = None
         self._statistics_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._on_statistics_timer_handler, self._statistics_timer)
+        self._idle_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self._on_idle_timer_handler, self._idle_timer)
 
         # Init layout:
         self._init_menu_bar()
@@ -728,6 +730,14 @@ class MainFrame(wx.Frame):
                 self._current_document.set_modified(True)
             if event_id == self._id_add_names:
                 words = self._current_document.get_names()
+                # todo log outputs
+                # todo clear log button
+                # todo after adding to ignored text is updated, list is not, some list items stay gray until checkboxes are used
+                # todo line number column is too thin
+                # todo move log to bottom when opened or closed
+                # todo highlight current line?
+                # todo save last line position.
+                # todo line marker button
                 words.add(selection)
                 self._current_document.set_modified(True)
             if event_id == self._id_del_names:
@@ -1305,6 +1315,9 @@ class MainFrame(wx.Frame):
                 self._main_text_field.StartStyling(start)
                 self._main_text_field.SetStyling(length, action['new_style_id'])
 
+        # Start word marking idle timer.
+        self._idle_timer.Start(Constants.idle_timer_delay, oneShot=True)
+
     # noinspection PyUnusedLocal
     def _clear_styles_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1382,6 +1395,16 @@ class MainFrame(wx.Frame):
             self._statistics_thread = StatisticsThread(self, self._main_text_field.GetText())
             assert self._statistics_thread is not None
             self._statistics_thread.start()
+
+    # noinspection PyUnusedLocal
+    def _on_idle_timer_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Idle timer handler. Runs after last edit and starts coloring recalculation.
+        :param event: Not used.
+        :return: None
+        """
+        # TODO recalculate the coloring data when idle. Do not redraw, just prepare data and update side list.
+        print('timer')
 
     # Methods---------------------------------------------------------------------------------------------------------------
 
@@ -1749,6 +1772,7 @@ class MainFrame(wx.Frame):
             self._log_text_field.Clear()
             self.post_message(Strings.report_log_cleared, Constants.msg_info)
 
+        counter = 0
         open_log: bool = False
         for message_type in [Constants.report_name_lines,
                              Constants.report_names_capitalized,
@@ -1759,11 +1783,13 @@ class MainFrame(wx.Frame):
                 open_log = True
                 for err in result[message_type]:
                     self.post_message(err, Constants.msg_warn)
+                    counter += 1
         if not open_log:
             self.post_message(Strings.report_ok, Constants.msg_ok)
         else:
             self._toolbar.ToggleTool(wx.ID_UP, True)
             self.move_log(up=True)
+            self.post_message(Strings.report_count.format(counter), Constants.msg_info)
 
     def move_log(self, up: bool = False) -> None:
         """

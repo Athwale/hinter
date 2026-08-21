@@ -86,6 +86,7 @@ config_llm_verbosity_max: int = 3
 
 static_box_font_size: int = 9
 statistics_timer_delay: int = 10000
+idle_timer_delay: int = 3000
 
 report_name_lines: str = 'nl'
 report_names_capitalized: str = 'nc'

@@ -87,6 +87,7 @@ class MainFrame(wx.Frame):
         self._id_limits = wx.NewId()
         self._id_llm_synonym = wx.NewId()
         self._id_llm_copy = wx.NewId()
+        self._id_log_clear = wx.NewId()
         self._id_synonym_ids = []
 
         self._available_indicators: Set[int] = set()
@@ -198,8 +199,12 @@ class MainFrame(wx.Frame):
         tools_menu_item_reset = tools_menu.Append(wx.ID_RESET, Strings.menu_item_reset,
                                                   Strings.menu_item_reset_hint)
         self._menu_items.append(tools_menu_item_reset)
-        tools_menu_item_log = tools_menu.Append(wx.ID_UP, Strings.menu_item_log,
+        tools_menu.AppendSeparator()
+        tools_menu_item_log = tools_menu.Append(wx.ID_UP, Strings.menu_item_log_open,
                                                 Strings.menu_item_log_hint)
+        self._menu_items.append(tools_menu_item_log)
+        tools_menu_item_log_open = tools_menu.Append(self._id_log_clear, Strings.menu_item_log_clear,
+                                                     Strings.menu_item_log_open_hint)
         self._menu_items.append(tools_menu_item_log)
         tools_menu.AppendSeparator()
         tools_menu_item_llm_config = tools_menu.Append(wx.ID_SETUP, Strings.menu_item_config_llm,
@@ -208,6 +213,8 @@ class MainFrame(wx.Frame):
         tools_menu_item_llm_connect = tools_menu.Append(wx.ID_EXECUTE, Strings.menu_item_connect_llm,
                                                         Strings.menu_item_connect_llm_hint)
         self._menu_items.append(tools_menu_item_llm_connect)
+
+        self.Bind(wx.EVT_MENU, lambda _on_log_clear: self._log_text_field.Clear(), id=self._id_log_clear)
 
         # About menu:
         about_menu = wx.Menu()
@@ -323,7 +330,7 @@ class MainFrame(wx.Frame):
         self._toolbar.AddControl(self._coloring_spinner, "")
 
         log_tool: wx.ToolBarToolBase = self._toolbar.AddCheckTool(toolId=wx.ID_UP,
-                                                                  label=Strings.menu_item_log,
+                                                                  label=Strings.menu_item_log_open,
                                                                   bitmap1=self._scale_icon('up.svg',
                                                                                            Constants.icon_tool_width,
                                                                                            Constants.icon_tool_height),
@@ -730,12 +737,11 @@ class MainFrame(wx.Frame):
                 self._current_document.set_modified(True)
             if event_id == self._id_add_names:
                 words = self._current_document.get_names()
-                # todo log outputs
-                # todo clear log button
+                # todo log outputs from name add and so on
                 # todo after adding to ignored text is updated, list is not, some list items stay gray until checkboxes are used
                 # todo line number column is too thin
                 # todo move log to bottom when opened or closed
-                # todo highlight current line?
+                # todo highlight current line
                 # todo save last line position.
                 # todo line marker button
                 words.add(selection)

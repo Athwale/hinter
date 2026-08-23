@@ -726,31 +726,45 @@ class MainFrame(wx.Frame):
         if selection:
             if event_id == self._id_add_ignore:
                 words = self._current_document.get_ignored_words()
-                words.add(selection)
-                self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
-                self._current_document.set_modified(True)
-                self._apply_indicators_handler(event)
+                if selection not in words:
+                    words.add(selection)
+                    self._set_status_text(
+                        Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
+                    self._current_document.set_modified(True)
+                    self._apply_indicators_handler(event)
+                    self.post_message(Strings.msg_added_ignored.format(selection), Constants.msg_info)
             if event_id == self._id_del_ignore:
                 words = self._current_document.get_ignored_words()
-                words.discard(selection)
+                try:
+                    words.remove(selection)
+                except KeyError as _:
+                    # If word is not in ignored, do not do anything.
+                    return
                 self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
                 self._current_document.set_modified(True)
+                self.post_message(Strings.msg_removed_ignored.format(selection), Constants.msg_info)
             if event_id == self._id_add_names:
                 words = self._current_document.get_names()
-                # todo log outputs from name add and so on
                 # todo after adding to ignored text is updated, list is not, some list items stay gray until checkboxes are used
-                # todo line number column is too thin
+                # todo line number column is too thin, count lines and set size dynamically
                 # todo move log to bottom when opened or closed
                 # todo highlight current line
                 # todo save last line position.
-                # todo line marker button
-                words.add(selection)
-                self._current_document.set_modified(True)
+                # todo line marker button, save marked lines
+                if selection not in words:
+                    words.add(selection)
+                    self._current_document.set_modified(True)
+                    self.post_message(Strings.msg_added_names.format(selection), Constants.msg_info)
             if event_id == self._id_del_names:
                 words = self._current_document.get_names()
-                words.discard(selection)
+                try:
+                    words.remove(selection)
+                except KeyError as _:
+                    return
                 self._current_document.set_modified(True)
+                self.post_message(Strings.msg_removed_names.format(selection), Constants.msg_info)
             if event_id in self._id_synonym_ids:
+                # Replace with synonym.
                 item_id = event.GetId()
                 menu = event.GetEventObject()
                 menu_item = menu.FindItemById(item_id)

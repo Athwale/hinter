@@ -75,5 +75,5 @@ class LLMThread(Thread):
                 content.append(reply['message']['content'])
             wx.CallAfter(self._parent.llm_response_callback, content, False)
         except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
-            wx.CallAfter(self._parent.llm_response_callback, Strings.msg_llm_connection_ok.format('ERROR',
-                                                                                                  str(e)), True)
+            wx.CallAfter(self._parent.llm_response_callback, [Strings.msg_llm_connection_ok.format('ERROR',
+                                                                                                   str(e))], True)

@@ -746,8 +746,6 @@ class MainFrame(wx.Frame):
             if event_id == self._id_add_names:
                 words = self._current_document.get_names()
                 # todo after adding to ignored text is updated, list is not, some list items stay gray until checkboxes are used
-                # todo line number column is too thin, count lines and set size dynamically
-                # todo move log to bottom when opened or closed
                 # todo highlight current line
                 # todo save last line position.
                 # todo line marker button, save marked lines
@@ -1338,6 +1336,9 @@ class MainFrame(wx.Frame):
         # Start word marking idle timer.
         self._idle_timer.Start(Constants.idle_timer_delay, oneShot=True)
 
+        # Update line number column width.
+        self._main_text_field.SetMarginWidth(1, len(str(self._main_text_field.GetNumberOfLines())) * 12)
+
     # noinspection PyUnusedLocal
     def _clear_styles_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1818,16 +1819,26 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._splitter is not None
+        assert self._log_text_field is not None
 
         if up:
+            # Move log up, runs when saving.
             self._splitter.SetSashPosition(10, True)
             self._log_up = True
+            self._log_text_field.ScrollLines(Constants.max_log_length)
             return
 
+        # Runs on button.
         if self._log_up:
+            # Move log down.
             self._splitter.SetSashPosition(self.GetSize().height, True)
+            # todo move log to bottom when opened or closed
+            self._log_text_field.SetInsertionPoint(-1)
+            self._log_text_field.ShowPosition(self._log_text_field.GetLastPosition())
+            self._log_text_field.ScrollLines(Constants.max_log_length)
         else:
             self._splitter.SetSashPosition(10, True)
+            self._log_text_field.ScrollLines(Constants.max_log_length)
         self._log_up = not self._log_up
 
     def post_message(self, message: str, severity: int) -> None:

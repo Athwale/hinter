@@ -10,6 +10,7 @@ config_file: Path = Path.home() / '.config' / 'w-hinter.conf'
 
 color_grey: wx.Colour = wx.Colour(158, 162, 168)
 color_grey_dark: wx.Colour = wx.Colour(82, 84, 82)
+color_grey_light: wx.Colour = wx.Colour(225, 230, 237)
 color_orange: wx.Colour = wx.Colour(252, 119, 3)
 color_green: wx.Colour = wx.Colour(36, 145, 69)
 

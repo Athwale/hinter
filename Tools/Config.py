@@ -21,6 +21,7 @@ class Config:
         self._position_y: int = 0
         self._width: int = Constants.main_window_size.width
         self._height: int = Constants.main_window_size.height
+        self._last_text_pos: int = 0
 
         self._llm_url: str = Constants.llm_default_url
         self._llm_system_prompt: str = Constants.llm_system_prompt
@@ -102,6 +103,11 @@ class Config:
                                 self._llm_verbosity = int(line.split(":")[1].replace('\n', '').strip())
                             except ValueError as _:
                                 self._llm_verbosity = Constants.config_llm_verbosity_default
+                        if line.startswith('text_position:'):
+                            try:
+                                self._last_text_pos = int(line.split(":")[1].replace('\n', '').strip())
+                            except ValueError as _:
+                                self._last_text_pos = 0
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 
@@ -180,6 +186,21 @@ class Config:
         :return: LLM number of responses.
         """
         return self._llm_responses
+
+    def set_last_text_position(self, pos: int) -> None:
+        """
+        Set last position in text.
+        :param pos: Position in text.
+        :return: None
+        """
+        self._last_text_pos = pos
+
+    def get_last_text_position(self) -> int:
+        """
+        Get saved text position.
+        :return: Saved text position.
+        """
+        return self._last_text_pos
 
     def set_llm_temperature(self, temperature: float) -> None:
         """
@@ -313,3 +334,4 @@ class Config:
             config.write(f"llm_presence_p: {self._llm_presence_p}\n")
             config.write(f"llm_frequency_p: {self._llm_frequency_p}\n")
             config.write(f"llm_verbosity: {self._llm_verbosity}\n")
+            config.write(f"text_position: {self._last_text_pos}\n")

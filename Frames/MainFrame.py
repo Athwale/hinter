@@ -90,6 +90,11 @@ class MainFrame(wx.Frame):
         self._id_log_clear = wx.NewId()
         self._id_synonym_ids = []
 
+        # Marker IDs
+        self._marker_current_line: int = 1
+        self._marker_marked_line: int = 2
+        self._currently_highlighted_line: int = 0
+
         self._available_indicators: Set[int] = set()
         self._selected_words: List[str] = []
         self._coloring_tool_off: bool = True
@@ -192,6 +197,7 @@ class MainFrame(wx.Frame):
         self._menu_items.append(edit_menu_item_synonyms)
 
         # Tools menu:
+        # todo line marker button to tools and add clear all marks button, save marked lines
         tools_menu = wx.Menu()
         tools_menu_item_words = tools_menu.Append(wx.ID_INFO, Strings.menu_item_word_list,
                                                   Strings.menu_item_word_list_hint)
@@ -203,9 +209,9 @@ class MainFrame(wx.Frame):
         tools_menu_item_log = tools_menu.Append(wx.ID_UP, Strings.menu_item_log_open,
                                                 Strings.menu_item_log_hint)
         self._menu_items.append(tools_menu_item_log)
-        tools_menu_item_log_open = tools_menu.Append(self._id_log_clear, Strings.menu_item_log_clear,
+        tools_menu_item_log_clear = tools_menu.Append(self._id_log_clear, Strings.menu_item_log_clear,
                                                      Strings.menu_item_log_open_hint)
-        self._menu_items.append(tools_menu_item_log)
+        self._menu_items.append(tools_menu_item_log_clear)
         tools_menu.AppendSeparator()
         tools_menu_item_llm_config = tools_menu.Append(wx.ID_SETUP, Strings.menu_item_config_llm,
                                                        Strings.menu_item_config_llm_hint)
@@ -336,6 +342,12 @@ class MainFrame(wx.Frame):
                                                                                            Constants.icon_tool_height),
                                                                   shortHelp=Strings.menu_item_log_hint)
         self._tools.append(log_tool)
+
+        mark_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_ADD, Strings.menu_item_mark,
+                                                              self._scale_icon('mark.svg', Constants.icon_tool_width,
+                                                                               Constants.icon_tool_height),
+                                                              Strings.menu_item_mark_hint)
+        self._tools.append(mark_tool)
 
         self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
 
@@ -503,6 +515,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_TEXT_ENTER, self._llm_input_field_send_handler, self._input_text_field)
         self._input_text_field.Bind(wx.EVT_KEY_DOWN, self._llm_input_field_key_handler)
 
+        # Mark current line on keys and mouse.
+        self._main_text_field.Bind(stc.EVT_STC_UPDATEUI, self._main_text_field_key_handler)
+
         # Assemble
         main_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
         toolbar_horizontal_box = wx.BoxSizer(wx.HORIZONTAL)
@@ -611,6 +626,11 @@ class MainFrame(wx.Frame):
         self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
         self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
 
+        # Line markers
+        self._main_text_field.MarkerDefine(self._marker_current_line, stc.STC_MARK_BACKGROUND,
+                                           background=Constants.color_grey_light)
+        self._main_text_field.MarkerDefine(self._marker_marked_line, stc.STC_MARK_BACKGROUND, background="RED")
+
     # Handlers ---------------------------------------------------------------------------------------------------------
     # noinspection PyUnusedLocal
     def _on_main_text_right_click(self, event: wx.ContextMenuEvent) -> None:
@@ -623,6 +643,7 @@ class MainFrame(wx.Frame):
         assert self._current_document is not None
 
         self._main_text_field.TargetFromSelection()
+        self._highlight_current_line()
 
         if self._main_text_field.GetSelectionEmpty():
             # Select the word under the cursor.
@@ -746,9 +767,7 @@ class MainFrame(wx.Frame):
             if event_id == self._id_add_names:
                 words = self._current_document.get_names()
                 # todo after adding to ignored text is updated, list is not, some list items stay gray until checkboxes are used
-                # todo highlight current line
-                # todo save last line position.
-                # todo line marker button, save marked lines
+                # todo if the saved position is last char, it does not scroll there for some reason.
                 if selection not in words:
                     words.add(selection)
                     self._current_document.set_modified(True)
@@ -953,6 +972,16 @@ class MainFrame(wx.Frame):
             # Reset on any other key press.
             self._llm_history_index = Constants.llm_history_size - 1
             event.Skip()
+
+    # noinspection PyUnusedLocal
+    def _main_text_field_key_handler(self, event: wx.KeyEvent) -> None:
+        """
+        Mark current line with highlight on any keypress.
+        :param event: Not used.
+        :return: None
+        """
+        self._highlight_current_line()
+        event.Skip()
 
     # noinspection PyUnusedLocal
     def _llm_input_field_send_handler(self, event: wx.CommandEvent) -> None:
@@ -1303,7 +1332,12 @@ class MainFrame(wx.Frame):
 
         # The even contains a bit mask of what happened, we need to compare it with &.
         mod_type: int = event.GetModificationType()
+        if mod_type & stc.STC_MOD_CHANGEMARKER:
+            # Do not run for highlighting.
+            return
+
         if mod_type & stc.STC_MOD_CHANGEINDICATOR:
+            # Do not run for word marking with colors.
             return
 
         self._found_last_index = 0
@@ -1500,7 +1534,7 @@ class MainFrame(wx.Frame):
 
     def _on_fully_loaded(self) -> None:
         """
-        Runs once the gui is loaded.
+        Runs once the gui is loaded before document is loaded.
         :return: None
         """
         last_file = self._config.get_last_file()
@@ -1714,16 +1748,21 @@ class MainFrame(wx.Frame):
         self._set_status_text(Strings.status_calculating, 0)
         self.post_divider()
         self.post_message(Strings.msg_loaded.format(self._current_document.get_path()), Constants.msg_info)
+        self._main_text_field.ShowPosition(self._config.get_last_text_position())
+        self._highlight_current_line()
 
     def _save_config(self) -> None:
         """
         Back up application state.
         :return: None
         """
-        assert self._current_document is not None
+        assert self._main_text_field is not None
 
         try:
-            self._config.set_last_file(self._current_document.get_path())
+            if self._current_document:
+                self._config.set_last_file(self._current_document.get_path())
+                self._config.set_last_text_position(self._main_text_field.GetCurrentPos())
+
             self._config.set_position(self.GetPosition().x, self.GetPosition().y)
             self._config.set_size(self.GetSize())
             self._config.save_config()
@@ -1943,3 +1982,18 @@ class MainFrame(wx.Frame):
         self.post_message(Strings.msg_llm_connection_ok.format('ERROR', code),
                           Constants.msg_err)
         return False
+
+    def _highlight_current_line(self) -> None:
+        """
+        Mark current line for visibility.
+        :return: None
+        """
+        assert self._main_text_field is not None
+
+        current_line = self._main_text_field.LineFromPosition(self._main_text_field.GetCurrentPos())
+        if current_line == self._currently_highlighted_line:
+            return
+        # Delete marker from last highlighted line, apply to current line, save for next time.
+        self._main_text_field.MarkerDelete(self._currently_highlighted_line, self._marker_current_line)
+        self._main_text_field.MarkerAdd(current_line, self._marker_current_line)
+        self._currently_highlighted_line = current_line

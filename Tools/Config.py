@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Set
 
 import wx
 
@@ -22,6 +22,7 @@ class Config:
         self._width: int = Constants.main_window_size.width
         self._height: int = Constants.main_window_size.height
         self._last_text_pos: int = 0
+        self._red_marks: Set[int] = {-1}
 
         self._llm_url: str = Constants.llm_default_url
         self._llm_system_prompt: str = Constants.llm_system_prompt
@@ -108,6 +109,17 @@ class Config:
                                 self._last_text_pos = int(line.split(":")[1].replace('\n', '').strip())
                             except ValueError as _:
                                 self._last_text_pos = 0
+                        if line.startswith('red_lines:'):
+                            # red_lines: {33, 11, 4}
+                            try:
+                                line_set = set()
+                                for l in line.split(":")[1].replace('\n', '').replace('}', '').replace('{',
+                                                                                                       '').strip().split(
+                                        ','):
+                                    line_set.add(int(l))
+                                self._red_marks = line_set
+                            except ValueError as _:
+                                self._red_marks = {-1}
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 
@@ -140,6 +152,21 @@ class Config:
         :return: LLM url.
         """
         return self._llm_url
+
+    def set_marked_lines(self, lines: Set[int]) -> None:
+        """
+        Set new marked lines list.
+        :param lines: List of lines.
+        :return: None
+        """
+        self._red_marks = lines
+
+    def get_marked_lines(self) -> Set[int]:
+        """
+        Get a list of red marked Lines.
+        :return: List of ints.
+        """
+        return self._red_marks
 
     def set_llm_system_prompt(self, prompt: str) -> None:
         """
@@ -335,3 +362,4 @@ class Config:
             config.write(f"llm_frequency_p: {self._llm_frequency_p}\n")
             config.write(f"llm_verbosity: {self._llm_verbosity}\n")
             config.write(f"text_position: {self._last_text_pos}\n")
+            config.write(f"red_lines: {self._red_marks}\n")

@@ -4,7 +4,7 @@ import shutil
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Tuple
 
 import requests
 import wx
@@ -38,6 +38,7 @@ from Tools.Config import Config
 
 
 # todo spell check
+# todo separate notes non modal window? Stored in document too.
 
 class MainFrame(wx.Frame):
     """
@@ -88,12 +89,16 @@ class MainFrame(wx.Frame):
         self._id_llm_synonym = wx.NewId()
         self._id_llm_copy = wx.NewId()
         self._id_log_clear = wx.NewId()
+        self._id_clear_red_marks = wx.NewId()
+        self._id_clear_yellow_marks = wx.NewId()
         self._id_synonym_ids = []
 
         # Marker IDs
         self._marker_current_line: int = 1
-        self._marker_marked_line: int = 2
+        self._marker_red_line: int = 2
+        self._marker_yellow_line: int = 5
         self._currently_highlighted_line: int = 0
+        self._marked_red_lines: Set[int] = set()
 
         self._available_indicators: Set[int] = set()
         self._selected_words: List[str] = []
@@ -197,7 +202,6 @@ class MainFrame(wx.Frame):
         self._menu_items.append(edit_menu_item_synonyms)
 
         # Tools menu:
-        # todo line marker button to tools and add clear all marks button, save marked lines
         tools_menu = wx.Menu()
         tools_menu_item_words = tools_menu.Append(wx.ID_INFO, Strings.menu_item_word_list,
                                                   Strings.menu_item_word_list_hint)
@@ -219,6 +223,16 @@ class MainFrame(wx.Frame):
         tools_menu_item_llm_connect = tools_menu.Append(wx.ID_EXECUTE, Strings.menu_item_connect_llm,
                                                         Strings.menu_item_connect_llm_hint)
         self._menu_items.append(tools_menu_item_llm_connect)
+        tools_menu.AppendSeparator()
+        tools_menu_item_mark_line = tools_menu.Append(wx.ID_ADD, Strings.menu_item_mark,
+                                                      Strings.menu_item_mark_hint)
+        self._menu_items.append(tools_menu_item_mark_line)
+        tools_menu_item_clear_red_marks = tools_menu.Append(self._id_clear_red_marks, Strings.menu_item_clear_red_marks,
+                                                            Strings.menu_item_clear_red_marks_hint)
+        self._menu_items.append(tools_menu_item_clear_red_marks)
+        tools_menu_item_clear_yellow_marks = tools_menu.Append(self._id_clear_yellow_marks,
+                                                               Strings.menu_item_clear_yellow_marks_hint)
+        self._menu_items.append(tools_menu_item_clear_yellow_marks)
 
         self.Bind(wx.EVT_MENU, lambda _on_log_clear: self._log_text_field.Clear(), id=self._id_log_clear)
 
@@ -256,6 +270,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._log_handler, tools_menu_item_log)
         self.Bind(wx.EVT_MENU, self._llm_config_handler, tools_menu_item_llm_config)
         self.Bind(wx.EVT_MENU, self._llm_test_handler, tools_menu_item_llm_connect)
+        self.Bind(wx.EVT_MENU, self._mark_line_red_handler, tools_menu_item_mark_line)
+        self.Bind(wx.EVT_MENU, self._clear_red_marks_handler, tools_menu_item_clear_red_marks)
+        self.Bind(wx.EVT_MENU, self._clear_yellow_marks_handler, tools_menu_item_clear_yellow_marks)
 
         # About menu:
         self.Bind(wx.EVT_MENU, self._about_handler, about_menu_item_about)
@@ -629,7 +646,8 @@ class MainFrame(wx.Frame):
         # Line markers
         self._main_text_field.MarkerDefine(self._marker_current_line, stc.STC_MARK_BACKGROUND,
                                            background=Constants.color_grey_light)
-        self._main_text_field.MarkerDefine(self._marker_marked_line, stc.STC_MARK_BACKGROUND, background="RED")
+        self._main_text_field.MarkerDefine(self._marker_red_line, stc.STC_MARK_BACKGROUND, background="RED")
+        self._main_text_field.MarkerDefine(self._marker_yellow_line, stc.STC_MARK_BACKGROUND, background="YELLOW")
 
     # Handlers ---------------------------------------------------------------------------------------------------------
     # noinspection PyUnusedLocal
@@ -654,6 +672,9 @@ class MainFrame(wx.Frame):
             self._main_text_field.SetSelection(word_start, word_end)
 
         menu = wx.Menu()
+        mark_line = menu.Append(wx.ID_ADD, Strings.menu_item_toggle_mark)
+        self.Bind(wx.EVT_MENU, self._mark_line_red_handler, id=wx.ID_ADD)
+        menu.AppendSeparator()
         undo_item = menu.Append(wx.ID_UNDO, Strings.menu_item_undo)
         redo_item = menu.Append(wx.ID_REDO, Strings.menu_item_redo)
         menu.AppendSeparator()
@@ -767,7 +788,6 @@ class MainFrame(wx.Frame):
             if event_id == self._id_add_names:
                 words = self._current_document.get_names()
                 # todo after adding to ignored text is updated, list is not, some list items stay gray until checkboxes are used
-                # todo if the saved position is last char, it does not scroll there for some reason.
                 if selection not in words:
                     words.add(selection)
                     self._current_document.set_modified(True)
@@ -1139,7 +1159,6 @@ class MainFrame(wx.Frame):
         Thread callback to finish applying indicators once the calculations are made.
         :return: None
         """
-        print('a')
         assert self._current_document is not None
         assert self._side_word_list is not None
         assert self._repetition_selector is not None
@@ -1218,8 +1237,7 @@ class MainFrame(wx.Frame):
                     item.set_enabled(has_indicator)
 
         # Display indicators.
-        # todo this is the slowest part
-        # todo can we apply indicators only to the currently visible lines?
+        # todo this is the slowest part, can we apply indicators only to the currently visible lines?
         # Reduce redrawing with freeze.
         self._main_text_field.Freeze()
         for w in fitting_words:
@@ -1461,7 +1479,55 @@ class MainFrame(wx.Frame):
         # TODO recalculate the coloring data when idle. Do not redraw, just prepare data and update side list.
         print('timer')
 
+    # noinspection PyUnusedLocal
+    def _clear_red_marks_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Clear red marking from all marked lines.
+        :param event: Not used.
+        :return: None
+        """
+        assert self._main_text_field is not None
+
+        for line in list(self._marked_red_lines):
+            self._main_text_field.MarkerDelete(line, self._marker_red_line)
+            self._marked_red_lines.remove(line)
+
+    # noinspection PyUnusedLocal
+    def _clear_yellow_marks_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Clear yellow marking from all marked lines with errors.
+        :param event: Not used.
+        :return: None
+        """
+        assert self._main_text_field is not None
+        self._main_text_field.MarkerDeleteAll(self._marker_yellow_line)
+
+    # noinspection PyUnusedLocal
+    def _mark_line_red_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Mark or unmark current line RED.
+        :param event: Not used.
+        :return: None
+        """
+        assert self._main_text_field is not None
+        self._mark_line_red(self._main_text_field.LineFromPosition(self._main_text_field.GetCurrentPos()))
+
     # Methods---------------------------------------------------------------------------------------------------------------
+
+    def _mark_line_red(self, line: int) -> None:
+        """
+        Mark or unmark line RED.
+        :param line: Not used.
+        :return: None
+        """
+        assert self._main_text_field is not None
+
+        if line in self._marked_red_lines:
+            self._main_text_field.MarkerDelete(line, self._marker_red_line)
+            self._marked_red_lines.remove(line)
+        else:
+            self._main_text_field.MarkerAdd(line, self._marker_red_line)
+            self._marked_red_lines.add(line)
 
     def _sanitized_selection(self) -> str:
         """
@@ -1741,6 +1807,11 @@ class MainFrame(wx.Frame):
         # on_modified will run while loading and erroneously set modified to True so we need to fix it.
         self._current_document.set_modified(False)
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
+        # todo if the saved position is last char, it does not scroll there for some reason.
+        self._main_text_field.ShowPosition(self._config.get_last_text_position())
+        self._highlight_current_line()
+        for line in self._config.get_marked_lines():
+            self._mark_line_red(line)
         self.enable_editor()
         self._main_text_field.SetFocus()
         self._waiting_dialog.Close()
@@ -1748,8 +1819,6 @@ class MainFrame(wx.Frame):
         self._set_status_text(Strings.status_calculating, 0)
         self.post_divider()
         self.post_message(Strings.msg_loaded.format(self._current_document.get_path()), Constants.msg_info)
-        self._main_text_field.ShowPosition(self._config.get_last_text_position())
-        self._highlight_current_line()
 
     def _save_config(self) -> None:
         """
@@ -1762,6 +1831,10 @@ class MainFrame(wx.Frame):
             if self._current_document:
                 self._config.set_last_file(self._current_document.get_path())
                 self._config.set_last_text_position(self._main_text_field.GetCurrentPos())
+                if self._marked_red_lines:
+                    self._config.set_marked_lines(self._marked_red_lines)
+                else:
+                    self._config.set_marked_lines({-1})
 
             self._config.set_position(self.GetPosition().x, self.GetPosition().y)
             self._config.set_size(self.GetSize())
@@ -1819,20 +1892,23 @@ class MainFrame(wx.Frame):
             self.post_message(Strings.msg_save_fail.format(self._current_document.get_path()), Constants.msg_err)
         self._waiting_dialog.Close()
 
-    def document_test_callback(self, result: defaultdict[str, List[str]]) -> None:
+    def document_test_callback(self, result: defaultdict[str, List[Tuple[str, int]]]) -> None:
         """
         Callback for document tests which prints the messages into log box and shows it.
         :param result: Dictionary of errors.
         :return: None
         """
         assert self._log_text_field is not None
+        assert self._main_text_field is not None
         assert self._toolbar is not None
 
         if self._log_text_field.GetNumberOfLines() > Constants.max_log_length:
+            # Clear log if it is too long.
             self._log_text_field.Clear()
             self.post_message(Strings.report_log_cleared, Constants.msg_info)
 
         counter = 0
+        self._main_text_field.MarkerDeleteAll(self._marker_yellow_line)
         open_log: bool = False
         for message_type in [Constants.report_name_lines,
                              Constants.report_names_capitalized,
@@ -1842,7 +1918,8 @@ class MainFrame(wx.Frame):
             if message_type in result:
                 open_log = True
                 for err in result[message_type]:
-                    self.post_message(err, Constants.msg_warn)
+                    self.post_message(err[0], Constants.msg_warn)
+                    self._main_text_field.MarkerAdd(err[1] - 1, self._marker_yellow_line)
                     counter += 1
         if not open_log:
             self.post_message(Strings.report_ok, Constants.msg_ok)
@@ -1871,7 +1948,7 @@ class MainFrame(wx.Frame):
         if self._log_up:
             # Move log down.
             self._splitter.SetSashPosition(self.GetSize().height, True)
-            # todo move log to bottom when opened or closed
+            # todo move log to bottom when opened or closed does not always work.
             self._log_text_field.SetInsertionPoint(-1)
             self._log_text_field.ShowPosition(self._log_text_field.GetLastPosition())
             self._log_text_field.ScrollLines(Constants.max_log_length)

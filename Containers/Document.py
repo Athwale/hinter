@@ -33,6 +33,7 @@ class Document:
         self._ignored_words: Set[str] = set()
         self._names: Set[str] = set()
         self._synonyms: List[Set[str]] = []
+        self._notes: str = 'Example notes'
 
     def get_ignored_words(self) -> Set[str]:
         """
@@ -83,6 +84,13 @@ class Document:
         """
         return self._word_data
 
+    def get_notes(self) -> str:
+        """
+        Return notes
+        :return: Notes string.
+        """
+        return self._notes
+
     def is_new(self) -> bool:
         """
         Return True if this document was never saved.
@@ -98,6 +106,14 @@ class Document:
         return self._is_modified
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+    def set_notes(self, notes: str) -> None:
+        """
+        Set new notes.
+        :param notes: Notes string.
+        :return: None
+        """
+        self._notes = notes
 
     def set_ignored_words(self, words: Set[str]) -> None:
         """
@@ -253,6 +269,9 @@ class Document:
                                 self._names.add(w.strip().lower())
                 else:
                     raise FormatError(Strings.err_file_format_metadata)
+        base = soup.find(name="base")
+        if base:
+            self._notes = str(base['target'])
 
     def save_document(self) -> bool:
         """
@@ -275,6 +294,10 @@ class Document:
 
         meta_string += f'{",".join(self._ignored_words)}; names:{",".join(self._names)}{synonym_part}'
         title.string = meta_string
+
+        # Save notes
+        base = soup.find(name="base")
+        base['target'] = self._notes
 
         body = soup.find(name="body")
         # Everything is in one paragraph, the rest is solved by <br>

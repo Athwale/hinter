@@ -25,9 +25,10 @@ from Containers.SidePanel import SidePanel
 from Containers.Word import Word
 from Dialogs.AboutDialog import AboutDialog
 from Dialogs.LLMConfigDialog import LLMConfigDialog
-from Dialogs.PlainTextEditDialog import PlainTextEditDialog
+from Dialogs.NotesEditorDialog import NotesEditorDialog
 from Dialogs.SaveLoadWaitDialog import SavingWaitDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
+from Dialogs.WordListEditDialog import WordListEditDialog
 from Resources.Fetch import Fetch
 from Threads.ColoratorThread import ColoratorThread
 from Threads.LLMThread import LLMThread
@@ -38,7 +39,6 @@ from Tools.Config import Config
 
 
 # todo spell check
-# todo separate notes non modal window? Stored in document too.
 
 class MainFrame(wx.Frame):
     """
@@ -202,6 +202,10 @@ class MainFrame(wx.Frame):
 
         # Tools menu:
         tools_menu = wx.Menu()
+        tools_menu_item_notes = tools_menu.Append(wx.ID_CONTEXT_HELP, Strings.menu_item_notes,
+                                                  Strings.menu_item_notes_hint)
+        self._menu_items.append(tools_menu_item_notes)
+        tools_menu.AppendSeparator()
         tools_menu_item_words = tools_menu.Append(wx.ID_INFO, Strings.menu_item_word_list,
                                                   Strings.menu_item_word_list_hint)
         self._menu_items.append(tools_menu_item_words)
@@ -272,6 +276,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._mark_line_red_handler, tools_menu_item_mark_line)
         self.Bind(wx.EVT_MENU, self._clear_red_marks_handler, tools_menu_item_clear_red_marks)
         self.Bind(wx.EVT_MENU, self._clear_yellow_marks_handler, tools_menu_item_clear_yellow_marks)
+        self.Bind(wx.EVT_MENU, self._notes_handler, tools_menu_item_notes)
 
         # About menu:
         self.Bind(wx.EVT_MENU, self._about_handler, about_menu_item_about)
@@ -959,11 +964,11 @@ class MainFrame(wx.Frame):
         button_id = event.GetId()
         dialog = None
         if button_id == self._id_ignored:
-            dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_ignored_hint, self._current_document)
+            dialog = WordListEditDialog(self, Strings.menu_item_edit_words_ignored_hint, self._current_document)
         elif button_id == self._id_names:
-            dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_names_hint, self._current_document)
+            dialog = WordListEditDialog(self, Strings.menu_item_edit_words_names_hint, self._current_document)
         elif button_id == self._id_edit_synonyms:
-            dialog = PlainTextEditDialog(self, Strings.menu_item_edit_words_synonyms_hint, self._current_document)
+            dialog = WordListEditDialog(self, Strings.menu_item_edit_words_synonyms_hint, self._current_document)
         if dialog:
             dialog.ShowModal()
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
@@ -1045,6 +1050,18 @@ class MainFrame(wx.Frame):
         self.post_message(Strings.msg_llm_connection_config.format(self._config.get_llm_url()),
                           Constants.msg_info)
         self._test_llm_connection()
+
+    # noinspection PyUnusedLocal
+    def _notes_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Open a notes edit dialog.
+        :param event: Not used.
+        :return: None
+        """
+        # todo add toolbar button
+        if self._current_document:
+            dialog = NotesEditorDialog(self, self._current_document)
+            dialog.Show()
 
     # noinspection PyUnusedLocal
     def _llm_test_handler(self, event: wx.CommandEvent) -> None:
@@ -1363,6 +1380,9 @@ class MainFrame(wx.Frame):
         if self._current_document:
             self._current_document.set_modified(True)
 
+        # todo this needs to happen when word list or notes are edited, red mark lines.
+        # todo notes must save when document is saved.
+        # todo adjust llm config height.
         if not self.GetTitle().startswith('*'):
             self.SetTitle(f"* {self.GetTitle()}")
 

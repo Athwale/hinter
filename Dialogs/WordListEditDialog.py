@@ -4,7 +4,7 @@ from Constants import Constants, Strings
 from Containers.Document import Document
 
 
-class PlainTextEditDialog(wx.Dialog):
+class WordListEditDialog(wx.Dialog):
 
     def __init__(self, parent, word_list: str, document: Document):
         """

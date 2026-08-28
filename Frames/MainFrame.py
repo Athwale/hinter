@@ -97,7 +97,6 @@ class MainFrame(wx.Frame):
         self._marker_current_line: int = 1
         self._marker_red_line: int = 2
         self._marker_yellow_line: int = 5
-        self._currently_highlighted_line: int = 0
         self._marked_red_lines: Set[int] = set()
 
         self._available_indicators: Set[int] = set()
@@ -1939,7 +1938,7 @@ class MainFrame(wx.Frame):
 
         if up:
             # Move log up, runs when saving.
-            self._splitter.SetSashPosition(10, True)
+            self._splitter.SetSashPosition(Constants.chat_upper_position, True)
             self._log_up = True
             self._log_text_field.ScrollLines(Constants.max_log_length)
             return
@@ -1948,10 +1947,7 @@ class MainFrame(wx.Frame):
         if self._log_up:
             # Move log down.
             self._splitter.SetSashPosition(self.GetSize().height, True)
-            # todo move log to bottom when opened or closed does not always work.
-            self._log_text_field.SetInsertionPoint(-1)
-            self._log_text_field.ShowPosition(self._log_text_field.GetLastPosition())
-            self._log_text_field.ScrollLines(Constants.max_log_length)
+            wx.CallLater(50, self._log_text_field.ShowPosition, self._log_text_field.GetLastPosition())
         else:
             self._splitter.SetSashPosition(10, True)
             self._log_text_field.ScrollLines(Constants.max_log_length)
@@ -2067,10 +2063,6 @@ class MainFrame(wx.Frame):
         """
         assert self._main_text_field is not None
 
+        self._main_text_field.MarkerDeleteAll(self._marker_current_line)
         current_line = self._main_text_field.LineFromPosition(self._main_text_field.GetCurrentPos())
-        if current_line == self._currently_highlighted_line:
-            return
-        # Delete marker from last highlighted line, apply to current line, save for next time.
-        self._main_text_field.MarkerDelete(self._currently_highlighted_line, self._marker_current_line)
         self._main_text_field.MarkerAdd(current_line, self._marker_current_line)
-        self._currently_highlighted_line = current_line

@@ -50,6 +50,7 @@ words_dialog_width: int = 400
 words_dialog_height: int = 900
 
 min_chat_height: int = 150
+chat_upper_position: int = 400
 
 plain_text_dialog_width: int = 400
 plain_text_dialog_height: int = 600

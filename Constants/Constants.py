@@ -55,6 +55,9 @@ chat_upper_position: int = 400
 plain_text_dialog_width: int = 400
 plain_text_dialog_height: int = 600
 
+llm_dialog_width: int = 400
+llm_dialog_height: int = 535
+
 word_list_width: int = 220
 
 html_wildcard: str = "HTML files (*.html)|*.html"

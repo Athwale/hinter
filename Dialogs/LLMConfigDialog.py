@@ -15,7 +15,7 @@ class LLMConfigDialog(wx.Dialog):
         :param config: Config instance.
         """
         wx.Dialog.__init__(self, parent, title=Strings.dialog_llm,
-                           size=wx.Size(Constants.plain_text_dialog_width, Constants.plain_text_dialog_height),
+                           size=wx.Size(Constants.llm_dialog_width, Constants.llm_dialog_height),
                            style=wx.DEFAULT_DIALOG_STYLE)
 
         self._config = config
@@ -139,9 +139,9 @@ class LLMConfigDialog(wx.Dialog):
                                       border=Constants.default_border)
         self._main_vertical_sizer.Add(self._field_system_prompt, 0, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP,
                                       border=Constants.default_border)
-        self._main_vertical_sizer.Add(values_sizer, 0, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.TOP,
+        self._main_vertical_sizer.Add(values_sizer, 0, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP,
                                       border=Constants.default_border)
-        self._main_vertical_sizer.Add(self._button_sizer, 0, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.TOP,
+        self._main_vertical_sizer.Add(self._button_sizer, 0, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM,
                                       border=Constants.default_border)
         self.SetSizer(self._main_vertical_sizer)
         self._display_dialog_contents()

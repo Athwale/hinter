@@ -78,6 +78,7 @@ class WordListEditDialog(wx.Dialog):
                 elif self._list_type == Strings.menu_item_edit_words_ignored_hint:
                     self._document.set_ignored_words(new_set)
                 # Skip event to let it go into the main thread and close this dialog.
+                self._document.set_modified(True)
                 event.Skip()
             elif self._list_type == Strings.menu_item_edit_words_synonyms_hint:
                 synonyms = self._field_text.GetValue().split('\n')
@@ -97,6 +98,7 @@ class WordListEditDialog(wx.Dialog):
                             new_set.add(word.strip())
                         new_list.append(new_set)
                 self._document.set_synonyms(new_list)
+                self._document.set_modified(True)
                 event.Skip()
         elif event.GetId() == wx.ID_CANCEL:
             event.Skip()

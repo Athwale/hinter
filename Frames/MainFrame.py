@@ -104,6 +104,8 @@ class MainFrame(wx.Frame):
         self._coloring_tool_off: bool = True
         self._log_up: bool = False
 
+        self._notes_dialog: NotesEditorDialog = None
+
         self._found_words: List[tuple[tuple[int, int], int]] = []
         self._found_last_index = 0
 
@@ -369,6 +371,12 @@ class MainFrame(wx.Frame):
                                                                                Constants.icon_tool_height),
                                                               Strings.menu_item_mark_hint)
         self._tools.append(mark_tool)
+
+        notes_tool: wx.ToolBarToolBase = self._toolbar.AddTool(wx.ID_CONTEXT_HELP, Strings.menu_item_notes,
+                                                               self._scale_icon('notes.svg', Constants.icon_tool_width,
+                                                                                Constants.icon_tool_height),
+                                                               Strings.menu_item_notes_hint)
+        self._tools.append(notes_tool)
 
         self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
 
@@ -972,6 +980,8 @@ class MainFrame(wx.Frame):
         if dialog:
             dialog.ShowModal()
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
+        if self._current_document.is_modified():
+            self._set_title_modified()
 
     # noinspection PyUnusedLocal
     def _llm_input_field_key_handler(self, event: wx.KeyEvent) -> None:
@@ -1058,10 +1068,11 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # todo add toolbar button
-        if self._current_document:
-            dialog = NotesEditorDialog(self, self._current_document)
-            dialog.Show()
+        # todo only show once
+        # todo must display edited document on edited
+        if self._current_document and not self._notes_dialog:
+            self._notes_dialog = NotesEditorDialog(self, self._current_document)
+            self._notes_dialog.Show()
 
     # noinspection PyUnusedLocal
     def _llm_test_handler(self, event: wx.CommandEvent) -> None:
@@ -1380,11 +1391,7 @@ class MainFrame(wx.Frame):
         if self._current_document:
             self._current_document.set_modified(True)
 
-        # todo this needs to happen when word list or notes are edited, red mark lines.
-        # todo notes must save when document is saved.
-        # todo adjust llm config height.
-        if not self.GetTitle().startswith('*'):
-            self.SetTitle(f"* {self.GetTitle()}")
+        self._set_title_modified()
 
         if mod_type & stc.STC_MOD_CONTAINER:
             token = event.GetToken()
@@ -1506,10 +1513,13 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._main_text_field is not None
+        assert self._current_document is not None
 
         for line in list(self._marked_red_lines):
             self._main_text_field.MarkerDelete(line, self._marker_red_line)
             self._marked_red_lines.remove(line)
+            self._set_title_modified()
+            self._current_document.set_modified(True)
 
     # noinspection PyUnusedLocal
     def _clear_yellow_marks_handler(self, event: wx.CommandEvent) -> None:
@@ -1540,6 +1550,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._main_text_field is not None
+        assert self._current_document is not None
 
         if line in self._marked_red_lines:
             self._main_text_field.MarkerDelete(line, self._marker_red_line)
@@ -1548,13 +1559,17 @@ class MainFrame(wx.Frame):
             self._main_text_field.MarkerAdd(line, self._marker_red_line)
             self._marked_red_lines.add(line)
 
+        if self.IsEnabled():
+            # Ignore while document is loading. It will mark lines from config but those are not new edits.
+            self._set_title_modified()
+            self._current_document.set_modified(True)
+
     def _sanitized_selection(self) -> str:
         """
         Strip characters from text selection.
         :return: Stripped prepared string.
         """
         assert self._main_text_field is not None
-
         return self._main_text_field.GetSelectedText().strip().lower().lstrip('.').rstrip('.').lstrip(',').rstrip(',')
 
     def _clear_editor(self) -> None:
@@ -1826,18 +1841,18 @@ class MainFrame(wx.Frame):
         # on_modified will run while loading and erroneously set modified to True so we need to fix it.
         self._current_document.set_modified(False)
         self._set_status_text(Strings.status_ignored.format(len(self._current_document.get_ignored_words())), 2)
-        # todo if the saved position is last char, it does not scroll there for some reason.
-        self._main_text_field.ShowPosition(self._config.get_last_text_position())
         self._highlight_current_line()
         for line in self._config.get_marked_lines():
             self._mark_line_red(line)
-        self.enable_editor()
         self._main_text_field.SetFocus()
         self._waiting_dialog.Close()
         self._statistics_timer.Start(Constants.statistics_timer_delay)
         self._set_status_text(Strings.status_calculating, 0)
         self.post_divider()
         self.post_message(Strings.msg_loaded.format(self._current_document.get_path()), Constants.msg_info)
+        self.enable_editor()
+        # Wait for the gui to load all and then jump to line.
+        wx.CallLater(50, self._main_text_field.ShowPosition, self._config.get_last_text_position())
 
     def _save_config(self) -> None:
         """
@@ -2010,6 +2025,14 @@ class MainFrame(wx.Frame):
 
         self._log_text_field.SetForegroundColour(wx.BLACK)
         self._log_text_field.AppendText(f"{179 * '-'}\n")
+
+    def _set_title_modified(self) -> None:
+        """
+        Set the title to show modified.
+        :return: None
+        """
+        if not self.GetTitle().startswith('*'):
+            self.SetTitle(f"* {self.GetTitle()}")
 
     def _convert_document(self) -> List:
         """

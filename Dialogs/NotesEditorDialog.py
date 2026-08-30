@@ -25,12 +25,10 @@ class NotesEditorDialog(wx.Dialog):
         # Buttons
         self._button_sizer = wx.BoxSizer(wx.VERTICAL)
         grouping_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self._cancel_button = wx.Button(self, wx.ID_CANCEL, Strings.button_cancel)
-        self._save_button = wx.Button(self, wx.ID_OK, Strings.button_save)
+        self._save_button = wx.Button(self, wx.ID_OK, Strings.button_ok)
         self._save_button.SetDefault()
         grouping_sizer.Add(self._save_button)
         grouping_sizer.Add(wx.Size(Constants.default_border, Constants.default_border))
-        grouping_sizer.Add(self._cancel_button)
         self._button_sizer.Add(grouping_sizer, flag=wx.ALIGN_CENTER_HORIZONTAL)
 
         # Putting the sizers together
@@ -44,7 +42,7 @@ class NotesEditorDialog(wx.Dialog):
 
         # Bind handlers
         self.Bind(wx.EVT_BUTTON, self._handle_buttons, self._save_button)
-        self.Bind(wx.EVT_BUTTON, self._handle_buttons, self._cancel_button)
+        self.Bind(wx.EVT_TEXT, self._text_changed, self._field_text)
 
     def _handle_buttons(self, event: wx.CommandEvent) -> None:
         """
@@ -55,9 +53,17 @@ class NotesEditorDialog(wx.Dialog):
         if event.GetId() == wx.ID_OK:
             self._document.set_notes(self._field_text.GetValue())
             self._document.set_modified(True)
+            # todo let the main frame know it closed and was edited.
             event.Skip()
-        elif event.GetId() == wx.ID_CANCEL:
-            event.Skip()
+
+    # noinspection PyUnusedLocal
+    def _text_changed(self, event: wx.CommandEvent) -> None:
+        """
+        Handle text changes and save to document.
+        :param event: Not used
+        :return: None
+        """
+        self._document.set_notes(self._field_text.GetValue())
 
     def _display_dialog_contents(self) -> None:
         """

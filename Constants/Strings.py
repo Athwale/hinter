@@ -99,6 +99,7 @@ label_verbosity: str = 'Verbosity'
 button_close: str = "Close"
 button_cancel: str = "Cancel"
 button_save: str = "Save"
+button_ok: str = "Ok"
 
 status_warning: str = "Warning"
 status_saved: str = "Saved: {}"

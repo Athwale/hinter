@@ -19,6 +19,7 @@ from wx.svg import SVGimage
 from Constants import Constants
 from Constants import Strings
 from Constants.Constants import EVT_CHECKBOX_CHANGED
+from Constants.Events import Events
 from Containers.Document import Document
 from Containers.ListItemPanel import ListItemPanel
 from Containers.SidePanel import SidePanel
@@ -104,7 +105,8 @@ class MainFrame(wx.Frame):
         self._coloring_tool_off: bool = True
         self._log_up: bool = False
 
-        self._notes_dialog: NotesEditorDialog = None
+        self._notes_dialog: NotesEditorDialog | None = None
+        self._notes_open: bool = False
 
         self._found_words: List[tuple[tuple[int, int], int]] = []
         self._found_last_index = 0
@@ -117,6 +119,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_TIMER, self._on_statistics_timer_handler, self._statistics_timer)
         self._idle_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._on_idle_timer_handler, self._idle_timer)
+
+        self.Bind(Events.EVT_NOTES_CLOSED, self._notes_closed_handler)
+        self.Bind(Events.EVT_TEXT_CHANGED, self._notes_changed_handler)
 
         # Init layout:
         self._init_menu_bar()
@@ -278,7 +283,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self._mark_line_red_handler, tools_menu_item_mark_line)
         self.Bind(wx.EVT_MENU, self._clear_red_marks_handler, tools_menu_item_clear_red_marks)
         self.Bind(wx.EVT_MENU, self._clear_yellow_marks_handler, tools_menu_item_clear_yellow_marks)
-        self.Bind(wx.EVT_MENU, self._notes_handler, tools_menu_item_notes)
+        self.Bind(wx.EVT_MENU, self._notes_open_handler, tools_menu_item_notes)
 
         # About menu:
         self.Bind(wx.EVT_MENU, self._about_handler, about_menu_item_about)
@@ -1062,17 +1067,38 @@ class MainFrame(wx.Frame):
         self._test_llm_connection()
 
     # noinspection PyUnusedLocal
-    def _notes_handler(self, event: wx.CommandEvent) -> None:
+    def _notes_open_handler(self, event: wx.CommandEvent) -> None:
         """
         Open a notes edit dialog.
         :param event: Not used.
         :return: None
         """
-        # todo only show once
-        # todo must display edited document on edited
-        if self._current_document and not self._notes_dialog:
+        if self._current_document and not self._notes_open:
+            self._notes_open = True
             self._notes_dialog = NotesEditorDialog(self, self._current_document)
+            assert self._notes_dialog is not None
             self._notes_dialog.Show()
+
+    # noinspection PyUnusedLocal
+    def _notes_closed_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Process the notes dialog closing.
+        :param event: Not used.
+        :return: None
+        """
+        self._notes_open = False
+
+    # noinspection PyUnusedLocal
+    def _notes_changed_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Process the notes changing in the dialog.
+        :param event: Not used.
+        :return: None
+        """
+        assert self._current_document is not None
+
+        self._current_document.set_modified(True)
+        self._set_title_modified()
 
     # noinspection PyUnusedLocal
     def _llm_test_handler(self, event: wx.CommandEvent) -> None:
@@ -1282,6 +1308,16 @@ class MainFrame(wx.Frame):
         self._main_text_field.Refresh()
         self._update_indicator_count()
         self._coloring_spinner.Stop()
+
+    # noinspection PyUnusedLocal
+    def _on_idle_timer_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Idle timer handler. Runs after last edit and starts coloring recalculation.
+        :param event: Not used.
+        :return: None
+        """
+        # TODO recalculate the coloring data when idle. Do not redraw, just prepare data and update side list.
+        print('timer')
 
     def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1494,16 +1530,6 @@ class MainFrame(wx.Frame):
             self._statistics_thread = StatisticsThread(self, self._main_text_field.GetText())
             assert self._statistics_thread is not None
             self._statistics_thread.start()
-
-    # noinspection PyUnusedLocal
-    def _on_idle_timer_handler(self, event: wx.CommandEvent) -> None:
-        """
-        Idle timer handler. Runs after last edit and starts coloring recalculation.
-        :param event: Not used.
-        :return: None
-        """
-        # TODO recalculate the coloring data when idle. Do not redraw, just prepare data and update side list.
-        print('timer')
 
     # noinspection PyUnusedLocal
     def _clear_red_marks_handler(self, event: wx.CommandEvent) -> None:
@@ -1834,7 +1860,7 @@ class MainFrame(wx.Frame):
             self._show_error_ok_dialog(Strings.warn_errors.format(formatted))
             return
 
-        # Todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering the text on main thead.
+        # Todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering the text on main thread.
         self._main_text_field.EmptyUndoBuffer()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._set_status_text(self._current_document.get_path().name, 1)

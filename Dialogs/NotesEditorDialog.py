@@ -1,6 +1,6 @@
 import wx
 
-from Constants import Constants, Strings
+from Constants import Constants, Strings, Events
 from Containers.Document import Document
 
 
@@ -15,6 +15,7 @@ class NotesEditorDialog(wx.Dialog):
         """
         wx.Dialog.__init__(self, parent, title=Strings.dialog_edit, style=wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX)
 
+        self._parent = parent
         self._document = document
 
         self._main_vertical_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -52,8 +53,8 @@ class NotesEditorDialog(wx.Dialog):
         """
         if event.GetId() == wx.ID_OK:
             self._document.set_notes(self._field_text.GetValue())
-            self._document.set_modified(True)
-            # todo let the main frame know it closed and was edited.
+            close_evt = Events.Events.NotesClosedEvent(self.GetId())
+            wx.PostEvent(self._parent.GetEventHandler(), close_evt)
             event.Skip()
 
     # noinspection PyUnusedLocal
@@ -64,6 +65,8 @@ class NotesEditorDialog(wx.Dialog):
         :return: None
         """
         self._document.set_notes(self._field_text.GetValue())
+        change_evt = Events.Events.TextChangedEvent(self.GetId())
+        wx.PostEvent(self._parent.GetEventHandler(), change_evt)
 
     def _display_dialog_contents(self) -> None:
         """

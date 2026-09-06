@@ -1860,7 +1860,8 @@ class MainFrame(wx.Frame):
             self._show_error_ok_dialog(Strings.warn_errors.format(formatted))
             return
 
-        # Todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering the text on main thread.
+        # Todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering
+        #  the text on main thread.
         self._main_text_field.EmptyUndoBuffer()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._set_status_text(self._current_document.get_path().name, 1)

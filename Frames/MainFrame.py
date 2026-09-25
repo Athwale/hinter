@@ -1317,6 +1317,7 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # TODO recalculate the coloring data when idle. Do not redraw, just prepare data and update side list.
+        # TODO taskbar icon
         print('timer')
 
     def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:

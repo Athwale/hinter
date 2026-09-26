@@ -124,6 +124,7 @@ class MainFrame(wx.Frame):
         self.Bind(Events.EVT_TEXT_CHANGED, self._notes_changed_handler)
 
         # Init layout:
+        self.SetIcon(wx.Icon(Fetch.get_resource_path('icon.ico'), wx.BITMAP_TYPE_ICO))
         self._init_menu_bar()
         self._init_tool_bar()
         self._init_main_layout()
@@ -1317,7 +1318,6 @@ class MainFrame(wx.Frame):
         :return: None
         """
         # TODO recalculate the coloring data when idle. Do not redraw, just prepare data and update side list.
-        # TODO taskbar icon
         print('timer')
 
     def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:

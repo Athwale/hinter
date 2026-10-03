@@ -1014,16 +1014,6 @@ class MainFrame(wx.Frame):
             event.Skip()
 
     # noinspection PyUnusedLocal
-    def _main_text_field_key_handler(self, event: wx.KeyEvent) -> None:
-        """
-        Mark current line with highlight on any keypress.
-        :param event: Not used.
-        :return: None
-        """
-        self._highlight_current_line()
-        event.Skip()
-
-    # noinspection PyUnusedLocal
     def _llm_input_field_send_handler(self, event: wx.CommandEvent) -> None:
         """
         Send message to LLM.
@@ -1300,6 +1290,8 @@ class MainFrame(wx.Frame):
             if word_instance.has_indicator() and w.is_checked():
                 indicator = word_instance.get_indicator()
                 locations = word_instance.get_spans()
+                # TODO limit to the range of currently visible lines.
+                # todo store the results in a global var, display on scroll and clean before displaying with delay?
                 for word_span in locations:
                     word_span: re.Match
                     self._main_text_field.SetIndicatorCurrent(indicator)
@@ -1309,6 +1301,21 @@ class MainFrame(wx.Frame):
         self._main_text_field.Refresh()
         self._update_indicator_count()
         self._coloring_spinner.Stop()
+
+    # noinspection PyUnusedLocal
+    def _main_text_field_key_handler(self, event: wx.KeyEvent) -> None:
+        """
+        Mark current line with highlight on any keypress. And display markers.
+        :param event: Not used.
+        :return: None
+        """
+        first_display_line = self._main_text_field.GetFirstVisibleLine()
+        last_display_line = first_display_line + self._main_text_field.LinesOnScreen()
+        start = self._main_text_field.PositionFromLine(first_display_line)
+        end = self._main_text_field.GetLineEndPosition(last_display_line)
+
+        self._highlight_current_line()
+        event.Skip()
 
     # noinspection PyUnusedLocal
     def _on_idle_timer_handler(self, event: wx.CommandEvent) -> None:

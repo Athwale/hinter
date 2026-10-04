@@ -1175,12 +1175,9 @@ class MainFrame(wx.Frame):
 
         # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
         #  Can we update the list somehow automatically? Precalculate on idle?
-        # Clear before reapplying. We always have 0-31 indicators.
-        for indicator in range(32):
-            self._main_text_field.SetIndicatorCurrent(indicator)
-            self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
-            if not self._selected_words and self._coloring_tool_off:
-                self._side_word_list.clear_list()
+        self._clear_visible_range_indicators()
+        if not self._selected_words and self._coloring_tool_off:
+            self._side_word_list.clear_list()
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
@@ -1194,11 +1191,9 @@ class MainFrame(wx.Frame):
                 self._coloring_spinner.Start()
                 ColoratorThread(self, self._current_document, self._main_text_field.GetText())
             else:
-                # This runs when we are using the list check boxes and spinners.
-                # todo changing the text and then using the checkboxes messes up the positions.
-                #  Every position after the changed text must be updated.
-                #  Solve this later. Start recalculating once idle in background?
-                ColoratorThread(self, self._current_document, self._main_text_field.GetText())
+                # This runs when we are using the list check boxes and spinners. Apply indicators using previous data
+                # that is calculated on text change in background.
+                self.apply_indicators()
 
     def apply_indicators_callback(self, plain_words: Dict[bytes, int],
                                   spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
@@ -1218,6 +1213,7 @@ class MainFrame(wx.Frame):
         Apply indicators once the thread calculations are made.
         :return: None
         """
+        # todo test printing a and check this does not run multiple times
         assert self._current_document is not None
         assert self._side_word_list is not None
         assert self._repetition_selector is not None
@@ -1301,19 +1297,7 @@ class MainFrame(wx.Frame):
                     item.set_enabled(has_indicator)
 
         # Display indicators.
-        # todo dynamically display indicators, do we delay this a little for the user to stop scrolling?
-        # Get the span of text that is currently visible to the user.
-        first_display_line = self._main_text_field.DocLineFromVisible(self._main_text_field.GetFirstVisibleLine())
-        last_display_line = first_display_line + self._main_text_field.LinesOnScreen()
-        visible_start = self._main_text_field.PositionFromLine(first_display_line)
-        visible_end = self._main_text_field.GetLineEndPosition(last_display_line)
-
-        # Reduce redrawing with freeze. # todo do we need this when we display dynamically?
-        self._main_text_field.Freeze()
-        for indicator in range(32):
-            # Clear indicators in visible range before reapplying. We always have 0-31 indicators.
-            self._main_text_field.SetIndicatorCurrent(indicator)
-            self._main_text_field.IndicatorClearRange(visible_start, visible_end)
+        visible_start, visible_end = self._clear_visible_range_indicators()
         for w in fitting_words:
             w: ListItemPanel
             word_instance = w.get_word_instance()
@@ -1327,20 +1311,49 @@ class MainFrame(wx.Frame):
                         self._main_text_field.SetIndicatorCurrent(indicator)
                         self._main_text_field.IndicatorFillRange(word_span.span()[0],
                                                                  word_span.span()[1] - word_span.span()[0])
-        self._main_text_field.Thaw()
         self._main_text_field.Refresh()
         self._update_indicator_count()
         self._coloring_spinner.Stop()
 
+    def _clear_visible_range_indicators(self) -> tuple[int, int]:
+        """
+        Clear all indicators in the range of lines the user can see.
+        :return: (visible_start, visible_ent) as character positions in the window.
+        """
+        assert self._main_text_field is not None
+
+        # Get the span of text currently visible to the user. DocLineFromVisible corrects for shift by word wrap.
+        first_display_line = self._main_text_field.DocLineFromVisible(self._main_text_field.GetFirstVisibleLine())
+        last_display_line = first_display_line + self._main_text_field.LinesOnScreen()
+        visible_start = self._main_text_field.PositionFromLine(first_display_line)
+        visible_end = self._main_text_field.GetLineEndPosition(last_display_line)
+
+        # Clear indicators in visible range before reapplying. We always have 0-31 indicators.
+        for indicator in range(32):
+            self._main_text_field.SetIndicatorCurrent(indicator)
+            self._main_text_field.IndicatorClearRange(visible_start, visible_end)
+        return visible_start, visible_end
+
     # noinspection PyUnusedLocal
-    def _main_text_field_key_handler(self, event: wx.KeyEvent) -> None:
+    def _main_text_field_key_handler(self, event: stc.StyledTextEvent) -> None:
         """
         Mark current line with highlight on any keypress. And display markers.
         :param event: Not used.
         :return: None
         """
+        assert self._toolbar is not None
+
         self._highlight_current_line()
         event.Skip()
+
+        # TODO recalculate the coloring data on text change in thread only if the thread is not running already. Disable controls while running?
+
+        # Check bitmask to do indicator redrawing only when scrolling.
+        updated = event.GetUpdated()
+        if updated & stc.STC_UPDATE_V_SCROLL:
+            colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
+            if self._current_document and self._word_counts and colorize_tool.IsToggled():
+                self.apply_indicators()
 
     # noinspection PyUnusedLocal
     def _on_idle_timer_handler(self, event: wx.CommandEvent) -> None:

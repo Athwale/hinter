@@ -1301,10 +1301,9 @@ class MainFrame(wx.Frame):
                     item.set_enabled(has_indicator)
 
         # Display indicators.
-        # todo this is the slowest part, can we apply indicators only to the currently visible lines?
         # todo dynamically display indicators, do we delay this a little for the user to stop scrolling?
         # Get the span of text that is currently visible to the user.
-        first_display_line = self._main_text_field.GetFirstVisibleLine()
+        first_display_line = self._main_text_field.DocLineFromVisible(self._main_text_field.GetFirstVisibleLine())
         last_display_line = first_display_line + self._main_text_field.LinesOnScreen()
         visible_start = self._main_text_field.PositionFromLine(first_display_line)
         visible_end = self._main_text_field.GetLineEndPosition(last_display_line)
@@ -1325,7 +1324,6 @@ class MainFrame(wx.Frame):
                     word_span: re.Match
                     if visible_start <= word_span.span()[0] <= visible_end:
                         # Only apply indicator if the word starts inside the visible text on screen
-                        # todo except document start, the spans are moved down for some reason
                         self._main_text_field.SetIndicatorCurrent(indicator)
                         self._main_text_field.IndicatorFillRange(word_span.span()[0],
                                                                  word_span.span()[1] - word_span.span()[0])

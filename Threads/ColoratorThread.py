@@ -41,11 +41,13 @@ class ColoratorThread(Thread):
 
         # Defaultdict wll create a new empty list if the key does not exist and add it into it. Otherwise, it
         # will just add the word.
+        # Dictionary of words as bytes and a list of regex matches where the word is.
         spans_by_word: defaultdict[bytes, List[re.Match]] = defaultdict(list)
         for span in word_spans:
             word_bytes = span.group()
             spans_by_word[word_bytes].append(span)
 
+        # Dictionary of words as bytes and the amount of each word.
         plain_words: Dict[bytes, int] = {word: len(spans) for word, spans in spans_by_word.items()}
 
         # Remove words no longer present.

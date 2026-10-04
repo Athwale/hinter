@@ -105,6 +105,10 @@ class MainFrame(wx.Frame):
         self._coloring_tool_off: bool = True
         self._log_up: bool = False
 
+        # Used for repeated word marking
+        self._word_counts: Dict[bytes, int] = {}
+        self._spans_by_word: defaultdict[bytes, List[re.Match]] = None
+
         self._notes_dialog: NotesEditorDialog | None = None
         self._notes_open: bool = False
 
@@ -1199,8 +1203,19 @@ class MainFrame(wx.Frame):
     def apply_indicators_callback(self, plain_words: Dict[bytes, int],
                                   spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
         """
+        Thread callback to receive repeated word indicator calculation results from a thread.
+        :param plain_words: Dictionary of words as bytes and the amount of each word.
+        :param spans_by_word: Dictionary of words as bytes and a list of regex matches where the word is.
+        :return: None
+        """
+        self._word_counts = plain_words
+        self._spans_by_word = spans_by_word
+        self.apply_indicators()
+
+    def apply_indicators(self) -> None:
+        """
         # todo this method is slow on long texts.
-        Thread callback to finish applying indicators once the calculations are made.
+        Apply indicators once the thread calculations are made.
         :return: None
         """
         assert self._current_document is not None
@@ -1210,6 +1225,11 @@ class MainFrame(wx.Frame):
         assert self._max_repeated_word_length_selector is not None
         assert self._main_text_field is not None
         assert self._coloring_spinner is not None
+
+        # Dictionary of words as bytes and the amount of each word.
+        plain_words: Dict[bytes, int] = self._word_counts
+        # Dictionary of words as bytes and a list of regex matches where the word is.
+        spans_by_word: defaultdict[bytes, List[re.Match]] = self._spans_by_word
 
         word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
         # Update or create word panels
@@ -1282,21 +1302,33 @@ class MainFrame(wx.Frame):
 
         # Display indicators.
         # todo this is the slowest part, can we apply indicators only to the currently visible lines?
-        # Reduce redrawing with freeze.
+        # todo dynamically display indicators, do we delay this a little for the user to stop scrolling?
+        # Get the span of text that is currently visible to the user.
+        first_display_line = self._main_text_field.GetFirstVisibleLine()
+        last_display_line = first_display_line + self._main_text_field.LinesOnScreen()
+        visible_start = self._main_text_field.PositionFromLine(first_display_line)
+        visible_end = self._main_text_field.GetLineEndPosition(last_display_line)
+
+        # Reduce redrawing with freeze. # todo do we need this when we display dynamically?
         self._main_text_field.Freeze()
+        for indicator in range(32):
+            # Clear indicators in visible range before reapplying. We always have 0-31 indicators.
+            self._main_text_field.SetIndicatorCurrent(indicator)
+            self._main_text_field.IndicatorClearRange(visible_start, visible_end)
         for w in fitting_words:
             w: ListItemPanel
             word_instance = w.get_word_instance()
             if word_instance.has_indicator() and w.is_checked():
                 indicator = word_instance.get_indicator()
                 locations = word_instance.get_spans()
-                # TODO limit to the range of currently visible lines.
-                # todo store the results in a global var, display on scroll and clean before displaying with delay?
                 for word_span in locations:
                     word_span: re.Match
-                    self._main_text_field.SetIndicatorCurrent(indicator)
-                    self._main_text_field.IndicatorFillRange(word_span.span()[0],
-                                                             word_span.span()[1] - word_span.span()[0])
+                    if visible_start <= word_span.span()[0] <= visible_end:
+                        # Only apply indicator if the word starts inside the visible text on screen
+                        # todo except document start, the spans are moved down for some reason
+                        self._main_text_field.SetIndicatorCurrent(indicator)
+                        self._main_text_field.IndicatorFillRange(word_span.span()[0],
+                                                                 word_span.span()[1] - word_span.span()[0])
         self._main_text_field.Thaw()
         self._main_text_field.Refresh()
         self._update_indicator_count()
@@ -1309,11 +1341,6 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        first_display_line = self._main_text_field.GetFirstVisibleLine()
-        last_display_line = first_display_line + self._main_text_field.LinesOnScreen()
-        start = self._main_text_field.PositionFromLine(first_display_line)
-        end = self._main_text_field.GetLineEndPosition(last_display_line)
-
         self._highlight_current_line()
         event.Skip()
 

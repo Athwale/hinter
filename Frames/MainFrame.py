@@ -121,6 +121,7 @@ class MainFrame(wx.Frame):
         self._llm_thread: LLMThread | None = None
         self._statistics_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._on_statistics_timer_handler, self._statistics_timer)
+
         self._idle_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._on_idle_timer_handler, self._idle_timer)
 
@@ -1362,8 +1363,10 @@ class MainFrame(wx.Frame):
         :param event: Not used.
         :return: None
         """
-        # TODO recalculate the coloring data when idle. Do not redraw, just prepare data and update side list.
-        print('timer')
+        assert self._current_document is not None
+
+        if self._current_document.is_modified():
+            self._save_document(tests=False)
 
     def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1949,10 +1952,11 @@ class MainFrame(wx.Frame):
         except (AttributeError, PermissionError) as _:
             self._show_error_ok_dialog(Strings.err_config_file)
 
-    def _save_document(self, save_as: bool = False) -> None:
+    def _save_document(self, save_as: bool = False, tests: bool = True) -> None:
         """
         Save current file and optionally show a save as dialog.
         :param save_as: True to show dialog.
+        :param tests: Run tests on document while saving.
         :return: None
         """
         assert self._current_document is not None
@@ -1968,7 +1972,8 @@ class MainFrame(wx.Frame):
             self._waiting_dialog.Show()
             self._waiting_dialog.start(saving=True)
             self._current_document.set_path(Path(destination))
-            SaveFileThread(self, self._current_document, self._convert_document(), self._main_text_field.GetText())
+            SaveFileThread(self, self._current_document, self._convert_document(), self._main_text_field.GetText(),
+                           tests)
         else:
             # Canceled dialog.
             self._set_status_text(Strings.status_not_saved.format('canceled'), 0)
@@ -1998,6 +2003,7 @@ class MainFrame(wx.Frame):
             self.post_divider()
             self.post_message(Strings.msg_save_fail.format(self._current_document.get_path()), Constants.msg_err)
         self._waiting_dialog.Close()
+        self._main_text_field.SetFocus()
 
     def document_test_callback(self, result: defaultdict[str, List[Tuple[str, int]]]) -> None:
         """

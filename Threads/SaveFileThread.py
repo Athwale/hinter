@@ -14,7 +14,7 @@ class SaveFileThread(Thread):
     Thread for saving the current document to disk.
     """
 
-    def __init__(self, parent, document: Document, converted_text: List, plain_text: str) -> None:
+    def __init__(self, parent, document: Document, converted_text: List, plain_text: str, run_tests: bool) -> None:
         """
         Thread constructor.
         The editor is disabled during this operation.
@@ -22,6 +22,7 @@ class SaveFileThread(Thread):
         :param document: The document instance to save.
         :param converted_text: Data prepared for saving.
         :param plain_text: Plain text for additional tests.
+        :param run_tests: Run or do not run tests.
         :return: None
         """
         super().__init__()
@@ -30,6 +31,7 @@ class SaveFileThread(Thread):
         # Using the text field here is not thread safe. Gui methods can not be called form background threads safely.
         self._converted_text = converted_text
         self._plain_text = plain_text
+        self._run_tets = run_tests
         self.start()
 
     def run(self) -> None:
@@ -47,25 +49,26 @@ class SaveFileThread(Thread):
             wx.CallAfter(self._parent.save_document_callback, False)
             return
 
-        check_fails: defaultdict[str, List[Tuple[str, int]]] = defaultdict(list)
-        check_functions: List[Callable[[str, int, str], Tuple[str, List[Tuple[str, int]]]]] = [self._check_leftover,
+        if self._run_tets:
+            check_fails: defaultdict[str, List[Tuple[str, int]]] = defaultdict(list)
+            check_functions: List[Callable[[str, int, str], Tuple[str, List[Tuple[str, int]]]]] = [self._check_leftover,
                                                                                    self._check_repetitions,
                                                                                    self._check_similar_words]
-        if self._document.get_names():
-            check_functions.append(self._check_names)
-            check_functions.append(self._check_name_lines)
-        else:
-            check_fails[Constants.report_names_capitalized] = [(Strings.report_names_not_configured_lines, -1)]
-            check_fails[Constants.report_name_lines] = [(Strings.report_names_not_configured_caps, -1)]
+            if self._document.get_names():
+                check_functions.append(self._check_names)
+                check_functions.append(self._check_name_lines)
+            else:
+                check_fails[Constants.report_names_capitalized] = [(Strings.report_names_not_configured_lines, -1)]
+                check_fails[Constants.report_name_lines] = [(Strings.report_names_not_configured_caps, -1)]
 
-        # Enumerate will not create the whole list in memory.
-        for counter, line in enumerate(self._plain_text.splitlines(), start=1):
-            stub = line[0:25] if len(line) >= 25 else line
-            for f in check_functions:
-                test_type, test_result = f(line, counter, stub)
-                if test_result:
-                    check_fails[test_type].extend(test_result)
-        wx.CallAfter(self._parent.document_test_callback, check_fails)
+            # Enumerate will not create the whole list in memory.
+            for counter, line in enumerate(self._plain_text.splitlines(), start=1):
+                stub = line[0:25] if len(line) >= 25 else line
+                for f in check_functions:
+                    test_type, test_result = f(line, counter, stub)
+                    if test_result:
+                        check_fails[test_type].extend(test_result)
+            wx.CallAfter(self._parent.document_test_callback, check_fails)
 
     def _check_name_lines(self, line: str, line_index: int, stub: str) -> Tuple[str, List[Tuple[str, int]]]:
         """
@@ -73,7 +76,7 @@ class SaveFileThread(Thread):
         :param line: Line to check.
         :param line_index: Line number.
         :param stub: Line stub.
-        :return: List of erros strings.
+        :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
         for name in self._document.get_names():
@@ -88,7 +91,7 @@ class SaveFileThread(Thread):
         :param line: Line to check.
         :param line_index: Line number.
         :param stub: Line stub.
-        :return: List of erros strings.
+        :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
         names = self._document.get_names()
@@ -105,7 +108,7 @@ class SaveFileThread(Thread):
         :param line: Line to check.
         :param line_index: Line number.
         :param stub: Line stub.
-        :return: List of erros strings.
+        :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
         variants = (r'\b(?:the a|a the)\b', r' as \w+ a ')
@@ -122,7 +125,7 @@ class SaveFileThread(Thread):
         :param line: Line to check.
         :param line_index: Line number.
         :param stub: Line stub.
-        :return: List of erros strings.
+        :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
         regex = r'\b(\w+)(?:\s+\1)+\b'
@@ -138,7 +141,7 @@ class SaveFileThread(Thread):
         :param line: Line to check.
         :param line_index: Line number.
         :param stub: Line stub.
-        :return: List of erros strings.
+        :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
         word_list = ['shorty', 'shortly']

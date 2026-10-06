@@ -53,6 +53,7 @@ class MainFrame(wx.Frame):
         super(MainFrame, self).__init__(None, title=Strings.app_title.format(Strings.status_no_document))
 
         self._current_document: Document | None = None
+        self._ready: bool = False
 
         self._main_text_field: stc.StyledTextCtrl | None = None
         self._repetition_selector: wx.SpinCtrl | None = None
@@ -107,7 +108,7 @@ class MainFrame(wx.Frame):
 
         # Used for repeated word marking
         self._word_counts: Dict[bytes, int] = {}
-        self._spans_by_word: defaultdict[bytes, List[re.Match]] = None
+        self._spans_by_word: defaultdict[bytes, List[re.Match]] = defaultdict()
 
         self._notes_dialog: NotesEditorDialog | None = None
         self._notes_open: bool = False
@@ -118,6 +119,8 @@ class MainFrame(wx.Frame):
         self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
 
         self._statistics_thread: StatisticsThread | None = None
+        self._colorator_thread: ColoratorThread | None = None
+
         self._llm_thread: LLMThread | None = None
         self._statistics_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._on_statistics_timer_handler, self._statistics_timer)
@@ -1188,12 +1191,9 @@ class MainFrame(wx.Frame):
             self._coloring_tool_off = True
             return
         else:
+            self._coloring_spinner.Start()
             if self._coloring_tool_off:
-                self._coloring_spinner.Start()
-                ColoratorThread(self, self._current_document, self._main_text_field.GetText())
-            else:
-                # This runs when we are using the list check boxes and spinners. Apply indicators using previous data
-                # that is calculated on text change in background.
+                # Apply indicators using previous data that is calculated on text change in background.
                 self.apply_indicators()
 
     def apply_indicators_callback(self, plain_words: Dict[bytes, int],
@@ -1204,9 +1204,13 @@ class MainFrame(wx.Frame):
         :param spans_by_word: Dictionary of words as bytes and a list of regex matches where the word is.
         :return: None
         """
+        assert self._toolbar is not None
+
         self._word_counts = plain_words
         self._spans_by_word = spans_by_word
-        self.apply_indicators()
+
+        # Enable the coloring tool once we have data to show.
+        self._toolbar.EnableTool(wx.ID_APPLY, True)
 
     def apply_indicators(self) -> None:
         """
@@ -1347,8 +1351,6 @@ class MainFrame(wx.Frame):
         self._highlight_current_line()
         event.Skip()
 
-        # TODO recalculate the coloring data on text change in thread only if the thread is not running already. Disable controls while running?
-
         # Check bitmask to do indicator redrawing only when scrolling.
         updated = event.GetUpdated()
         if updated & stc.STC_UPDATE_V_SCROLL:
@@ -1364,6 +1366,17 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._current_document is not None
+        assert self._main_text_field is not None
+        assert self._toolbar is not None
+
+        # Recalculate the coloring data if the thread is not running already.
+        if self._current_document:
+            if self._ready:
+                if self._colorator_thread is None or not self._colorator_thread.is_alive():
+                    self._colorator_thread = ColoratorThread(self, self._current_document,
+                                                             self._main_text_field.GetText())
+                    # todo button needs to be disabled along with other indicator controls when the text changes until new data is calculated.
+                    self._toolbar.EnableTool(wx.ID_APPLY, False)
 
         if self._current_document.is_modified():
             self._save_document(tests=False)
@@ -1729,6 +1742,7 @@ class MainFrame(wx.Frame):
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
 
+        self._ready = False
         if everything:
             self.Disable()
             for t in self._tools:
@@ -1762,9 +1776,13 @@ class MainFrame(wx.Frame):
         self._max_repeated_word_length_selector.Enable()
         self._main_text_field.Enable()
         for t in self._tools:
+            if t.GetId() == wx.ID_APPLY:
+                # Skip the coloring tool, that is enabled by it's own thread logic.
+                continue
             self._toolbar.EnableTool(t.GetId(), True)
         for i in self._menu_items:
             i.Enable(True)
+        self._ready = True
 
     def _open_save_dialog(self) -> str:
         """

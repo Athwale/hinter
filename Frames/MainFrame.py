@@ -369,9 +369,6 @@ class MainFrame(wx.Frame):
                                                                        shortHelp=Strings.menu_item_colorize)
         self._tools.append(colorize_tool)
 
-        self._coloring_spinner = wx.ActivityIndicator(self._toolbar, wx.ID_ANY, size=wx.Size(10, 10))
-        self._toolbar.AddControl(self._coloring_spinner, "")
-
         log_tool: wx.ToolBarToolBase = self._toolbar.AddCheckTool(toolId=wx.ID_UP,
                                                                   label=Strings.menu_item_log_open,
                                                                   bitmap1=self._scale_icon('up.svg',
@@ -391,6 +388,9 @@ class MainFrame(wx.Frame):
                                                                                 Constants.icon_tool_height),
                                                                Strings.menu_item_notes_hint)
         self._tools.append(notes_tool)
+
+        self._coloring_spinner = wx.ActivityIndicator(self._toolbar, wx.ID_ANY, size=wx.Size(10, 10))
+        self._toolbar.AddControl(self._coloring_spinner, "")
 
         self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
 
@@ -1174,7 +1174,6 @@ class MainFrame(wx.Frame):
         assert self._main_text_field is not None
         assert self._side_word_list is not None
         assert self._toolbar is not None
-        assert self._coloring_spinner is not None
         assert self._current_document is not None
 
         # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
@@ -1191,7 +1190,6 @@ class MainFrame(wx.Frame):
             self._coloring_tool_off = True
             return
         else:
-            self._coloring_spinner.Start()
             if self._coloring_tool_off:
                 # Apply indicators using previous data that is calculated on text change in background.
                 self.apply_indicators()
@@ -1205,27 +1203,42 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._toolbar is not None
+        assert self._coloring_spinner is not None
+        assert self._side_word_list is not None
+        assert self._repetition_selector is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
 
         self._word_counts = plain_words
         self._spans_by_word = spans_by_word
 
         # Enable the coloring tool once we have data to show.
         self._toolbar.EnableTool(wx.ID_APPLY, True)
+        self._side_word_list.Enable()
+
+        self._repetition_selector.Enable()
+        self._min_repeated_word_length_selector.Enable()
+        self._max_repeated_word_length_selector.Enable()
+        for item in self._menu_items:
+            item: wx.MenuItem
+            if item.GetId() == wx.ID_RESET or item.GetId() == self._id_ignored:
+                item.Enable(True)
+
+        self._coloring_spinner.Stop()
 
     def apply_indicators(self) -> None:
         """
         # todo this method is slow on long texts.
+        # todo test printing a and check this does not run multiple times
         Apply indicators once the thread calculations are made.
         :return: None
         """
-        # todo test printing a and check this does not run multiple times
         assert self._current_document is not None
         assert self._side_word_list is not None
         assert self._repetition_selector is not None
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
         assert self._main_text_field is not None
-        assert self._coloring_spinner is not None
 
         # Dictionary of words as bytes and the amount of each word.
         plain_words: Dict[bytes, int] = self._word_counts
@@ -1318,7 +1331,6 @@ class MainFrame(wx.Frame):
                                                                  word_span.span()[1] - word_span.span()[0])
         self._main_text_field.Refresh()
         self._update_indicator_count()
-        self._coloring_spinner.Stop()
 
     def _clear_visible_range_indicators(self) -> tuple[int, int]:
         """
@@ -1375,8 +1387,6 @@ class MainFrame(wx.Frame):
                 if self._colorator_thread is None or not self._colorator_thread.is_alive():
                     self._colorator_thread = ColoratorThread(self, self._current_document,
                                                              self._main_text_field.GetText())
-                    # todo button needs to be disabled along with other indicator controls when the text changes until new data is calculated.
-                    self._toolbar.EnableTool(wx.ID_APPLY, False)
 
         if self._current_document.is_modified():
             self._save_document(tests=False)
@@ -1472,6 +1482,12 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._main_text_field is not None
+        assert self._toolbar is not None
+        assert self._coloring_spinner is not None
+        assert self._repetition_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._side_word_list is not None
 
         # The even contains a bit mask of what happened, we need to compare it with &.
         mod_type: int = event.GetModificationType()
@@ -1482,6 +1498,20 @@ class MainFrame(wx.Frame):
         if mod_type & stc.STC_MOD_CHANGEINDICATOR:
             # Do not run for word marking with colors.
             return
+
+        # Disable indicators because recalculation is needed.
+        # TODO changing selectors is broken.
+        # TODO unselecting list items hides all.
+        self._coloring_spinner.Start()
+        self._toolbar.EnableTool(wx.ID_APPLY, False)
+        self._repetition_selector.Disable()
+        self._min_repeated_word_length_selector.Disable()
+        self._max_repeated_word_length_selector.Disable()
+        self._side_word_list.Disable()
+        for item in self._menu_items:
+            item: wx.MenuItem
+            if item.GetId() == wx.ID_RESET or item.GetId() == self._id_ignored:
+                item.Enable(False)
 
         self._found_last_index = 0
         self._found_words.clear()
@@ -1730,6 +1760,31 @@ class MainFrame(wx.Frame):
             self._load_document(last_file)
         self._test_llm_connection()
 
+    def enable_editor(self) -> None:
+        """
+        Enable all features of the editor.
+        :return: None
+        """
+        assert self._toolbar is not None
+        assert self._repetition_selector is not None
+        assert self._main_text_field is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+
+        self.Enable()
+        self._main_text_field.Enable()
+        for t in self._tools:
+            if t.GetId() == wx.ID_APPLY:
+                # Skip the coloring tool, that is enabled by its own thread logic.
+                continue
+            self._toolbar.EnableTool(t.GetId(), True)
+        for i in self._menu_items:
+            if i.GetId() == wx.ID_RESET or i.GetId() == self._id_ignored:
+                # These are enabled by the colorator thread finishing work.
+                continue
+            i.Enable(True)
+        self._ready = True
+
     def _disable_editor(self, everything=False) -> None:
         """
         Disable all features.
@@ -1758,31 +1813,6 @@ class MainFrame(wx.Frame):
         for i in self._menu_items:
             if i.GetId() not in [wx.ID_NEW, wx.ID_OPEN, wx.ID_EXIT, wx.ID_ABOUT]:
                 i.Enable(False)
-
-    def enable_editor(self) -> None:
-        """
-        Enable all features of the editor.
-        :return: None
-        """
-        assert self._toolbar is not None
-        assert self._repetition_selector is not None
-        assert self._main_text_field is not None
-        assert self._min_repeated_word_length_selector is not None
-        assert self._max_repeated_word_length_selector is not None
-
-        self.Enable()
-        self._repetition_selector.Enable()
-        self._min_repeated_word_length_selector.Enable()
-        self._max_repeated_word_length_selector.Enable()
-        self._main_text_field.Enable()
-        for t in self._tools:
-            if t.GetId() == wx.ID_APPLY:
-                # Skip the coloring tool, that is enabled by it's own thread logic.
-                continue
-            self._toolbar.EnableTool(t.GetId(), True)
-        for i in self._menu_items:
-            i.Enable(True)
-        self._ready = True
 
     def _open_save_dialog(self) -> str:
         """

@@ -137,7 +137,7 @@ report_capital_names: str = "Line: {} starts with name: {} - {}..."
 report_names: str = "Line: {} has uncapitalized name: {} - {}..."
 report_leftover: str = "Line: {} has leftover: {} - {}..."
 report_repetition: str = "Line: {} has repeated word: {} - {}..."
-report_similars: str = "Line: {} has word which may be incorrect: {} - {}..."
+report_similar: str = "Line: {} has word which may be incorrect: {} - {}..."
 report_count: str = "{} errors"
 
 msg_init: str = "Initialized OK"

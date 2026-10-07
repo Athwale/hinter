@@ -147,5 +147,5 @@ class SaveFileThread(Thread):
         word_list = ['shorty', 'shortly']
         for word in word_list:
             if word in line:
-                errors.append((Strings.report_similars.format(line_index, word, stub), line_index))
+                errors.append((Strings.report_similar.format(line_index, word, stub), line_index))
         return Constants.report_similar, errors

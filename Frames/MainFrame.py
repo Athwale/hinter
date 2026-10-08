@@ -1189,11 +1189,52 @@ class MainFrame(wx.Frame):
             self._main_text_field.Refresh()
             self._side_word_list.clear_list()
             self._coloring_tool_off = True
-            return
         else:
-            if self._coloring_tool_off:
-                # Apply indicators using previous data that is calculated on text change in background.
-                self.apply_indicators()
+            # Apply indicators using previous data that is calculated on text change in background.
+            self.apply_indicators()
+
+    def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Handle changes to word repetition spin ctrls.
+        :param event: Not used.
+        :return: None
+        """
+        assert self._toolbar is not None
+
+        # TODO changing limits leaves disabled items disabled even though we should have free indicators.
+        # todo indicators should be freed from words not fitting the limits.
+        colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
+        if colorize_tool.IsToggled():
+            self._apply_indicators_handler(event)
+
+    def _word_list_handler(self, event: dv.DataViewEvent) -> None:
+        """
+        Handle checkboxes in the side word list.
+        This even fires after the checkbox has been changed.
+        :param event: Passed along.
+        :return: None
+        """
+        assert self._side_word_list is not None
+
+        self._selected_words.clear()
+        for item in self._side_word_list.GetChildren():
+            # Assign indicators to selected words.
+            item: ListItemPanel
+            if item.is_checked():
+                self._selected_words.append(item.get_word_instance().get_word())
+                if not item.get_word_instance().has_indicator():
+                    if len(self._available_indicators) > 0:
+                        item.get_word_instance().set_indicator(self._available_indicators.pop())
+                    else:
+                        item.get_word_instance().clear_indicator()
+            else:
+                # Return indicator to magazine.
+                indicator = item.get_word_instance().get_indicator()
+                item.get_word_instance().clear_indicator()
+                if indicator > -1:
+                    self._available_indicators.add(indicator)
+        self._clear_visible_range_indicators()
+        self.apply_indicators()
 
     def apply_indicators_callback(self, plain_words: Dict[bytes, int],
                                   spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
@@ -1301,6 +1342,12 @@ class MainFrame(wx.Frame):
             # Fill only once when the tool runs the first time.
             self._side_word_list.add_items(fitting_words)
             self._coloring_tool_off = False
+            if self._available_indicators:
+                # We have some spare indicators, enable all checkboxes.
+                for item in self._side_word_list.GetChildren():
+                    item: ListItemPanel
+                    if not item.is_enabled():
+                        item.set_enabled(True)
         else:
             if self._available_indicators:
                 # We have some spare indicators, enable all checkboxes.
@@ -1392,42 +1439,6 @@ class MainFrame(wx.Frame):
         if self._current_document.is_modified():
             self._save_document(tests=False)
 
-    def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:
-        """
-        Handle changes to word repetition spin ctrls.
-        :param event: Not used.
-        :return: None
-        """
-        assert self._toolbar is not None
-
-        colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
-        if colorize_tool.IsToggled():
-            self._apply_indicators_handler(event)
-
-    def _word_list_handler(self, event: dv.DataViewEvent) -> None:
-        """
-        Handle checkboxes in the side word list.
-        This even fires after the checkbox has been changed.
-        :param event: Passed along.
-        :return: None
-        """
-        assert self._side_word_list is not None
-
-        self._selected_words.clear()
-        for item in self._side_word_list.GetChildren():
-            item: ListItemPanel
-            if item.is_checked():
-                self._selected_words.append(item.get_word_instance().get_word())
-                if not item.get_word_instance().has_indicator():
-                    item.get_word_instance().set_indicator(self._available_indicators.pop())
-            else:
-                # Return indicator to magazine.
-                indicator = item.get_word_instance().get_indicator()
-                if indicator > -1:
-                    self._available_indicators.add(indicator)
-                    item.get_word_instance().clear_indicator()
-        self._apply_indicators_handler(event)
-
     # noinspection PyUnusedLocal
     def _make_bold_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1501,8 +1512,6 @@ class MainFrame(wx.Frame):
             return
 
         # Disable indicators because recalculation is needed.
-        # TODO changing selectors is broken.
-        # TODO unselecting list items hides all.
         self._coloring_spinner.Start()
         self._toolbar.EnableTool(wx.ID_APPLY, False)
         self._repetition_selector.Disable()

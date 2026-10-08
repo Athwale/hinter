@@ -830,6 +830,7 @@ class MainFrame(wx.Frame):
                 # Replace with synonym.
                 item_id = event.GetId()
                 menu = event.GetEventObject()
+                menu: wx.Menu
                 menu_item = menu.FindItemById(item_id)
                 item_text = menu_item.GetItemLabelText()
                 self._main_text_field.ReplaceSelection(item_text)

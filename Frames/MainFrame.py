@@ -70,6 +70,7 @@ class MainFrame(wx.Frame):
         self._tools: List[wx.ToolBarToolBase] = []
         self._menu_items: List[wx.MenuItem] = []
         self._side_word_list: SidePanel | None = None
+        self._side_word_border_sizer: wx.StaticBoxSizer | None = None
         self._splitter: wx.SplitterWindow | None = None
         self._coloring_spinner: wx.ActivityIndicator | None = None
         self._ai_spinner: wx.ActivityIndicator | None = None
@@ -268,7 +269,7 @@ class MainFrame(wx.Frame):
         # Bind menu item handlers.
         # File menu:
         self.Bind(wx.EVT_MENU, self._quit_handler, file_menu_item_quit)
-        self.Bind(wx.EVT_MENU, self._open_file, file_menu_item_open)
+        self.Bind(wx.EVT_MENU, self._open_file_handler, file_menu_item_open)
         self.Bind(wx.EVT_MENU, self._save_file_handler, file_menu_item_save)
         self.Bind(wx.EVT_MENU, self._save_as_file_handler, file_menu_item_save_as)
         self.Bind(wx.EVT_MENU, self._new_file_handler, file_menu_item_new)
@@ -488,11 +489,12 @@ class MainFrame(wx.Frame):
         # Initialize word list:
         self._side_word_list = SidePanel(self)
         assert self._side_word_list is not None
-        side_word_border_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, Strings.label_words)
-        font = side_word_border_sizer.GetStaticBox().GetFont()
+        self._side_word_border_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, Strings.label_words.format('0'))
+        assert self._side_word_border_sizer is not None
+        font = self._side_word_border_sizer.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
-        side_word_border_sizer.GetStaticBox().SetFont(font)
-        side_word_border_sizer.Add(self._side_word_list, 1, wx.EXPAND)
+        self._side_word_border_sizer.GetStaticBox().SetFont(font)
+        self._side_word_border_sizer.Add(self._side_word_list, 1, wx.EXPAND)
 
         # Initialize search shortcut into accelerator table
         new_id = wx.NewId()
@@ -538,9 +540,11 @@ class MainFrame(wx.Frame):
         self.Bind(stc.EVT_STC_MODIFIED, self.on_modified_handler)
         self.Bind(wx.EVT_CLOSE, self._on_exit_handler)
 
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._repetition_selector)
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._min_repeated_word_length_selector)
-        self.Bind(wx.EVT_SPINCTRL, self._handle_marking_selector_handler, self._max_repeated_word_length_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_indicator_limits_selector_handler, self._repetition_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_indicator_limits_selector_handler,
+                  self._min_repeated_word_length_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_indicator_limits_selector_handler,
+                  self._max_repeated_word_length_selector)
 
         self.Bind(EVT_CHECKBOX_CHANGED, self._word_list_handler)
 
@@ -597,7 +601,7 @@ class MainFrame(wx.Frame):
         input_sizer.Add(self._ai_spinner, 0, wx.EXPAND)
         bottom_panel_sizer.Add(input_sizer, 0, wx.EXPAND)
 
-        main_horizontal_box.Add(side_word_border_sizer, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT,
+        main_horizontal_box.Add(self._side_word_border_sizer, 0, wx.EXPAND | wx.BOTTOM | wx.RIGHT | wx.LEFT,
                                 Constants.default_border)
 
         self.SetSizer(main_horizontal_box)
@@ -837,7 +841,7 @@ class MainFrame(wx.Frame):
             if event_id == self._id_limits:
                 self._max_repeated_word_length_selector.SetValue(len(selection))
                 self._min_repeated_word_length_selector.SetValue(len(selection))
-                self._handle_marking_selector_handler(event)
+                self._handle_indicator_limits_selector_handler(event)
             if event_id == self._id_llm_synonym:
                 self._input_text_field.SetValue(Strings.llm_ask_synonym.format(selection))
                 self._llm_input_field_send_handler(event)
@@ -1149,7 +1153,7 @@ class MainFrame(wx.Frame):
         self.move_log()
 
     # noinspection PyUnusedLocal
-    def _open_file(self, event: wx.CommandEvent) -> None:
+    def _open_file_handler(self, event: wx.CommandEvent) -> None:
         """
         Open existing file for editing.
         :param event: Not used
@@ -1176,24 +1180,35 @@ class MainFrame(wx.Frame):
         assert self._side_word_list is not None
         assert self._toolbar is not None
         assert self._current_document is not None
+        assert self._repetition_selector is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
+        assert self._side_word_border_sizer is not None
 
         # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
-        #  Can we update the list somehow automatically? Precalculate on idle?
+        #  Can we update the list somehow automatically?
         self._clear_visible_range_indicators()
         if not self._selected_words and self._coloring_tool_off:
             self._side_word_list.clear_list()
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
-            # Clear if we are turning the tool off.
+            # Clear if we are turning the tool off. Disable limit controls.
             self._main_text_field.Refresh()
             self._side_word_list.clear_list()
+            self._max_repeated_word_length_selector.Disable()
+            self._min_repeated_word_length_selector.Disable()
+            self._repetition_selector.Disable()
+            self._side_word_border_sizer.GetStaticBox().SetLabel(Strings.label_words.format('0'))
             self._coloring_tool_off = True
         else:
             # Apply indicators using previous data that is calculated on text change in background.
+            self._max_repeated_word_length_selector.Enable()
+            self._min_repeated_word_length_selector.Enable()
+            self._repetition_selector.Enable()
             self.apply_indicators()
 
-    def _handle_marking_selector_handler(self, event: wx.CommandEvent) -> None:
+    def _handle_indicator_limits_selector_handler(self, event: wx.CommandEvent) -> None:
         """
         Handle changes to word repetition spin ctrls.
         :param event: Not used.
@@ -1205,7 +1220,8 @@ class MainFrame(wx.Frame):
         # todo indicators should be freed from words not fitting the limits.
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if colorize_tool.IsToggled():
-            self._apply_indicators_handler(event)
+            self._clear_visible_range_indicators()
+            self.apply_indicators()
 
     def _word_list_handler(self, event: dv.DataViewEvent) -> None:
         """
@@ -1236,42 +1252,12 @@ class MainFrame(wx.Frame):
         self._clear_visible_range_indicators()
         self.apply_indicators()
 
-    def apply_indicators_callback(self, plain_words: Dict[bytes, int],
-                                  spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
-        """
-        Thread callback to receive repeated word indicator calculation results from a thread.
-        :param plain_words: Dictionary of words as bytes and the amount of each word.
-        :param spans_by_word: Dictionary of words as bytes and a list of regex matches where the word is.
-        :return: None
-        """
-        assert self._toolbar is not None
-        assert self._coloring_spinner is not None
-        assert self._side_word_list is not None
-        assert self._repetition_selector is not None
-        assert self._min_repeated_word_length_selector is not None
-        assert self._max_repeated_word_length_selector is not None
-
-        self._word_counts = plain_words
-        self._spans_by_word = spans_by_word
-
-        # Enable the coloring tool once we have data to show.
-        self._toolbar.EnableTool(wx.ID_APPLY, True)
-        self._side_word_list.Enable()
-
-        self._repetition_selector.Enable()
-        self._min_repeated_word_length_selector.Enable()
-        self._max_repeated_word_length_selector.Enable()
-        for item in self._menu_items:
-            item: wx.MenuItem
-            if item.GetId() == wx.ID_RESET or item.GetId() == self._id_ignored:
-                item.Enable(True)
-
-        self._coloring_spinner.Stop()
-
     def apply_indicators(self) -> None:
         """
         # todo this method is slow on long texts.
         # todo test printing a and check this does not run multiple times
+        # todo loading a new document from a loaded document does not show the loading dialog
+        # todo clicking the coloring tool should immediately show button change
         Apply indicators once the thread calculations are made.
         :return: None
         """
@@ -1281,6 +1267,7 @@ class MainFrame(wx.Frame):
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
         assert self._main_text_field is not None
+        assert self._side_word_border_sizer is not None
 
         # Dictionary of words as bytes and the amount of each word.
         plain_words: Dict[bytes, int] = self._word_counts
@@ -1288,19 +1275,18 @@ class MainFrame(wx.Frame):
         spans_by_word: defaultdict[bytes, List[re.Match]] = self._spans_by_word
 
         word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
-        # Update or create word panels
+        # Update or create word panels according to all words in the document.
         # This can not be done in a thread because it is calling a gui method and will segfault.
-        if self._coloring_tool_off:
-            for word, count in plain_words.items():
-                spans = spans_by_word[word]
-                panel = word_data.get(word)
-                if panel is None:
-                    new_panel = self._side_word_list.add_hidden_item(Word(word.decode('utf-8'), spans, count))
-                    word_data[word] = new_panel
-                else:
-                    word_container = panel.get_word_instance()
-                    word_container.set_spans(spans)
-                    word_container.set_count(count)
+        for word, count in plain_words.items():
+            spans = spans_by_word[word]
+            panel = word_data.get(word)
+            if panel is None:
+                new_panel = self._side_word_list.add_hidden_item(Word(word.decode('utf-8'), spans, count))
+                word_data[word] = new_panel
+            else:
+                word_container = panel.get_word_instance()
+                word_container.set_spans(spans)
+                word_container.set_count(count)
 
         repetition_limit = self._repetition_selector.GetValue()
         length_min_limit = self._min_repeated_word_length_selector.GetValue()
@@ -1337,17 +1323,17 @@ class MainFrame(wx.Frame):
                 if indicator_counter == -1:
                     break
 
-        # Fill word list.
-        if self._coloring_tool_off:
-            # Fill only once when the tool runs the first time.
-            self._side_word_list.add_items(fitting_words)
-            self._coloring_tool_off = False
-            if self._available_indicators:
-                # We have some spare indicators, enable all checkboxes.
-                for item in self._side_word_list.GetChildren():
-                    item: ListItemPanel
-                    if not item.is_enabled():
-                        item.set_enabled(True)
+        # Fill/Update word list.
+        self._side_word_list.clear_list()
+        # Fill only once when the tool runs the first time.
+        self._side_word_list.add_items(fitting_words)
+        self._coloring_tool_off = False
+        if self._available_indicators:
+            # We have some spare indicators, enable all checkboxes.
+            for item in self._side_word_list.GetChildren():
+                item: ListItemPanel
+                if not item.is_enabled():
+                    item.set_enabled(True)
         else:
             if self._available_indicators:
                 # We have some spare indicators, enable all checkboxes.
@@ -1363,6 +1349,9 @@ class MainFrame(wx.Frame):
                     item.set_enabled(has_indicator)
 
         # Display indicators.
+        # todo why does the list have 800 items? Because it counts even words with no repetitions, we do not need that?
+        self._side_word_border_sizer.GetStaticBox().SetLabel(Strings.label_words.format(len(fitting_words)))
+        print(len(self._side_word_list.GetChildren()))
         visible_start, visible_end = self._clear_visible_range_indicators()
         for w in fitting_words:
             w: ListItemPanel
@@ -1379,6 +1368,32 @@ class MainFrame(wx.Frame):
                                                                  word_span.span()[1] - word_span.span()[0])
         self._main_text_field.Refresh()
         self._update_indicator_count()
+
+    def apply_indicators_callback(self, plain_words: Dict[bytes, int],
+                                  spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
+        """
+        Thread callback to receive repeated word indicator calculation results from a thread.
+        :param plain_words: Dictionary of words as bytes and the amount of each word.
+        :param spans_by_word: Dictionary of words as bytes and a list of regex matches where the word is.
+        :return: None
+        """
+        assert self._toolbar is not None
+        assert self._coloring_spinner is not None
+        assert self._side_word_list is not None
+
+        self._word_counts = plain_words
+        self._spans_by_word = spans_by_word
+
+        # Enable the coloring tool once we have data to show.
+        self._toolbar.EnableTool(wx.ID_APPLY, True)
+        self._side_word_list.Enable()
+
+        for item in self._menu_items:
+            item: wx.MenuItem
+            if item.GetId() == wx.ID_RESET or item.GetId() == self._id_ignored:
+                item.Enable(True)
+
+        self._coloring_spinner.Stop()
 
     def _clear_visible_range_indicators(self) -> tuple[int, int]:
         """

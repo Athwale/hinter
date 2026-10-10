@@ -129,6 +129,10 @@ class MainFrame(wx.Frame):
         self._idle_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._on_idle_timer_handler, self._idle_timer)
 
+        self._autosave_timer = wx.Timer(self)
+        # TODO save when idle for 30s.
+        self.Bind(wx.EVT_TIMER, self._on_autosave_timer_handler, self._autosave_timer)
+
         self.Bind(Events.EVT_NOTES_CLOSED, self._notes_closed_handler)
         self.Bind(Events.EVT_TEXT_CHANGED, self._notes_changed_handler)
 
@@ -1184,14 +1188,20 @@ class MainFrame(wx.Frame):
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
         assert self._side_word_border_sizer is not None
+        assert self._coloring_spinner is not None
+
+        colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
+        if colorize_tool.IsToggled():
+            self._coloring_spinner.Start()
 
         # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
         #  Can we update the list somehow automatically?
+
+        # todo longer timer for saving.
         self._clear_visible_range_indicators()
         if not self._selected_words and self._coloring_tool_off:
             self._side_word_list.clear_list()
 
-        colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if not colorize_tool.IsToggled():
             # Clear if we are turning the tool off. Disable limit controls.
             self._main_text_field.Refresh()
@@ -1206,7 +1216,8 @@ class MainFrame(wx.Frame):
             self._max_repeated_word_length_selector.Enable()
             self._min_repeated_word_length_selector.Enable()
             self._repetition_selector.Enable()
-            self.apply_indicators()
+            # Give the button 250ms to display state change.
+            wx.CallLater(250, self.apply_indicators)
 
     def _handle_indicator_limits_selector_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1216,12 +1227,41 @@ class MainFrame(wx.Frame):
         """
         assert self._toolbar is not None
 
-        # TODO changing limits leaves disabled items disabled even though we should have free indicators.
-        # todo indicators should be freed from words not fitting the limits.
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if colorize_tool.IsToggled():
             self._clear_visible_range_indicators()
             self.apply_indicators()
+
+    def apply_indicators_callback(self, plain_words: Dict[bytes, int],
+                                  spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
+        """
+        Thread callback to receive repeated word indicator calculation results from a thread.
+        :param plain_words: Dictionary of words as bytes and the amount of each word.
+        :param spans_by_word: Dictionary of words as bytes and a list of regex matches where the word is.
+        :return: None
+        """
+        assert self._toolbar is not None
+        assert self._coloring_spinner is not None
+        assert self._side_word_list is not None
+        assert self._toolbar is not None
+
+        self._word_counts = plain_words
+        self._spans_by_word = spans_by_word
+
+        # Enable the coloring tool once we have data to show.
+        self._toolbar.EnableTool(wx.ID_APPLY, True)
+        self._side_word_list.Enable()
+
+        for item in self._menu_items:
+            item: wx.MenuItem
+            if item.GetId() == wx.ID_RESET or item.GetId() == self._id_ignored:
+                item.Enable(True)
+
+        colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
+        if colorize_tool.IsToggled():
+            self._clear_visible_range_indicators()
+            self.apply_indicators()
+        self._coloring_spinner.Stop()
 
     def _word_list_handler(self, event: dv.DataViewEvent) -> None:
         """
@@ -1254,10 +1294,7 @@ class MainFrame(wx.Frame):
 
     def apply_indicators(self) -> None:
         """
-        # todo this method is slow on long texts.
         # todo test printing a and check this does not run multiple times
-        # todo loading a new document from a loaded document does not show the loading dialog
-        # todo clicking the coloring tool should immediately show button change
         Apply indicators once the thread calculations are made.
         :return: None
         """
@@ -1268,6 +1305,7 @@ class MainFrame(wx.Frame):
         assert self._max_repeated_word_length_selector is not None
         assert self._main_text_field is not None
         assert self._side_word_border_sizer is not None
+        assert self._coloring_spinner is not None
 
         # Dictionary of words as bytes and the amount of each word.
         plain_words: Dict[bytes, int] = self._word_counts
@@ -1280,13 +1318,14 @@ class MainFrame(wx.Frame):
         for word, count in plain_words.items():
             spans = spans_by_word[word]
             panel = word_data.get(word)
-            if panel is None:
-                new_panel = self._side_word_list.add_hidden_item(Word(word.decode('utf-8'), spans, count))
-                word_data[word] = new_panel
-            else:
-                word_container = panel.get_word_instance()
-                word_container.set_spans(spans)
-                word_container.set_count(count)
+            if count > 1:
+                if panel is None:
+                    new_panel = self._side_word_list.add_hidden_item(Word(word.decode('utf-8'), spans, count))
+                    word_data[word] = new_panel
+                else:
+                    word_container = panel.get_word_instance()
+                    word_container.set_spans(spans)
+                    word_container.set_count(count)
 
         repetition_limit = self._repetition_selector.GetValue()
         length_min_limit = self._min_repeated_word_length_selector.GetValue()
@@ -1296,14 +1335,24 @@ class MainFrame(wx.Frame):
         fitting_words: List[ListItemPanel] = []
         for panel in word_data.values():
             panel: ListItemPanel
-            word_instance = panel.get_word_instance()
-            word = word_instance.get_word()
+            word_instance: Word = panel.get_word_instance()
+            word: str = word_instance.get_word()
             w_count = word_instance.get_count()
             if w_count >= repetition_limit and length_min_limit <= len(word) <= length_max_limit:
                 if word not in self._current_document.get_ignored_words():
                     if word in self._selected_words:
                         panel.set_checked(True)
                     fitting_words.append(panel)
+            else:
+                # Return indicator to magazine, reset word to unselected if it does not fit filters.
+                indicator = word_instance.get_indicator()
+                word_instance.clear_indicator()
+                if indicator > -1:
+                    self._available_indicators.add(indicator)
+                word_instance.set_selected(False)
+                panel.set_checked(False)
+                if word in self._selected_words:
+                    self._selected_words.remove(word)
 
         # Assign indicators to filtered words.
         if self._coloring_tool_off:
@@ -1349,9 +1398,7 @@ class MainFrame(wx.Frame):
                     item.set_enabled(has_indicator)
 
         # Display indicators.
-        # todo why does the list have 800 items? Because it counts even words with no repetitions, we do not need that?
         self._side_word_border_sizer.GetStaticBox().SetLabel(Strings.label_words.format(len(fitting_words)))
-        print(len(self._side_word_list.GetChildren()))
         visible_start, visible_end = self._clear_visible_range_indicators()
         for w in fitting_words:
             w: ListItemPanel
@@ -1368,31 +1415,6 @@ class MainFrame(wx.Frame):
                                                                  word_span.span()[1] - word_span.span()[0])
         self._main_text_field.Refresh()
         self._update_indicator_count()
-
-    def apply_indicators_callback(self, plain_words: Dict[bytes, int],
-                                  spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
-        """
-        Thread callback to receive repeated word indicator calculation results from a thread.
-        :param plain_words: Dictionary of words as bytes and the amount of each word.
-        :param spans_by_word: Dictionary of words as bytes and a list of regex matches where the word is.
-        :return: None
-        """
-        assert self._toolbar is not None
-        assert self._coloring_spinner is not None
-        assert self._side_word_list is not None
-
-        self._word_counts = plain_words
-        self._spans_by_word = spans_by_word
-
-        # Enable the coloring tool once we have data to show.
-        self._toolbar.EnableTool(wx.ID_APPLY, True)
-        self._side_word_list.Enable()
-
-        for item in self._menu_items:
-            item: wx.MenuItem
-            if item.GetId() == wx.ID_RESET or item.GetId() == self._id_ignored:
-                item.Enable(True)
-
         self._coloring_spinner.Stop()
 
     def _clear_visible_range_indicators(self) -> tuple[int, int]:
@@ -1969,6 +1991,9 @@ class MainFrame(wx.Frame):
         """
         assert self._current_document is not None
         assert self._main_text_field is not None
+        assert self._repetition_selector is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
 
         if exp:
             self._show_error_ok_dialog(exp)
@@ -1999,6 +2024,9 @@ class MainFrame(wx.Frame):
         self._set_status_text(Strings.status_calculating, 0)
         self.post_divider()
         self.post_message(Strings.msg_loaded.format(self._current_document.get_path()), Constants.msg_info)
+        self._repetition_selector.SetValue(Constants.config_min_repetitions_default)
+        self._min_repeated_word_length_selector.SetValue(Constants.config_min_len_default)
+        self._max_repeated_word_length_selector.SetValue(Constants.config_max_len)
         self.enable_editor()
         # Wait for the gui to load all and then jump to line.
         wx.CallLater(50, self._main_text_field.ShowPosition, self._config.get_last_text_position())

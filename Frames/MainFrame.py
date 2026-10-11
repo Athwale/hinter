@@ -130,7 +130,6 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_TIMER, self._on_idle_timer_handler, self._idle_timer)
 
         self._autosave_timer = wx.Timer(self)
-        # TODO save when idle for 30s.
         self.Bind(wx.EVT_TIMER, self._on_autosave_timer_handler, self._autosave_timer)
 
         self.Bind(Events.EVT_NOTES_CLOSED, self._notes_closed_handler)
@@ -1194,10 +1193,6 @@ class MainFrame(wx.Frame):
         if colorize_tool.IsToggled():
             self._coloring_spinner.Start()
 
-        # todo if a word becomes missing in text, it remains in the side panel while the tool is active.
-        #  Can we update the list somehow automatically?
-
-        # todo longer timer for saving.
         self._clear_visible_range_indicators()
         if not self._selected_words and self._coloring_tool_off:
             self._side_word_list.clear_list()
@@ -1244,6 +1239,9 @@ class MainFrame(wx.Frame):
         assert self._coloring_spinner is not None
         assert self._side_word_list is not None
         assert self._toolbar is not None
+        assert self._repetition_selector is not None
+        assert self._min_repeated_word_length_selector is not None
+        assert self._max_repeated_word_length_selector is not None
 
         self._word_counts = plain_words
         self._spans_by_word = spans_by_word
@@ -1259,6 +1257,9 @@ class MainFrame(wx.Frame):
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if colorize_tool.IsToggled():
+            self._max_repeated_word_length_selector.Enable()
+            self._min_repeated_word_length_selector.Enable()
+            self._repetition_selector.Enable()
             self._clear_visible_range_indicators()
             self.apply_indicators()
         self._coloring_spinner.Stop()
@@ -1306,6 +1307,10 @@ class MainFrame(wx.Frame):
         assert self._main_text_field is not None
         assert self._side_word_border_sizer is not None
         assert self._coloring_spinner is not None
+
+        # todo if a last word that was repeated remains in the document a wrong number of it is in the list, all word counts need to be updated
+        # todo after saving, coloring tool is not re-enabled.
+        # todo adding a new word 3 times sometimes adds it in disabled state to the list
 
         # Dictionary of words as bytes and the amount of each word.
         plain_words: Dict[bytes, int] = self._word_counts
@@ -1473,6 +1478,15 @@ class MainFrame(wx.Frame):
                     self._colorator_thread = ColoratorThread(self, self._current_document,
                                                              self._main_text_field.GetText())
 
+    # noinspection PyUnusedLocal
+    def _on_autosave_timer_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Auto save timer handler.
+        :param event: Not used.
+        :return: None
+        """
+        assert self._current_document is not None
+
         if self._current_document.is_modified():
             self._save_document(tests=False)
 
@@ -1586,8 +1600,11 @@ class MainFrame(wx.Frame):
                 self._main_text_field.StartStyling(start)
                 self._main_text_field.SetStyling(length, action['new_style_id'])
 
-        # Start word marking idle timer.
+        # Restart word marking idle timer.
         self._idle_timer.Start(Constants.idle_timer_delay, oneShot=True)
+
+        # Restart auto save timer.
+        self._autosave_timer.Start(Constants.autosave_timer_delay, oneShot=True)
 
         # Update line number column width.
         self._main_text_field.SetMarginWidth(1, len(str(self._main_text_field.GetNumberOfLines())) * 12)

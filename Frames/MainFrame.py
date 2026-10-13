@@ -39,6 +39,7 @@ from Threads.StatisticsThread import StatisticsThread
 from Tools.Config import Config
 
 
+# todo add open recent submenu
 # todo spell check
 
 class MainFrame(wx.Frame):
@@ -110,6 +111,7 @@ class MainFrame(wx.Frame):
         # Used for repeated word marking
         self._word_counts: Dict[bytes, int] = {}
         self._spans_by_word: defaultdict[bytes, List[re.Match]] = defaultdict()
+        self._fitting_words: List[ListItemPanel] = []
 
         self._notes_dialog: NotesEditorDialog | None = None
         self._notes_open: bool = False
@@ -1193,12 +1195,14 @@ class MainFrame(wx.Frame):
         if colorize_tool.IsToggled():
             self._coloring_spinner.Start()
 
-        self._clear_visible_range_indicators()
         if not self._selected_words and self._coloring_tool_off:
             self._side_word_list.clear_list()
 
         if not colorize_tool.IsToggled():
             # Clear if we are turning the tool off. Disable limit controls.
+            for indicator in range(32):
+                self._main_text_field.SetIndicatorCurrent(indicator)
+                self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
             self._main_text_field.Refresh()
             self._side_word_list.clear_list()
             self._max_repeated_word_length_selector.Disable()
@@ -1212,7 +1216,7 @@ class MainFrame(wx.Frame):
             self._min_repeated_word_length_selector.Enable()
             self._repetition_selector.Enable()
             # Give the button 250ms to display state change.
-            wx.CallLater(250, self.apply_indicators)
+            wx.CallLater(250, self._apply_indicators)
 
     def _handle_indicator_limits_selector_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1224,8 +1228,7 @@ class MainFrame(wx.Frame):
 
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if colorize_tool.IsToggled():
-            self._clear_visible_range_indicators()
-            self.apply_indicators()
+            self._apply_indicators()
 
     def apply_indicators_callback(self, plain_words: Dict[bytes, int],
                                   spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
@@ -1260,8 +1263,7 @@ class MainFrame(wx.Frame):
             self._max_repeated_word_length_selector.Enable()
             self._min_repeated_word_length_selector.Enable()
             self._repetition_selector.Enable()
-            self._clear_visible_range_indicators()
-            self.apply_indicators()
+            self._apply_indicators()
         self._coloring_spinner.Stop()
 
     def _word_list_handler(self, event: dv.DataViewEvent) -> None:
@@ -1290,10 +1292,9 @@ class MainFrame(wx.Frame):
                 item.get_word_instance().clear_indicator()
                 if indicator > -1:
                     self._available_indicators.add(indicator)
-        self._clear_visible_range_indicators()
-        self.apply_indicators()
+        self._apply_indicators()
 
-    def apply_indicators(self) -> None:
+    def _apply_indicators(self) -> None:
         """
         # todo test printing a and check this does not run multiple times
         Apply indicators once the thread calculations are made.
@@ -1305,11 +1306,11 @@ class MainFrame(wx.Frame):
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
         assert self._main_text_field is not None
-        assert self._side_word_border_sizer is not None
         assert self._coloring_spinner is not None
+        assert self._side_word_border_sizer is not None
 
-        # todo if a last word that was repeated remains in the document a wrong number of it is in the list, all word counts need to be updated
-        # todo adding a new word 3 times sometimes adds it in disabled state to the list
+        # todo start with one word test, add three more then on new line add 000 three times, it will be disabled in the list, it was not previously selected it is a new word, but why disabled?
+        # todo scrolling with markers on is slow on large documents, scrolling runs this whole function, do we need that, or just redraw markers?
 
         # Dictionary of words as bytes and the amount of each word.
         plain_words: Dict[bytes, int] = self._word_counts
@@ -1322,21 +1323,20 @@ class MainFrame(wx.Frame):
         for word, count in plain_words.items():
             spans = spans_by_word[word]
             panel = word_data.get(word)
-            if count > 1:
-                if panel is None:
-                    new_panel = self._side_word_list.add_hidden_item(Word(word.decode('utf-8'), spans, count))
-                    word_data[word] = new_panel
-                else:
-                    word_container = panel.get_word_instance()
-                    word_container.set_spans(spans)
-                    word_container.set_count(count)
+            if panel is None:
+                new_panel = self._side_word_list.add_hidden_item(Word(word.decode('utf-8'), spans, count))
+                word_data[word] = new_panel
+            else:
+                word_container = panel.get_word_instance()
+                word_container.set_spans(spans)
+                word_container.set_count(count)
 
         repetition_limit = self._repetition_selector.GetValue()
         length_min_limit = self._min_repeated_word_length_selector.GetValue()
         length_max_limit = self._max_repeated_word_length_selector.GetValue()
 
         # Filter the words that fit the marking criteria to a new list and work on that.
-        fitting_words: List[ListItemPanel] = []
+        self._fitting_words.clear()
         for panel in word_data.values():
             panel: ListItemPanel
             word_instance: Word = panel.get_word_instance()
@@ -1346,7 +1346,7 @@ class MainFrame(wx.Frame):
                 if word not in self._current_document.get_ignored_words():
                     if word in self._selected_words:
                         panel.set_checked(True)
-                    fitting_words.append(panel)
+                    self._fitting_words.append(panel)
             else:
                 # Return indicator to magazine, reset word to unselected if it does not fit filters.
                 indicator = word_instance.get_indicator()
@@ -1363,7 +1363,7 @@ class MainFrame(wx.Frame):
             # The tool is running for the first time, assign indicators to everything top down.
             indicator_counter = 31
             # Sort the words from the highest number of repetitions down.
-            for w in sorted(fitting_words, reverse=True):
+            for w in sorted(self._fitting_words, reverse=True):
                 w: ListItemPanel
                 word_instance = w.get_word_instance()
                 word_instance.set_indicator(indicator_counter)
@@ -1379,7 +1379,7 @@ class MainFrame(wx.Frame):
         # Fill/Update word list.
         self._side_word_list.clear_list()
         # Fill only once when the tool runs the first time.
-        self._side_word_list.add_items(fitting_words)
+        self._side_word_list.add_items(self._fitting_words)
         self._coloring_tool_off = False
         if self._available_indicators:
             # We have some spare indicators, enable all checkboxes.
@@ -1401,10 +1401,22 @@ class MainFrame(wx.Frame):
                     has_indicator = item.get_word_instance().has_indicator()
                     item.set_enabled(has_indicator)
 
+        self._side_word_border_sizer.GetStaticBox().SetLabel(Strings.label_words.format(len(self._fitting_words)))
+        self._display_indicators()
+        self._main_text_field.Refresh()
+        self._update_indicator_count()
+        self._coloring_spinner.Stop()
+
+    def _display_indicators(self) -> None:
+        """
+        Display indicators in visible line range.
+        :return: None
+        """
+        assert self._main_text_field is not None
+
         # Display indicators.
-        self._side_word_border_sizer.GetStaticBox().SetLabel(Strings.label_words.format(len(fitting_words)))
         visible_start, visible_end = self._clear_visible_range_indicators()
-        for w in fitting_words:
+        for w in self._fitting_words:
             w: ListItemPanel
             word_instance = w.get_word_instance()
             if word_instance.has_indicator() and w.is_checked():
@@ -1417,9 +1429,8 @@ class MainFrame(wx.Frame):
                         self._main_text_field.SetIndicatorCurrent(indicator)
                         self._main_text_field.IndicatorFillRange(word_span.span()[0],
                                                                  word_span.span()[1] - word_span.span()[0])
+        # todo do we need this? Optimize the speed of this as much as possible.
         self._main_text_field.Refresh()
-        self._update_indicator_count()
-        self._coloring_spinner.Stop()
 
     def _clear_visible_range_indicators(self) -> tuple[int, int]:
         """
@@ -1457,7 +1468,7 @@ class MainFrame(wx.Frame):
         if updated & stc.STC_UPDATE_V_SCROLL:
             colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
             if self._current_document and self._word_counts and colorize_tool.IsToggled():
-                self.apply_indicators()
+                self._display_indicators()
 
     # noinspection PyUnusedLocal
     def _on_idle_timer_handler(self, event: wx.CommandEvent) -> None:

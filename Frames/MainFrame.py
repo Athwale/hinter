@@ -1309,7 +1309,6 @@ class MainFrame(wx.Frame):
         assert self._coloring_spinner is not None
 
         # todo if a last word that was repeated remains in the document a wrong number of it is in the list, all word counts need to be updated
-        # todo after saving, coloring tool is not re-enabled.
         # todo adding a new word 3 times sometimes adds it in disabled state to the list
 
         # Dictionary of words as bytes and the amount of each word.
@@ -1830,12 +1829,19 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._toolbar is not None
-        assert self._repetition_selector is not None
         assert self._main_text_field is not None
+        assert self._repetition_selector is not None
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
+        assert self._side_word_list is not None
 
         self.Enable()
+        # These are enabled in a thread later when coloring calculations are done.
+        self._repetition_selector.Disable()
+        self._min_repeated_word_length_selector.Disable()
+        self._max_repeated_word_length_selector.Disable()
+        self._side_word_list.Disable()
+
         self._main_text_field.Enable()
         for t in self._tools:
             if t.GetId() == wx.ID_APPLY:
@@ -1856,10 +1862,11 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._toolbar is not None
-        assert self._repetition_selector is not None
         assert self._main_text_field is not None
+        assert self._repetition_selector is not None
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
+        assert self._side_word_list is not None
 
         self._ready = False
         if everything:
@@ -1871,6 +1878,7 @@ class MainFrame(wx.Frame):
         self._min_repeated_word_length_selector.Disable()
         self._max_repeated_word_length_selector.Disable()
         self._main_text_field.Disable()
+        self._side_word_list.Disable()
         for t in self._tools:
             if t.GetId() not in [wx.ID_NEW, wx.ID_OPEN]:
                 self._toolbar.EnableTool(t.GetId(), False)
@@ -2105,6 +2113,7 @@ class MainFrame(wx.Frame):
         """
         assert self._current_document is not None
         assert self._main_text_field is not None
+        assert self._coloring_spinner is not None
 
         if result:
             self._set_status_text(self._current_document.get_path().name, 1)
@@ -2121,6 +2130,9 @@ class MainFrame(wx.Frame):
             self.post_divider()
             self.post_message(Strings.msg_save_fail.format(self._current_document.get_path()), Constants.msg_err)
         self._waiting_dialog.Close()
+        # Restart coloring thread to recalculate newest data state.
+        self._coloring_spinner.Start()
+        self._idle_timer.Start(Constants.idle_timer_delay, oneShot=True)
         self._main_text_field.SetFocus()
 
     def document_test_callback(self, result: defaultdict[str, List[Tuple[str, int]]]) -> None:

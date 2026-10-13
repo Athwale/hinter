@@ -33,4 +33,8 @@ class SavingWaitDialog(wx.Dialog):
             self._busy_wheel.SetOwnForegroundColour(wx.Colour(0, 0, 255))
             self._label.SetLabelText(Strings.status_saving)
             self.SetTitle(Strings.status_saving)
+        else:
+            self._busy_wheel.SetOwnForegroundColour(wx.Colour(0, 255, 0))
+            self._label.SetLabelText(Strings.status_loading)
+            self.SetTitle(Strings.status_loading)
         self._busy_wheel.Start()

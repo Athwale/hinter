@@ -39,7 +39,6 @@ from Threads.StatisticsThread import StatisticsThread
 from Tools.Config import Config
 
 
-# todo add open recent submenu
 # todo spell check
 
 class MainFrame(wx.Frame):
@@ -632,6 +631,7 @@ class MainFrame(wx.Frame):
         self._main_text_field.StyleSetSpec(3, Constants.style_bold_italic)
 
         # todo use one with wx.stc.STC_INDIC_SQUIGGLE for spellcheck?
+        # Indicators can be 0 - 31 = 32 total indicators.
         indicator_number = 0
         alpha = {1: 60, 2: 150}
         colors = {
@@ -677,6 +677,8 @@ class MainFrame(wx.Frame):
         self._main_text_field.IndicatorSetForeground(indicator_number, wx.Colour(0, 255, 0))
         self._main_text_field.IndicatorSetAlpha(indicator_number, 255)
         self._main_text_field.IndicatorSetOutlineAlpha(indicator_number, 255)
+        self._available_indicators = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                                      23, 24, 25, 26, 27, 28, 29, 30, 31}
 
         # Line markers
         self._main_text_field.MarkerDefine(self._marker_current_line, stc.STC_MARK_BACKGROUND,
@@ -1209,6 +1211,8 @@ class MainFrame(wx.Frame):
             self._min_repeated_word_length_selector.Disable()
             self._repetition_selector.Disable()
             self._side_word_border_sizer.GetStaticBox().SetLabel(Strings.label_words.format('0'))
+            # Clear indicator status.
+            self._set_status_text('', 3)
             self._coloring_tool_off = True
         else:
             # Apply indicators using previous data that is calculated on text change in background.
@@ -1309,9 +1313,6 @@ class MainFrame(wx.Frame):
         assert self._coloring_spinner is not None
         assert self._side_word_border_sizer is not None
 
-        # todo start with one word test, add three more then on new line add 000 three times, it will be disabled in the list, it was not previously selected it is a new word, but why disabled?
-        # todo scrolling with markers on is slow on large documents, scrolling runs this whole function, do we need that, or just redraw markers?
-
         # Dictionary of words as bytes and the amount of each word.
         plain_words: Dict[bytes, int] = self._word_counts
         # Dictionary of words as bytes and a list of regex matches where the word is.
@@ -1361,20 +1362,16 @@ class MainFrame(wx.Frame):
         # Assign indicators to filtered words.
         if self._coloring_tool_off:
             # The tool is running for the first time, assign indicators to everything top down.
-            indicator_counter = 31
             # Sort the words from the highest number of repetitions down.
             for w in sorted(self._fitting_words, reverse=True):
                 w: ListItemPanel
                 word_instance = w.get_word_instance()
-                word_instance.set_indicator(indicator_counter)
-                if self._selected_words:
-                    if word_instance.is_selected():
+                if not word_instance.has_indicator():
+                    if len(self._available_indicators) > 0:
+                        word_instance.set_indicator(self._available_indicators.pop())
                         w.set_checked(True)
-                else:
-                    w.set_checked(True)
-                indicator_counter -= 1
-                if indicator_counter == -1:
-                    break
+
+        # todo on save test, check words with 2 repetitions and their distance
 
         # Fill/Update word list.
         self._side_word_list.clear_list()
@@ -1429,8 +1426,6 @@ class MainFrame(wx.Frame):
                         self._main_text_field.SetIndicatorCurrent(indicator)
                         self._main_text_field.IndicatorFillRange(word_span.span()[0],
                                                                  word_span.span()[1] - word_span.span()[0])
-        # todo do we need this? Optimize the speed of this as much as possible.
-        self._main_text_field.Refresh()
 
     def _clear_visible_range_indicators(self) -> tuple[int, int]:
         """
@@ -1445,7 +1440,7 @@ class MainFrame(wx.Frame):
         visible_start = self._main_text_field.PositionFromLine(first_display_line)
         visible_end = self._main_text_field.GetLineEndPosition(last_display_line)
 
-        # Clear indicators in visible range before reapplying. We always have 0-31 indicators.
+        # Clear indicators in visible range before reapplying. We always have 0-31 (32 indicators).
         for indicator in range(32):
             self._main_text_field.SetIndicatorCurrent(indicator)
             self._main_text_field.IndicatorClearRange(visible_start, visible_end)
@@ -2030,6 +2025,7 @@ class MainFrame(wx.Frame):
         assert self._repetition_selector is not None
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
+        assert self._side_word_border_sizer is not None
 
         if exp:
             self._show_error_ok_dialog(exp)
@@ -2058,11 +2054,15 @@ class MainFrame(wx.Frame):
         self._waiting_dialog.Close()
         self._statistics_timer.Start(Constants.statistics_timer_delay)
         self._set_status_text(Strings.status_calculating, 0)
+        self._set_status_text('', 3)
+        self._side_word_border_sizer.GetStaticBox().SetLabel(Strings.label_words.format('0'))
         self.post_divider()
         self.post_message(Strings.msg_loaded.format(self._current_document.get_path()), Constants.msg_info)
         self._repetition_selector.SetValue(Constants.config_min_repetitions_default)
         self._min_repeated_word_length_selector.SetValue(Constants.config_min_len_default)
         self._max_repeated_word_length_selector.SetValue(Constants.config_max_len)
+        self._available_indicators = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                                      23, 24, 25, 26, 27, 28, 29, 30, 31}
         self.enable_editor()
         # Wait for the gui to load all and then jump to line.
         wx.CallLater(50, self._main_text_field.ShowPosition, self._config.get_last_text_position())

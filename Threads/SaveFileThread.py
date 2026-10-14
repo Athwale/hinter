@@ -121,7 +121,7 @@ class SaveFileThread(Thread):
     @staticmethod
     def _check_repetitions(line: str, line_index: int, stub: str) -> Tuple[str, List[Tuple[str, int]]]:
         """
-        Check if any word is repeated in a row, such as "he did something".
+        Check if any word is repeated in a row, such as "he did did something".
         :param line: Line to check.
         :param line_index: Line number.
         :param stub: Line stub.

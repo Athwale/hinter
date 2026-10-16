@@ -65,7 +65,6 @@ class MainFrame(wx.Frame):
         self._search_button_up: wx.BitmapButton | None = None
         self._search_button_down: wx.BitmapButton | None = None
         self._unselect_words: wx.Button | None = None
-        self._select_words: wx.Button | None = None
         self._search_results: wx.StaticText | None = None
         self._status_bar: StatusBar | None = None
         self._toolbar: ToolBar | None = None
@@ -97,7 +96,6 @@ class MainFrame(wx.Frame):
         self._id_clear_red_marks = wx.NewId()
         self._id_clear_yellow_marks = wx.NewId()
         self._id_unselect_all_list = wx.NewId()
-        self._id_auto_select_list = wx.NewId()
         self._id_synonym_ids = []
 
         # Marker IDs
@@ -497,22 +495,18 @@ class MainFrame(wx.Frame):
         # Initialize word list:
         self._side_word_list = SidePanel(self)
         self._unselect_words = wx.Button(self, self._id_unselect_all_list, Strings.label_unselect_all_words,
-                                         size=wx.Size(110, 20))
-        self._select_words = wx.Button(self, self._id_auto_select_list, Strings.label_auto_select_words,
-                                       size=wx.Size(110, 20))
+                                         size=wx.Size(-1, 20))
         assert self._side_word_list is not None
         self._side_word_border_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, Strings.label_words.format('0'))
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         assert self._side_word_border_sizer is not None
         assert self._unselect_words is not None
-        assert self._select_words is not None
         font = self._side_word_border_sizer.GetStaticBox().GetFont()
         font.SetPointSize(Constants.static_box_font_size)
         self._side_word_border_sizer.GetStaticBox().SetFont(font)
         self._side_word_border_sizer.Add(self._side_word_list, 1, wx.EXPAND)
         button_sizer.Add(self._unselect_words, 1, wx.EXPAND | wx.RIGHT, border=Constants.default_border)
-        button_sizer.Add(self._select_words, 1, wx.EXPAND)
-        self._side_word_border_sizer.Add(button_sizer)
+        self._side_word_border_sizer.Add(button_sizer, 0, wx.EXPAND)
 
         # Initialize search shortcut into accelerator table
         new_id = wx.NewId()
@@ -569,7 +563,6 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self._search_up_handler, self._search_button_up)
         self.Bind(wx.EVT_BUTTON, self._search_down_handler, self._search_button_down)
 
-        self.Bind(wx.EVT_BUTTON, self._list_buttons_handler, self._select_words)
         self.Bind(wx.EVT_BUTTON, self._list_buttons_handler, self._unselect_words)
 
         self.Bind(wx.EVT_TEXT, self._search_handler, self._search_text_field)
@@ -981,19 +974,6 @@ class MainFrame(wx.Frame):
         """
         self._search_enter_handler(event)
 
-    def _list_buttons_handler(self, event: wx.CommandEvent) -> None:
-        """
-        List selection buttons handler.
-        :param event: Used to get button id.
-        :return: None
-        """
-        # todo unselect all and select first 32 words.
-        e_id = event.GetId()
-        if e_id == self._id_auto_select_list:
-            print('a')
-        elif e_id == self._id_unselect_all_list:
-            print('b')
-
     # noinspection PyUnusedLocal
     def _undo_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1239,7 +1219,6 @@ class MainFrame(wx.Frame):
             self._coloring_tool_off = True
         else:
             # Apply indicators using previous data that is calculated on text change in background.
-            self._enable_indicator_controls(True)
             # Give the button 250ms to display state change.
             wx.CallLater(250, self._apply_indicators)
 
@@ -1271,7 +1250,6 @@ class MainFrame(wx.Frame):
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
         assert self._unselect_words is not None
-        assert self._select_words is not None
 
         self._word_counts = plain_words
         self._spans_by_word = spans_by_word
@@ -1288,9 +1266,7 @@ class MainFrame(wx.Frame):
         colorize_tool: ToolBarToolBase = self._toolbar.FindById(wx.ID_APPLY)
         if colorize_tool.IsToggled():
             # Runs when text is changed and the tool is already active.
-            # todo what about context menu buttons? Do they rerun coloring and need to be disabled during calculations?
             self._apply_indicators()
-            self._enable_indicator_controls(True)
         self._coloring_spinner.Stop()
 
     def _word_list_handler(self, event: dv.DataViewEvent) -> None:
@@ -1320,6 +1296,27 @@ class MainFrame(wx.Frame):
                 if indicator > -1:
                     self._available_indicators.add(indicator)
         self._apply_indicators()
+
+    def _list_buttons_handler(self, event: wx.CommandEvent) -> None:
+        """
+        List selection buttons handler.
+        :param event: Used to get button id.
+        :return: None
+        """
+        assert self._side_word_list is not None
+
+        if event.GetId() == self._id_unselect_all_list and self._selected_words:
+            self._selected_words.clear()
+            for item in self._side_word_list.GetChildren():
+                # Assign indicators to selected words.
+                item: ListItemPanel
+                item.set_checked(False)
+                # Return indicator to magazine.
+                indicator = item.get_word_instance().get_indicator()
+                item.get_word_instance().clear_indicator()
+                if indicator > -1:
+                    self._available_indicators.add(indicator)
+            self._apply_indicators()
 
     def _apply_indicators(self) -> None:
         """
@@ -1391,9 +1388,11 @@ class MainFrame(wx.Frame):
                 if not word_instance.has_indicator():
                     if len(self._available_indicators) > 0:
                         word_instance.set_indicator(self._available_indicators.pop())
+                        self._selected_words.append(word_instance.get_word())
                         w.set_checked(True)
 
         # todo on save test, check words with 2 repetitions and their distance
+        # todo Word.is_selected() use in subsequent tool runs to only select words that were selected last time?
 
         # Fill/Update word list.
         self._side_word_list.clear_list()
@@ -1424,6 +1423,7 @@ class MainFrame(wx.Frame):
         self._display_indicators()
         self._main_text_field.Refresh()
         self._update_indicator_count()
+        self._enable_indicator_controls(True)
         self._coloring_spinner.Stop()
 
     def _display_indicators(self) -> None:
@@ -1578,7 +1578,6 @@ class MainFrame(wx.Frame):
         assert self._max_repeated_word_length_selector is not None
         assert self._min_repeated_word_length_selector is not None
         assert self._side_word_list is not None
-        assert self._select_words is not None
         assert self._unselect_words is not None
 
         # The even contains a bit mask of what happened, we need to compare it with &.
@@ -1910,26 +1909,22 @@ class MainFrame(wx.Frame):
         :param enable: True to enable, False to disable.
         :return: None
         """
+        # todo what about context menu buttons? Do they rerun coloring and need to be disabled during calculations?
         assert self._repetition_selector is not None
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
         assert self._unselect_words is not None
-        assert self._select_words is not None
 
         if enable:
             self._max_repeated_word_length_selector.Enable()
             self._min_repeated_word_length_selector.Enable()
             self._repetition_selector.Enable()
-            # todo enable once list is populated?
-            # todo what happens if there is no word but these are enabled and clicked?
             self._unselect_words.Enable()
-            self._select_words.Enable()
         else:
             self._max_repeated_word_length_selector.Disable()
             self._min_repeated_word_length_selector.Disable()
             self._repetition_selector.Disable()
             self._unselect_words.Disable()
-            self._select_words.Disable()
 
     def _open_save_dialog(self) -> str:
         """

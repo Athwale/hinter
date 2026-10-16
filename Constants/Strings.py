@@ -94,6 +94,8 @@ label_temp: str = 'Temperature'
 label_presence_penalty: str = 'Presence penalty'
 label_frequency_penalty: str = 'Frequency penalty'
 label_verbosity: str = 'Verbosity'
+label_unselect_all_words: str = 'Clear selection'
+label_auto_select_words: str = 'Auto select'
 
 button_close: str = "Close"
 button_cancel: str = "Cancel"

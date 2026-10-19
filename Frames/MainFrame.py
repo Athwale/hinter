@@ -1373,7 +1373,6 @@ class MainFrame(wx.Frame):
                 word_instance.clear_indicator()
                 if indicator > -1:
                     self._available_indicators.add(indicator)
-                word_instance.set_selected(False)
                 panel.set_checked(False)
                 if word in self._selected_words:
                     self._selected_words.remove(word)
@@ -1385,6 +1384,7 @@ class MainFrame(wx.Frame):
             for w in sorted(self._fitting_words, reverse=True):
                 w: ListItemPanel
                 word_instance = w.get_word_instance()
+                print(word_instance.get_word(), w.is_checked(), word_instance.is_selected())
                 if not word_instance.has_indicator():
                     if len(self._available_indicators) > 0:
                         word_instance.set_indicator(self._available_indicators.pop())

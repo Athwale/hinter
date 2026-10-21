@@ -34,6 +34,21 @@ class SaveFileThread(Thread):
         self._run_tets = run_tests
         self.start()
 
+    @staticmethod
+    def _find_stub(line: str, target: str) -> str:
+        """
+        Find a part of a line where the supposed problem might be located.
+        :param line: Full line of text.
+        :param target: String to look for.
+        :return: None
+        """
+        position = line.find(target)
+        if position >= 25:
+            stub = line[position - 25:position + 25]
+        else:
+            stub = line[0:position + 25]
+        return stub.replace('\n', '')
+
     def run(self) -> None:
         """
         Run the file saving task and post an event back to the main thread.
@@ -51,9 +66,9 @@ class SaveFileThread(Thread):
 
         if self._run_tets:
             check_fails: defaultdict[str, List[Tuple[str, int]]] = defaultdict(list)
-            check_functions: List[Callable[[str, int, str], Tuple[str, List[Tuple[str, int]]]]] = [self._check_leftover,
-                                                                                   self._check_repetitions,
-                                                                                   self._check_similar_words]
+            check_functions: List[Callable[[str, int], Tuple[str, List[Tuple[str, int]]]]] = [self._check_leftover,
+                                                                                              self._check_repetitions,
+                                                                                              self._check_similar_words]
             if self._document.get_names():
                 check_functions.append(self._check_names)
                 check_functions.append(self._check_name_lines)
@@ -63,34 +78,49 @@ class SaveFileThread(Thread):
 
             # Enumerate will not create the whole list in memory.
             for counter, line in enumerate(self._plain_text.splitlines(), start=1):
-                stub = line[0:25] if len(line) >= 25 else line
                 for f in check_functions:
-                    test_type, test_result = f(line, counter, stub)
+                    test_type, test_result = f(line, counter)
                     if test_result:
                         check_fails[test_type].extend(test_result)
+
+            self._check_word_distance()
+
             wx.CallAfter(self._parent.document_test_callback, check_fails)
 
-    def _check_name_lines(self, line: str, line_index: int, stub: str) -> Tuple[str, List[Tuple[str, int]]]:
+    def _check_word_distance(self) -> Tuple[str, List[Tuple[str, int]]]:
+        """
+        # todo This will need to work on the whole text.
+        # todo add test, check words with 2 repetitions and their distance
+        Check for words that are similar but do not trigger spellcheck and usually typed wrong because they are close
+        on the keyboard.
+        :return: List of errors strings.
+        """
+        # todo do we have latest marking data here, we need to run the calculation thread before save.
+        # todo distance should be measured in lines, can we save that for each word much earlier during calculations?
+        # self._word_counts = plain_words
+        # self._spans_by_word = spans_by_word
+        print(self._document.get_word_marking_data())
+
+    def _check_name_lines(self, line: str, line_index: int) -> Tuple[str, List[Tuple[str, int]]]:
         """
         Check if a line begins with a name.
         :param line: Line to check.
         :param line_index: Line number.
-        :param stub: Line stub.
         :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
         for name in self._document.get_names():
             if line.lower().startswith(name):
-                errors.append((Strings.report_capital_names.format(line_index, name.capitalize(), stub),
+                errors.append((Strings.report_capital_names.format(line_index, name.capitalize(),
+                                                                   self._find_stub(line.lower(), name).capitalize()),
                                line_index))
         return Constants.report_name_lines, errors
 
-    def _check_names(self, line: str, line_index: int, stub: str) -> Tuple[str, List[Tuple[str, int]]]:
+    def _check_names(self, line: str, line_index: int) -> Tuple[str, List[Tuple[str, int]]]:
         """
         Check if all names in text are capitalized.
         :param line: Line to check.
         :param line_index: Line number.
-        :param stub: Line stub.
         :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
@@ -98,16 +128,14 @@ class SaveFileThread(Thread):
         for name in names:
             # Names in names are not capitalized already, so we just look for them.
             if name in line:
-                errors.append((Strings.report_names.format(line_index, name, stub), line_index))
+                errors.append((Strings.report_names.format(line_index, name, self._find_stub(line, name)), line_index))
         return Constants.report_names_capitalized, errors
 
-    @staticmethod
-    def _check_leftover(line: str, line_index: int, stub: str) -> Tuple[str, List[Tuple[str, int]]]:
+    def _check_leftover(self, line: str, line_index: int) -> Tuple[str, List[Tuple[str, int]]]:
         """
         Check presence of 'the a' and 'a the' leftovers.
         :param line: Line to check.
         :param line_index: Line number.
-        :param stub: Line stub.
         :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
@@ -115,37 +143,96 @@ class SaveFileThread(Thread):
         for regex in variants:
             match = re.search(regex, line)
             if match:
-                errors.append((Strings.report_leftover.format(line_index, match.group(), stub), line_index))
+                errors.append((Strings.report_leftover.format(line_index, match.group(),
+                                                              self._find_stub(line, match.group())), line_index))
         return Constants.report_leftover, errors
 
-    @staticmethod
-    def _check_repetitions(line: str, line_index: int, stub: str) -> Tuple[str, List[Tuple[str, int]]]:
+    def _check_repetitions(self, line: str, line_index: int) -> Tuple[str, List[Tuple[str, int]]]:
         """
         Check if any word is repeated in a row, such as "he did did something".
         :param line: Line to check.
         :param line_index: Line number.
-        :param stub: Line stub.
         :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
         regex = r'\b(\w+)(?:\s+\1)+\b'
         match = re.search(regex, line)
         if match:
-            errors.append((Strings.report_repetition.format(line_index, match.group(), stub), line_index))
+            errors.append((Strings.report_repetition.format(line_index, match.group(),
+                                                            self._find_stub(line, match.group())), line_index))
         return Constants.report_repetition, errors
 
-    @staticmethod
-    def _check_similar_words(line: str, line_index: int, stub: str) -> Tuple[str, List[Tuple[str, int]]]:
+    def _check_similar_words(self, line: str, line_index: int) -> Tuple[str, List[Tuple[str, int]]]:
         """
-        Check for words that are similar but do not trigger spellcheck.
+        Check for words that are similar but do not trigger spellcheck and usually typed wrong because they are close
+        on the keyboard.
         :param line: Line to check.
         :param line_index: Line number.
-        :param stub: Line stub.
         :return: List of errors strings.
         """
         errors: List[Tuple[str, int]] = []
-        word_list = ['shorty', 'shortly']
-        for word in word_list:
-            if word in line:
-                errors.append((Strings.report_similar.format(line_index, word, stub), line_index))
+        word_list = [
+            ("shorty", "shortly"),
+            ("statue", "statute"),
+            ("form", "from"),
+            ("plan", "plane"),
+            ("unit", "until"),
+            ("thought", "though"),
+            ("trough", "tough"),
+            ("trail", "trial"),
+            ("causal", "casual"),
+            ("unite", "untie"),
+            ("sacred", "scared"),
+            ("marital", "martial"),
+            ("desert", "dessert"),
+            ("principal", "principle"),
+            ("complement", "compliment"),
+            ("stationery", "stationary"),
+            ("affect", "effect"),
+            ("moral", "morale"),
+            ("human", "humane"),
+            ("lose", "loose"),
+            ("definitely", "defiantly"),
+            ("quiet", "quite"),
+            ("diary", "dairy"),
+            ("angel", "angle"),
+            ("bread", "beard"),
+            ("prosecute", "persecute"),
+            ("adapt", "adept", "adopt"),
+            ("peek", "peak", "pique"),
+            ("pore", "pour", "poor"),
+            ("discreet", "discrete"),
+            ("elicit", "illicit"),
+            ("wary", "weary"),
+            ("metal", "mettle"),
+            ("patients", "patience"),
+            ("altar", "alter"),
+            ("assent", "ascent"),
+            ("bazaar", "bizarre"),
+            ("canvas", "canvass"),
+            ("capital", "capitol"),
+            ("cereal", "serial"),
+            ("chord", "cord"),
+            ("council", "counsel"),
+            ("currant", "current"),
+            ("dual", "duel"),
+            ("flea", "flee"),
+            ("hoard", "horde"),
+            ("lightning", "lightening"),
+            ("loath", "loathe"),
+            ("miner", "minor"),
+            ("naval", "navel"),
+            ("ordinance", "ordnance"),
+            ("pedal", "peddle", "petal"),
+            ("profit", "prophet"),
+            ("shear", "sheer"),
+            ("stair", "stare"),
+            ("vial", "vile"),
+            ("heard", "hears")
+        ]
+        for word_group in word_list:
+            for word in word_group:
+                if word in line:
+                    errors.append((Strings.report_similar.format(line_index, str(word_group),
+                                                                 self._find_stub(line, word)), line_index))
         return Constants.report_similar, errors

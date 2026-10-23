@@ -1304,6 +1304,23 @@ class MainFrame(wx.Frame):
                     self._available_indicators.add(indicator)
         self._apply_indicators()
 
+    def _unselect_all_list(self) -> None:
+        """
+        Unselect all selected word list items.
+        :return: None
+        """
+        assert self._side_word_list is not None
+
+        self._selected_words.clear()
+        for item in self._side_word_list.GetChildren():
+            item: ListItemPanel
+            item.set_checked(False)
+            # Return indicator to magazine.
+            indicator = item.get_word_instance().get_indicator()
+            item.get_word_instance().clear_indicator()
+            if indicator > -1:
+                self._available_indicators.add(indicator)
+
     def _list_buttons_handler(self, event: wx.CommandEvent) -> None:
         """
         List selection buttons handler.
@@ -1313,20 +1330,13 @@ class MainFrame(wx.Frame):
         assert self._side_word_list is not None
 
         if event.GetId() == self._id_unselect_all_list and self._selected_words:
-            self._selected_words.clear()
-            for item in self._side_word_list.GetChildren():
-                item: ListItemPanel
-                item.set_checked(False)
-                # Return indicator to magazine.
-                indicator = item.get_word_instance().get_indicator()
-                item.get_word_instance().clear_indicator()
-                if indicator > -1:
-                    self._available_indicators.add(indicator)
-            self._apply_indicators()
+            self._unselect_all_list()
         else:
-            # todo select all words fitting current settings until no indicators are left.
-            # Using the auto select button.
-            print('as')
+            # Using the auto select button. Deselect all first, then restart the tool from scratch.
+            self._unselect_all_list()
+            self._last_selected_words = False
+            self._coloring_tool_off = True
+        self._apply_indicators()
 
     def _apply_indicators(self) -> None:
         """

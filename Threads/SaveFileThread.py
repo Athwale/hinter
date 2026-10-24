@@ -14,7 +14,8 @@ class SaveFileThread(Thread):
     Thread for saving the current document to disk.
     """
 
-    def __init__(self, parent, document: Document, converted_text: List, plain_text: str, run_tests: bool) -> None:
+    def __init__(self, parent, document: Document, converted_text: List, plain_text: str,
+                 lines_by_word: defaultdict[bytes, List[int]], run_tests: bool) -> None:
         """
         Thread constructor.
         The editor is disabled during this operation.
@@ -22,6 +23,7 @@ class SaveFileThread(Thread):
         :param document: The document instance to save.
         :param converted_text: Data prepared for saving.
         :param plain_text: Plain text for additional tests.
+        :param lines_by_word: Dictionary of words as bytes and a list of lines where the word is.
         :param run_tests: Run or do not run tests.
         :return: None
         """
@@ -31,6 +33,7 @@ class SaveFileThread(Thread):
         # Using the text field here is not thread safe. Gui methods can not be called form background threads safely.
         self._converted_text = converted_text
         self._plain_text = plain_text
+        self._lines_by_word = lines_by_word
         self._run_tets = run_tests
         self.start()
 
@@ -83,23 +86,25 @@ class SaveFileThread(Thread):
                     if test_result:
                         check_fails[test_type].extend(test_result)
 
-            self._check_word_distance()
+            check_fails[Constants.report_close_words].extend(self._check_word_distance())
 
             wx.CallAfter(self._parent.document_test_callback, check_fails)
 
-    def _check_word_distance(self) -> Tuple[str, List[Tuple[str, int]]]:
+    def _check_word_distance(self) -> List[Tuple[str, int]]:
         """
-        # todo This will need to work on the whole text.
-        # todo add test, check words with 2 repetitions and their distance
-        Check for words that are similar but do not trigger spellcheck and usually typed wrong because they are close
-        on the keyboard.
+        # todo run the calculation thread before save to have the latest data.
+        # todo add spinner for setting line distance
+        Check for words with 2 repetitions that are too close together.
         :return: List of errors strings.
         """
-        # todo do we have latest marking data here, we need to run the calculation thread before save.
-        # todo distance should be measured in lines, can we save that for each word much earlier during calculations?
-        # self._word_counts = plain_words
-        # self._spans_by_word = spans_by_word
-        print(self._document.get_word_marking_data())
+        errors: List[Tuple[str, int]] = []
+        for word, lines in self._lines_by_word.items():
+            if len(lines) == 2:
+                # Run this for words with just two repetitions, the rest is visible in the gui coloring tool.
+                if (lines[1] - lines[0]) <= 3:
+                    errors.append((Strings.report_word_distance.format(word.decode('utf-8'), lines[0], lines[1]),
+                                   lines[0]))
+        return errors
 
     def _check_name_lines(self, line: str, line_index: int) -> Tuple[str, List[Tuple[str, int]]]:
         """
@@ -232,7 +237,8 @@ class SaveFileThread(Thread):
         ]
         for word_group in word_list:
             for word in word_group:
-                if word in line:
+                match = re.search(fr"\b{re.escape(word)}\b", line)
+                if match:
                     errors.append((Strings.report_similar.format(line_index, str(word_group),
                                                                  self._find_stub(line, word)), line_index))
         return Constants.report_similar, errors

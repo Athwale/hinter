@@ -69,6 +69,9 @@ config_max_repetitions: int = 100
 config_min_len: int = 1
 config_min_len_default: int = 3
 config_max_len: int = 100
+config_line_distance_min: int = 0
+config_line_distance_max: int = 100
+config_line_distance_default: int = 3
 
 config_llm_tokens_min: int = 100
 config_llm_tokens_max: int = 1000000
@@ -100,6 +103,7 @@ report_names_capitalized: str = 'nc'
 report_leftover: str = 'left'
 report_repetition: str = 'rep'
 report_similar: str = 'sim'
+report_close_words: str = 'cw'
 
 msg_reply: int = 0
 msg_info: int = 1

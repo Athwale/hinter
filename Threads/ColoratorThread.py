@@ -34,18 +34,23 @@ class ColoratorThread(Thread):
         Split text into words and prepare word panels containing data about every unique word.
         :return: None
         """
-        # This returns a reference and is changed in place, so I do not need to set it back.
+        # This returns a reference and is changed in place, so we do not need to set it back.
         word_data = self._document.get_word_marking_data()
         plain_text = self._text.lower()
         word_spans = list(self._word_matcher.finditer(plain_text.encode('utf-8')))
 
         # Defaultdict wll create a new empty list if the key does not exist and add it into it. Otherwise, it
-        # will just add the word.
-        # Dictionary of words as bytes and a list of regex matches where the word is.
+        # will just add the word to the existing list under that key.
         spans_by_word: defaultdict[bytes, List[re.Match]] = defaultdict(list)
+        lines_by_word: defaultdict[bytes, List[int]] = defaultdict(list)
         for span in word_spans:
             word_bytes = span.group()
+            # Dictionary of words as bytes and a list of regex matches where the word is.
             spans_by_word[word_bytes].append(span)
+
+            # Dictionary of words as bytes and a list of lines where the word is.
+            line_number = plain_text.count("\n", 0, span.start()) + 1
+            lines_by_word[word_bytes].append(line_number)
 
         # Dictionary of words as bytes and the amount of each word.
         plain_words: Dict[bytes, int] = {word: len(spans) for word, spans in spans_by_word.items()}
@@ -56,4 +61,4 @@ class ColoratorThread(Thread):
             for w in words_to_remove:
                 word_data.pop(w)
 
-        wx.CallAfter(self._parent.apply_indicators_callback, plain_words, spans_by_word)
+        wx.CallAfter(self._parent.apply_indicators_callback, plain_words, spans_by_word, lines_by_word)

@@ -96,6 +96,7 @@ label_frequency_penalty: str = 'Frequency penalty'
 label_verbosity: str = 'Verbosity'
 label_unselect_all_words: str = 'Clear selection'
 label_auto_select_words: str = 'Auto select'
+label_line_distance: str = 'Min word distance'
 
 button_close: str = "Close"
 button_cancel: str = "Cancel"
@@ -135,12 +136,13 @@ report_ok: str = "No errors"
 report_log_cleared: str = 'Log length exceeded, log cleared'
 report_names_not_configured_lines: str = "No names configured for line beginning test"
 report_names_not_configured_caps: str = "No names configured for capital letter test"
-report_capital_names: str = "Line: {} starts with name: {} - {}..."
-report_names: str = "Line: {} has uncapitalized name: {} - {}..."
-report_leftover: str = "Line: {} has leftover: {} - {}..."
-report_repetition: str = "Line: {} has repeated word: {} - {}..."
-report_similar: str = "Line: {} has word which may be incorrect: {} - {}..."
+report_capital_names: str = "Line: {} starts with name: - {} - {} -..."
+report_names: str = "Line: {} has uncapitalized name: - {} - {} -..."
+report_leftover: str = "Line: {} has leftover: - {} - {} -..."
+report_repetition: str = "Line: {} has repeated word: - {} - {} -..."
+report_similar: str = "Line: {} has word which may be incorrect: - {} - {} -..."
 report_count: str = "{} errors"
+report_word_distance: str = "Word: - {} - repeats too close on lines: {}, {}"
 
 msg_init: str = "Initialized OK"
 msg_saved: str = "Document saved: {}"

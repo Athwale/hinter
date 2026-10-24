@@ -59,6 +59,7 @@ class MainFrame(wx.Frame):
         self._repetition_selector: wx.SpinCtrl | None = None
         self._min_repeated_word_length_selector: wx.SpinCtrl | None = None
         self._max_repeated_word_length_selector: wx.SpinCtrl | None = None
+        self._line_distance_selector: wx.SpinCtrl | None = None
         self._search_text_field: wx.TextCtrl | None = None
         self._log_text_field: wx.TextCtrl | None = None
         self._input_text_field: wx.TextCtrl | None = None
@@ -115,6 +116,7 @@ class MainFrame(wx.Frame):
         # Used for repeated word marking
         self._word_counts: Dict[bytes, int] = {}
         self._spans_by_word: defaultdict[bytes, List[re.Match]] = defaultdict()
+        self._lines_by_word: defaultdict[bytes, List[int]] = defaultdict()
         self._fitting_words: List[ListItemPanel] = []
 
         self._notes_dialog: NotesEditorDialog | None = None
@@ -472,6 +474,14 @@ class MainFrame(wx.Frame):
                                                               max=Constants.config_max_len,
                                                               initial=Constants.config_max_len)
 
+        self._line_distance_selector = wx.SpinCtrl(top_panel, id=wx.ID_ANY,
+                                                   value=str(Constants.config_line_distance_default),
+                                                   style=wx.SP_ARROW_KEYS,
+                                                   size=wx.Size(120, -1),
+                                                   min=Constants.config_line_distance_min,
+                                                   max=Constants.config_line_distance_max,
+                                                   initial=Constants.config_line_distance_default)
+
         self._search_text_field = wx.TextCtrl(top_panel, style=wx.TE_PROCESS_ENTER)
         self._search_button_up = wx.BitmapButton(top_panel, -1, wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_GO_UP)))
         self._search_button_down = wx.BitmapButton(top_panel, -1,
@@ -536,6 +546,11 @@ class MainFrame(wx.Frame):
         font.SetPointSize(Constants.static_box_font_size)
         coloring_len_max_box.GetStaticBox().SetFont(font)
 
+        line_distance_box = wx.StaticBoxSizer(wx.HORIZONTAL, top_panel, Strings.label_line_distance)
+        font = line_distance_box.GetStaticBox().GetFont()
+        font.SetPointSize(Constants.static_box_font_size)
+        line_distance_box.GetStaticBox().SetFont(font)
+
         search_box = wx.StaticBoxSizer(wx.HORIZONTAL, top_panel, Strings.label_search_box)
         search_box.SetMinSize(width=350, height=-1)
         font = search_box.GetStaticBox().GetFont()
@@ -546,6 +561,7 @@ class MainFrame(wx.Frame):
         assert self._repetition_selector is not None
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
+        assert self._line_distance_selector is not None
         assert self._search_text_field is not None
         assert self._search_button_up is not None
         assert self._search_button_down is not None
@@ -564,6 +580,7 @@ class MainFrame(wx.Frame):
                   self._min_repeated_word_length_selector)
         self.Bind(wx.EVT_SPINCTRL, self._handle_indicator_limits_selector_handler,
                   self._max_repeated_word_length_selector)
+        self.Bind(wx.EVT_SPINCTRL, self._handle_line_distance_selector, self._line_distance_selector)
 
         self.Bind(EVT_CHECKBOX_CHANGED, self._word_list_handler)
 
@@ -594,8 +611,11 @@ class MainFrame(wx.Frame):
         coloring_repetitions_box.Add(self._repetition_selector, 0, wx.LEFT, Constants.default_border)
         coloring_len_min_box.Add(self._min_repeated_word_length_selector, 0, wx.LEFT,
                                  Constants.default_border)
-        coloring_len_max_box.Add(self._max_repeated_word_length_selector, 0, wx.LEFT,
-                                 Constants.default_border)
+        coloring_len_max_box.Add(self._max_repeated_word_length_selector, 0, wx.LEFT, Constants.default_border)
+
+        # todo disabling
+        line_distance_box.Add(self._line_distance_selector, 0, wx.LEFT, Constants.default_border)
+
         search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
         search_box.Add(self._search_button_up, 0, wx.LEFT, Constants.default_border)
         search_box.Add(self._search_button_down, 0, wx.LEFT, Constants.default_border)
@@ -604,6 +624,7 @@ class MainFrame(wx.Frame):
         toolbar_horizontal_box.Add(coloring_repetitions_box, 0, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_min_box, 0, wx.LEFT, Constants.default_border)
         toolbar_horizontal_box.Add(coloring_len_max_box, 0, wx.LEFT, Constants.default_border)
+        toolbar_horizontal_box.Add(line_distance_box, 0, wx.LEFT, Constants.default_border)
         toolbar_horizontal_box.Add(search_box, 1, wx.LEFT, Constants.default_border)
 
         top_panel_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -1230,6 +1251,7 @@ class MainFrame(wx.Frame):
             # Give the button 250ms to display state change.
             wx.CallLater(250, self._apply_indicators)
 
+    # noinspection PyUnusedLocal
     def _handle_indicator_limits_selector_handler(self, event: wx.CommandEvent) -> None:
         """
         Handle changes to word repetition spin ctrls.
@@ -1242,12 +1264,24 @@ class MainFrame(wx.Frame):
         if colorize_tool.IsToggled():
             self._apply_indicators()
 
+    # noinspection PyUnusedLocal
+    def _handle_line_distance_selector(self, event: wx.CommandEvent) -> None:
+        """
+        Handle changes to the min word distance by line spin ctrl.
+        :param event: Not used.
+        :return: None
+        """
+        # todo here
+        print('a')
+
     def apply_indicators_callback(self, plain_words: Dict[bytes, int],
-                                  spans_by_word: defaultdict[bytes, List[re.Match]]) -> None:
+                                  spans_by_word: defaultdict[bytes, List[re.Match]],
+                                  lines_by_word: defaultdict[bytes, List[int]]) -> None:
         """
         Thread callback to receive repeated word indicator calculation results from a thread.
         :param plain_words: Dictionary of words as bytes and the amount of each word.
         :param spans_by_word: Dictionary of words as bytes and a list of regex matches where the word is.
+        :param lines_by_word: Dictionary of words as bytes and a list of lines where the word is.
         :return: None
         """
         assert self._toolbar is not None
@@ -1260,6 +1294,7 @@ class MainFrame(wx.Frame):
 
         self._word_counts = plain_words
         self._spans_by_word = spans_by_word
+        self._lines_by_word = lines_by_word
 
         # Enable the coloring tool once we have data to show.
         self._toolbar.EnableTool(wx.ID_APPLY, True)
@@ -1352,16 +1387,13 @@ class MainFrame(wx.Frame):
         assert self._coloring_spinner is not None
         assert self._side_word_border_sizer is not None
 
-        # Dictionary of words as bytes and the amount of each word.
-        plain_words: Dict[bytes, int] = self._word_counts
-        # Dictionary of words as bytes and a list of regex matches where the word is.
-        spans_by_word: defaultdict[bytes, List[re.Match]] = self._spans_by_word
-
         word_data: Dict[bytes, ListItemPanel] = self._current_document.get_word_marking_data()
         # Update or create word panels according to all words in the document.
         # This can not be done in a thread because it is calling a gui method and will segfault.
-        for word, count in plain_words.items():
-            spans = spans_by_word[word]
+        # Word counts - Dictionary of words as bytes and the amount of each word.
+        # Spans by word - Dictionary of words as bytes and a list of regex matches where the word is.
+        for word, count in self._word_counts.items():
+            spans = self._spans_by_word[word]
             panel = word_data.get(word)
             if panel is None:
                 new_panel = self._side_word_list.add_hidden_item(Word(word.decode('utf-8'), spans, count))
@@ -2165,7 +2197,7 @@ class MainFrame(wx.Frame):
             self._waiting_dialog.start(saving=True)
             self._current_document.set_path(Path(destination))
             SaveFileThread(self, self._current_document, self._convert_document(), self._main_text_field.GetText(),
-                           tests)
+                           self._lines_by_word, tests)
         else:
             # Canceled dialog.
             self._set_status_text(Strings.status_not_saved.format('canceled'), 0)
@@ -2223,7 +2255,8 @@ class MainFrame(wx.Frame):
                              Constants.report_names_capitalized,
                              Constants.report_leftover,
                              Constants.report_repetition,
-                             Constants.report_similar]:
+                             Constants.report_similar,
+                             Constants.report_close_words]:
             if message_type in result:
                 open_log = True
                 for err in result[message_type]:

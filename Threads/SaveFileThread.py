@@ -1,7 +1,7 @@
 import re
 from collections import defaultdict
 from threading import Thread
-from typing import List, Callable, Tuple
+from typing import List, Callable, Tuple, Dict
 
 import wx
 
@@ -15,7 +15,7 @@ class SaveFileThread(Thread):
     """
 
     def __init__(self, parent, document: Document, converted_text: List, plain_text: str,
-                 lines_by_word: defaultdict[bytes, List[int]], run_tests: bool) -> None:
+                 word_distance: int, run_tests: bool) -> None:
         """
         Thread constructor.
         The editor is disabled during this operation.
@@ -23,7 +23,7 @@ class SaveFileThread(Thread):
         :param document: The document instance to save.
         :param converted_text: Data prepared for saving.
         :param plain_text: Plain text for additional tests.
-        :param lines_by_word: Dictionary of words as bytes and a list of lines where the word is.
+        :param word_distance: Minimum two repetition word distance.
         :param run_tests: Run or do not run tests.
         :return: None
         """
@@ -33,8 +33,9 @@ class SaveFileThread(Thread):
         # Using the text field here is not thread safe. Gui methods can not be called form background threads safely.
         self._converted_text = converted_text
         self._plain_text = plain_text
-        self._lines_by_word = lines_by_word
+        self._word_counts: Dict[bytes, int] = {}
         self._run_tets = run_tests
+        self._min_word_distance = word_distance
         self.start()
 
     @staticmethod
@@ -68,6 +69,8 @@ class SaveFileThread(Thread):
             return
 
         if self._run_tets:
+            # todo the tests are slow on large documents, save ends before tests.
+            # todo what is slow in them? Stream error messages into main thread or wait? Can we parallelize with threads?
             check_fails: defaultdict[str, List[Tuple[str, int]]] = defaultdict(list)
             check_functions: List[Callable[[str, int], Tuple[str, List[Tuple[str, int]]]]] = [self._check_leftover,
                                                                                               self._check_repetitions,
@@ -92,16 +95,29 @@ class SaveFileThread(Thread):
 
     def _check_word_distance(self) -> List[Tuple[str, int]]:
         """
-        # todo run the calculation thread before save to have the latest data.
-        # todo add spinner for setting line distance
         Check for words with 2 repetitions that are too close together.
         :return: List of errors strings.
         """
+        # Recalculate lines by word here to have the freshest data.
+        plain_text = self._plain_text.lower().encode('utf-8')
+        word_spans = list(Constants.word_matcher.finditer(plain_text))
+
+        # Defaultdict wll create a new empty list if the key does not exist and add it into it. Otherwise, it
+        # will just add the word to the existing list under that key.
+        lines_by_word: defaultdict[bytes, List[int]] = defaultdict(list)
+        line_counter = 1
+        for word_span in word_spans:
+            word_bytes = word_span.group()
+            if word_bytes == b"\n":
+                line_counter += 1
+            # Dictionary of words as bytes and a list of lines where the word is.
+            lines_by_word[word_bytes].append(line_counter)
+
         errors: List[Tuple[str, int]] = []
-        for word, lines in self._lines_by_word.items():
+        for word, lines in lines_by_word.items():
             if len(lines) == 2:
                 # Run this for words with just two repetitions, the rest is visible in the gui coloring tool.
-                if (lines[1] - lines[0]) <= 3:
+                if (lines[1] - lines[0]) <= self._min_word_distance:
                     errors.append((Strings.report_word_distance.format(word.decode('utf-8'), lines[0], lines[1]),
                                    lines[0]))
         return errors

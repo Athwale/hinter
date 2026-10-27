@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import List
 
@@ -13,6 +14,8 @@ color_grey_dark: wx.Colour = wx.Colour(82, 84, 82)
 color_grey_light: wx.Colour = wx.Colour(240, 240, 240)
 color_orange: wx.Colour = wx.Colour(252, 119, 3)
 color_green: wx.Colour = wx.Colour(36, 145, 69)
+
+word_matcher = re.compile(rb"\b([A-Za-z0-9]+)\b|(\r?\n)")
 
 llm_default_url: str = 'http://127.0.0.1:8080/v1/chat/completions'
 llm_default_port: int = 8080

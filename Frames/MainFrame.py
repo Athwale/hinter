@@ -31,11 +31,11 @@ from Dialogs.SaveLoadWaitDialog import SavingWaitDialog
 from Dialogs.WordInfoDialog import WordInfoDialog
 from Dialogs.WordListEditDialog import WordListEditDialog
 from Resources.Fetch import Fetch
-from Threads.ColoratorThread import ColoratorThread
 from Threads.LLMThread import LLMThread
 from Threads.LoadFileThread import LoadFileThread
 from Threads.SaveFileThread import SaveFileThread
 from Threads.StatisticsThread import StatisticsThread
+from Threads.WordDataThread import WordDataThread
 from Tools.Config import Config
 
 
@@ -116,7 +116,6 @@ class MainFrame(wx.Frame):
         # Used for repeated word marking
         self._word_counts: Dict[bytes, int] = {}
         self._spans_by_word: defaultdict[bytes, List[re.Match]] = defaultdict()
-        self._lines_by_word: defaultdict[bytes, List[int]] = defaultdict()
         self._fitting_words: List[ListItemPanel] = []
 
         self._notes_dialog: NotesEditorDialog | None = None
@@ -128,7 +127,7 @@ class MainFrame(wx.Frame):
         self._waiting_dialog: SavingWaitDialog = SavingWaitDialog(self)
 
         self._statistics_thread: StatisticsThread | None = None
-        self._colorator_thread: ColoratorThread | None = None
+        self._word_data_thread: WordDataThread | None = None
 
         self._llm_thread: LLMThread | None = None
         self._statistics_timer = wx.Timer(self)
@@ -580,7 +579,6 @@ class MainFrame(wx.Frame):
                   self._min_repeated_word_length_selector)
         self.Bind(wx.EVT_SPINCTRL, self._handle_indicator_limits_selector_handler,
                   self._max_repeated_word_length_selector)
-        self.Bind(wx.EVT_SPINCTRL, self._handle_line_distance_selector, self._line_distance_selector)
 
         self.Bind(EVT_CHECKBOX_CHANGED, self._word_list_handler)
 
@@ -613,7 +611,6 @@ class MainFrame(wx.Frame):
                                  Constants.default_border)
         coloring_len_max_box.Add(self._max_repeated_word_length_selector, 0, wx.LEFT, Constants.default_border)
 
-        # todo disabling
         line_distance_box.Add(self._line_distance_selector, 0, wx.LEFT, Constants.default_border)
 
         search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
@@ -1265,25 +1262,17 @@ class MainFrame(wx.Frame):
             self._apply_indicators()
 
     # noinspection PyUnusedLocal
-    def _handle_line_distance_selector(self, event: wx.CommandEvent) -> None:
-        """
-        Handle changes to the min word distance by line spin ctrl.
-        :param event: Not used.
-        :return: None
-        """
-        # todo here
-        print('a')
-
-    def apply_indicators_callback(self, plain_words: Dict[bytes, int],
-                                  spans_by_word: defaultdict[bytes, List[re.Match]],
-                                  lines_by_word: defaultdict[bytes, List[int]]) -> None:
+    def receive_word_data_callback(self, plain_words: Dict[bytes, int],
+                                   spans_by_word: defaultdict[bytes, List[re.Match]],
+                                   lines_by_word: defaultdict[bytes, List[int]]) -> None:
         """
         Thread callback to receive repeated word indicator calculation results from a thread.
         :param plain_words: Dictionary of words as bytes and the amount of each word.
         :param spans_by_word: Dictionary of words as bytes and a list of regex matches where the word is.
-        :param lines_by_word: Dictionary of words as bytes and a list of lines where the word is.
+        :param lines_by_word: Unused. Dictionary of words as bytes and a list of lines where the word is.
         :return: None
         """
+        # todo use the lines by word for something?
         assert self._toolbar is not None
         assert self._coloring_spinner is not None
         assert self._side_word_list is not None
@@ -1294,7 +1283,6 @@ class MainFrame(wx.Frame):
 
         self._word_counts = plain_words
         self._spans_by_word = spans_by_word
-        self._lines_by_word = lines_by_word
 
         # Enable the coloring tool once we have data to show.
         self._toolbar.EnableTool(wx.ID_APPLY, True)
@@ -1310,6 +1298,7 @@ class MainFrame(wx.Frame):
             # Runs when text is changed and the tool is already active.
             self._apply_indicators()
         self._coloring_spinner.Stop()
+        self._word_data_thread = None
 
     def _word_list_handler(self, event: dv.DataViewEvent) -> None:
         """
@@ -1551,9 +1540,9 @@ class MainFrame(wx.Frame):
         # Recalculate the coloring data if the thread is not running already.
         if self._current_document:
             if self._ready:
-                if self._colorator_thread is None or not self._colorator_thread.is_alive():
-                    self._colorator_thread = ColoratorThread(self, self._current_document,
-                                                             self._main_text_field.GetText())
+                if self._word_data_thread is None or not self._word_data_thread.is_alive():
+                    self._word_data_thread = WordDataThread(self, self._current_document,
+                                                            self._main_text_field.GetText())
 
     # noinspection PyUnusedLocal
     def _on_autosave_timer_handler(self, event: wx.CommandEvent) -> None:
@@ -1907,6 +1896,7 @@ class MainFrame(wx.Frame):
         assert self._toolbar is not None
         assert self._main_text_field is not None
         assert self._side_word_list is not None
+        assert self._line_distance_selector is not None
 
         self.Enable()
         # These are enabled in a thread later when coloring calculations are done.
@@ -1914,6 +1904,7 @@ class MainFrame(wx.Frame):
         self._enable_indicator_controls(False)
 
         self._main_text_field.Enable()
+        self._line_distance_selector.Enable()
         for t in self._tools:
             if t.GetId() == wx.ID_APPLY:
                 # Skip the coloring tool, that is enabled by its own thread logic.
@@ -1935,6 +1926,7 @@ class MainFrame(wx.Frame):
         assert self._toolbar is not None
         assert self._main_text_field is not None
         assert self._side_word_list is not None
+        assert self._line_distance_selector is not None
 
         self._ready = False
         if everything:
@@ -1945,6 +1937,7 @@ class MainFrame(wx.Frame):
         self._enable_indicator_controls(False)
         self._main_text_field.Disable()
         self._side_word_list.Disable()
+        self._line_distance_selector.Disable()
         for t in self._tools:
             if t.GetId() not in [wx.ID_NEW, wx.ID_OPEN]:
                 self._toolbar.EnableTool(t.GetId(), False)
@@ -2111,6 +2104,7 @@ class MainFrame(wx.Frame):
         assert self._repetition_selector is not None
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None
+        assert self._line_distance_selector is not None
         assert self._side_word_border_sizer is not None
 
         if exp:
@@ -2145,6 +2139,7 @@ class MainFrame(wx.Frame):
         self.post_divider()
         self.post_message(Strings.msg_loaded.format(self._current_document.get_path()), Constants.msg_info)
         self._repetition_selector.SetValue(Constants.config_min_repetitions_default)
+        self._line_distance_selector.SetValue(Constants.config_line_distance_default)
         self._min_repeated_word_length_selector.SetValue(Constants.config_min_len_default)
         self._max_repeated_word_length_selector.SetValue(Constants.config_max_len)
         self._available_indicators = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
@@ -2185,6 +2180,7 @@ class MainFrame(wx.Frame):
         """
         assert self._current_document is not None
         assert self._main_text_field is not None
+        assert self._line_distance_selector is not None
 
         self._set_status_text(Strings.status_saving, 0)
         self._disable_editor(everything=True)
@@ -2197,7 +2193,7 @@ class MainFrame(wx.Frame):
             self._waiting_dialog.start(saving=True)
             self._current_document.set_path(Path(destination))
             SaveFileThread(self, self._current_document, self._convert_document(), self._main_text_field.GetText(),
-                           self._lines_by_word, tests)
+                           self._line_distance_selector.GetValue(), tests)
         else:
             # Canceled dialog.
             self._set_status_text(Strings.status_not_saved.format('canceled'), 0)

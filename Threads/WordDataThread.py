@@ -48,6 +48,7 @@ class WordDataThread(Thread):
             word_bytes = word_span.group()
             if word_bytes == b"\n":
                 line_counter += 1
+                continue
             # Dictionary of words as bytes and a list of regex matches where the word is.
             spans_by_word[word_bytes].append(word_span)
 

@@ -116,6 +116,7 @@ class MainFrame(wx.Frame):
         # Used for repeated word marking
         self._word_counts: Dict[bytes, int] = {}
         self._spans_by_word: defaultdict[bytes, List[re.Match]] = defaultdict()
+        self._lines_by_word: defaultdict[bytes, List[int]] = defaultdict()
         self._fitting_words: List[ListItemPanel] = []
 
         self._notes_dialog: NotesEditorDialog | None = None
@@ -731,6 +732,7 @@ class MainFrame(wx.Frame):
         """
         assert self._main_text_field is not None
         assert self._current_document is not None
+        assert self._side_word_list is not None
 
         self._main_text_field.TargetFromSelection()
         self._highlight_current_line()
@@ -810,11 +812,11 @@ class MainFrame(wx.Frame):
                 self.Bind(wx.EVT_MENU, self._on_context_menu_text_handler, id=self._id_llm_synonym)
 
         copy_item.Enable(enable)
-        ignore_item.Enable(enable)
-        name_item.Enable(enable)
-        limits_item.Enable(enable)
-        ignore_del_item.Enable(enable)
-        name_del_item.Enable(enable)
+        ignore_item.Enable(self._side_word_list.IsEnabled())
+        name_item.Enable(self._side_word_list.IsEnabled())
+        limits_item.Enable(self._side_word_list.IsEnabled())
+        ignore_del_item.Enable(self._side_word_list.IsEnabled())
+        name_del_item.Enable(self._side_word_list.IsEnabled())
 
         undo_item.Enable(self._main_text_field.CanUndo())
         redo_item.Enable(self._main_text_field.CanRedo())
@@ -1182,7 +1184,7 @@ class MainFrame(wx.Frame):
         """
         assert self._current_document is not None
 
-        WordInfoDialog(self, self._current_document.get_word_marking_data())
+        WordInfoDialog(self, self._current_document.get_word_marking_data(), self._lines_by_word)
 
     # noinspection PyUnusedLocal
     def _log_handler(self, event: wx.CommandEvent) -> None:
@@ -1272,7 +1274,6 @@ class MainFrame(wx.Frame):
         :param lines_by_word: Unused. Dictionary of words as bytes and a list of lines where the word is.
         :return: None
         """
-        # todo use the lines by word for something?
         assert self._toolbar is not None
         assert self._coloring_spinner is not None
         assert self._side_word_list is not None
@@ -1283,6 +1284,7 @@ class MainFrame(wx.Frame):
 
         self._word_counts = plain_words
         self._spans_by_word = spans_by_word
+        self._lines_by_word = lines_by_word
 
         # Enable the coloring tool once we have data to show.
         self._toolbar.EnableTool(wx.ID_APPLY, True)
@@ -1352,9 +1354,14 @@ class MainFrame(wx.Frame):
         :return: None
         """
         assert self._side_word_list is not None
+        assert self._main_text_field is not None
 
         if event.GetId() == self._id_unselect_all_list and self._selected_words:
             self._unselect_all_list()
+            # Clear if we are turning the tool off. Disable limit controls.
+            for indicator in range(32):
+                self._main_text_field.SetIndicatorCurrent(indicator)
+                self._main_text_field.IndicatorClearRange(0, self._main_text_field.GetTextLength())
         else:
             # Using the auto select button. Deselect all first, then restart the tool from scratch.
             self._unselect_all_list()
@@ -1951,7 +1958,6 @@ class MainFrame(wx.Frame):
         :param enable: True to enable, False to disable.
         :return: None
         """
-        # todo what about context menu buttons? Do they rerun coloring and need to be disabled during calculations?
         assert self._repetition_selector is not None
         assert self._min_repeated_word_length_selector is not None
         assert self._max_repeated_word_length_selector is not None

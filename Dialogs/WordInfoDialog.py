@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Dict
 
 import wx
@@ -10,11 +11,12 @@ from Containers.ListItemPanel import ListItemPanel
 
 class WordInfoDialog(wx.Dialog):
 
-    def __init__(self, parent, panels: Dict[bytes, ListItemPanel]):
+    def __init__(self, parent, panels: Dict[bytes, ListItemPanel], lines_by_word: defaultdict[bytes, list[int]]):
         """
         Display a dialog with a word list and counts.
         :param parent: Parent frame.
         :param panels: Dictionary of [bytes, ListItemPanel]
+        :param lines_by_word: Dictionary of words and their lines.
         """
         wx.Dialog.__init__(self, parent, title=Strings.dialog_words_info,
                            size=Size(Constants.words_dialog_width, Constants.words_dialog_height))
@@ -29,7 +31,9 @@ class WordInfoDialog(wx.Dialog):
 
         content = ''
         for w, p in sorted(panels.items()):
-            content += f'{w.decode('utf-8')} -> {p.get_word_instance().get_count()}<br>'
+            # Lines contains duplicates when the word repeats on the same line.
+            unique_lines = set(lines_by_word[w])
+            content += f'{w.decode('utf-8')} -> {p.get_word_instance().get_count()},\tlines: {len(unique_lines)}<br>'
 
         if not content:
             content = Strings.warn_run_indicator_tool

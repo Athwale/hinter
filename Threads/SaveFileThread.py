@@ -68,9 +68,11 @@ class SaveFileThread(Thread):
             wx.CallAfter(self._parent.save_document_callback, False)
             return
 
+        print('start')
         if self._run_tets:
             # todo the tests are slow on large documents, save ends before tests.
-            # todo what is slow in them? Stream error messages into main thread or wait? Can we parallelize with threads?
+            # todo what is slow in them?
+            # todo Stream error messages into main thread or wait? Can we parallelize with threads?
             check_fails: defaultdict[str, List[Tuple[str, int]]] = defaultdict(list)
             check_functions: List[Callable[[str, int], Tuple[str, List[Tuple[str, int]]]]] = [self._check_leftover,
                                                                                               self._check_repetitions,
@@ -82,6 +84,9 @@ class SaveFileThread(Thread):
                 check_fails[Constants.report_names_capitalized] = [(Strings.report_names_not_configured_lines, -1)]
                 check_fails[Constants.report_name_lines] = [(Strings.report_names_not_configured_caps, -1)]
 
+            print('a')
+
+            # todo thread for each, up to 4 at once
             # Enumerate will not create the whole list in memory.
             for counter, line in enumerate(self._plain_text.splitlines(), start=1):
                 for f in check_functions:
@@ -89,9 +94,14 @@ class SaveFileThread(Thread):
                     if test_result:
                         check_fails[test_type].extend(test_result)
 
+            print('b')
+
             check_fails[Constants.report_close_words].extend(self._check_word_distance())
 
+            print('c')
+
             wx.CallAfter(self._parent.document_test_callback, check_fails)
+            print('stop')
 
     def _check_word_distance(self) -> List[Tuple[str, int]]:
         """

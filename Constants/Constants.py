@@ -15,8 +15,80 @@ color_grey_light: wx.Colour = wx.Colour(240, 240, 240)
 color_orange: wx.Colour = wx.Colour(252, 119, 3)
 color_green: wx.Colour = wx.Colour(36, 145, 69)
 
+# Used for disassembling the text.
 word_matcher = re.compile(rb"\b([A-Za-z0-9]+)\b|(\r?\n)")
 
+# Good writing tests:
+# Compiling regexes first saves time, and we do not need to iterate and recompile them in each run of re.search
+leftover_regex = re.compile(r'\b(?:the a|a the)\b| as \w+ a ')
+doubled_words_regex = re.compile(r'\b(\w+)(?:\s+\1)+\b')
+similar_words = [
+    ("shorty", "shortly"),
+    ("statue", "statute"),
+    ("form", "from"),
+    ("plan", "plane"),
+    ("unit", "until"),
+    ("thought", "though"),
+    ("trough", "tough"),
+    ("trail", "trial"),
+    ("causal", "casual"),
+    ("unite", "untie"),
+    ("sacred", "scared"),
+    ("marital", "martial"),
+    ("desert", "dessert"),
+    ("principal", "principle"),
+    ("complement", "compliment"),
+    ("stationery", "stationary"),
+    ("affect", "effect"),
+    ("moral", "morale"),
+    ("human", "humane"),
+    ("lose", "loose"),
+    ("definitely", "defiantly"),
+    ("quiet", "quite"),
+    ("diary", "dairy"),
+    ("angel", "angle"),
+    ("bread", "beard"),
+    ("prosecute", "persecute"),
+    ("adapt", "adept", "adopt"),
+    ("peek", "peak", "pique"),
+    ("pore", "pour", "poor"),
+    ("discreet", "discrete"),
+    ("elicit", "illicit"),
+    ("wary", "weary"),
+    ("metal", "mettle"),
+    ("patients", "patience"),
+    ("altar", "alter"),
+    ("assent", "ascent"),
+    ("bazaar", "bizarre"),
+    ("canvas", "canvass"), ("capital", "capitol"),
+    ("cereal", "serial"),
+    ("chord", "cord"),
+    ("council", "counsel"),
+    ("currant", "current"),
+    ("dual", "duel"), ("flea", "flee"),
+    ("hoard", "horde"),
+    ("lightning", "lightening"),
+    ("loath", "loathe"),
+    ("miner", "minor"),
+    ("naval", "naval"),
+    ("ordinance", "ordnance"),
+    ("pedal", "peddle", "petal"),
+    ("profit", "prophet"),
+    ("shear", "shear"),
+    ("stair", "stare"),
+    ("vial", "vile"),
+    ("heard", "hears")
+]
+# Build a single unified regex for similar words to check a line in one pass.
+# The map() function executes a specified function for each item in an iterable. Escape all words to avoid interpreting
+# any special characters. The item is sent to the function as a parameter.
+# {'shorty': ('shorty', 'shortly'), 'shortly': ('shorty', 'shortly'),...}
+# This is used to find the two words that are similar if either one of them is found.
+word_to_group = {word: group for group in similar_words for word in group}
+# \b(shorty|shortly|statue|...) Escape each word and connect them with |. Map returns an iterable.
+similar_words_regex = re.compile(r'\b(' + '|'.join(map(re.escape, word_to_group.keys())) + r')\b')
+
+# Other constants:
 llm_default_url: str = 'http://127.0.0.1:8080/v1/chat/completions'
 llm_default_port: int = 8080
 llm_system_prompt: str = ('You are an enthusiastic writer striving for the best quality stories.'
@@ -104,7 +176,7 @@ autosave_timer_delay: int = 30000
 report_name_lines: str = 'nl'
 report_names_capitalized: str = 'nc'
 report_leftover: str = 'left'
-report_repetition: str = 'rep'
+report_double_words: str = 'rep'
 report_similar: str = 'sim'
 report_close_words: str = 'cw'
 

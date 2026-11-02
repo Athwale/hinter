@@ -34,6 +34,7 @@ from Resources.Fetch import Fetch
 from Threads.LLMThread import LLMThread
 from Threads.LoadFileThread import LoadFileThread
 from Threads.SaveFileThread import SaveFileThread
+# from Threads.SaveFileThread1 import SaveFileThread
 from Threads.StatisticsThread import StatisticsThread
 from Threads.WordDataThread import WordDataThread
 from Tools.Config import Config
@@ -2256,7 +2257,7 @@ class MainFrame(wx.Frame):
         for message_type in [Constants.report_name_lines,
                              Constants.report_names_capitalized,
                              Constants.report_leftover,
-                             Constants.report_repetition,
+                             Constants.report_double_words,
                              Constants.report_similar,
                              Constants.report_close_words]:
             if message_type in result:

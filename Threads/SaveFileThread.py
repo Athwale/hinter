@@ -72,6 +72,7 @@ class SaveFileThread(Thread):
             errors.extend(self._check_leftover())
             errors.extend(self._check_repetitions())
             errors.extend(self._check_similar_words())
+            errors.extend(self._check_word_distance())
 
             # check_fails[Constants.report_close_words].extend(self._check_word_distance())
             # wx.CallAfter(self._parent.document_test_callback, check_fails)
@@ -86,27 +87,28 @@ class SaveFileThread(Thread):
         stub = self._plain_text[position - 25:position + 25]
         return stub.replace('\n', ' ')
 
-    def _check_word_distance(self) -> List[Tuple[str, int]]:
+    def _check_word_distance(self) -> List[Tuple[str, int, str, str]]:
         """
         Check for words with 2 repetitions that are too close together.
-        :return: List of errors strings.
+        :return: List of reports found (type, start position, stub, word or error)
         """
+        # todo rewrite this to the new format.
         # Recalculate lines by word here to have the freshest data.
         plain_text = self._plain_text.lower().encode('utf-8')
         word_spans = list(Constants.word_matcher.finditer(plain_text))
 
         # Defaultdict wll create a new empty list if the key does not exist and add it into it. Otherwise, it
         # will just add the word to the existing list under that key.
+        # Create a dictionary of words as bytes and a list of lines where the word is.
         lines_by_word: defaultdict[bytes, List[int]] = defaultdict(list)
         line_counter = 1
         for word_span in word_spans:
             word_bytes = word_span.group()
             if word_bytes == b"\n":
                 line_counter += 1
-            # Dictionary of words as bytes and a list of lines where the word is.
             lines_by_word[word_bytes].append(line_counter)
 
-        errors: List[Tuple[str, int]] = []
+        errors: List[Tuple[str, int, str, str]] = []
         for word, lines in lines_by_word.items():
             if len(lines) == 2:
                 # Run this for words with just two repetitions, the rest is visible in the gui coloring tool.

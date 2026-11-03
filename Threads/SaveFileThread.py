@@ -95,6 +95,7 @@ class SaveFileThread(Thread):
             word_bytes = word_span.group()
             if word_bytes == b"\n":
                 line_counter += 1
+                continue
             lines_by_word[word_bytes].append(line_counter)
 
         errors: List[Tuple[str, str, int, int]] = []

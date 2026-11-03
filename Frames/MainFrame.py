@@ -2126,9 +2126,8 @@ class MainFrame(wx.Frame):
             self._show_error_ok_dialog(Strings.warn_errors.format(formatted))
             return
 
-        # Todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering
-        #  the text on main thread.
-        # todo Can we parallelize with thread executor one thread for each test on whole text? beware of PIL.
+        # todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering
+        # todo the text on main thread. This may be because of GIL. Can we parallelize with ProcessPoolExecutor, Threads are not good for CPU bound tasks because of GIL.
         self._main_text_field.EmptyUndoBuffer()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._set_status_text(self._current_document.get_path().name, 1)
@@ -2248,7 +2247,6 @@ class MainFrame(wx.Frame):
         :param results: Dictionary of errors.
         :return: None
         """
-        # todo why in doc1 lines cross \n?
         assert self._log_text_field is not None
         assert self._main_text_field is not None
         assert self._toolbar is not None
@@ -2265,9 +2263,7 @@ class MainFrame(wx.Frame):
             report_type = report[0]
             if report_type == Constants.report_no_names:
                 # Special no names configured message
-                self.post_message(Strings.report_names_not_configured_caps, Constants.msg_warn)
-                self.post_message(Strings.report_names_not_configured_lines, Constants.msg_warn)
-                counter += 1
+                self.post_message(Strings.report_names_not_configured, Constants.msg_err)
             elif report_type != Constants.report_close_words:
                 # (type, start position, stub, word or error)
                 line = self._main_text_field.LineFromPosition(report[1]) + 1

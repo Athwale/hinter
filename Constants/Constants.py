@@ -21,7 +21,7 @@ word_matcher = re.compile(rb"\b([A-Za-z0-9]+)\b|(\r?\n)")
 # Good writing tests:
 # Compiling regexes first saves time, and we do not need to iterate and recompile them in each run of re.search
 leftover_regex = re.compile(r'\b(?:the a|a the)\b| as \w+ a '.encode('utf-8'))
-doubled_words_regex = re.compile(r'\b(\w+)(?:\s+\1)+\b'.encode('utf-8'))
+doubled_words_regex = re.compile(r'\b(\w+)([ \t]+\1)+\b'.encode('utf-8'))
 similar_words = [
     ("shorty", "shortly"),
     ("statue", "statute"),

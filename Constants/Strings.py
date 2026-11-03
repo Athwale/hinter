@@ -134,8 +134,7 @@ text_about: str = "About editor:\nhttps://github.com/Athwale/hinter\nAuthor: Ath
 
 report_ok: str = "No errors"
 report_log_cleared: str = 'Log length exceeded, log cleared'
-report_names_not_configured_lines: str = "No names configured for line beginning test"
-report_names_not_configured_caps: str = "No names configured for capital letter test"
+report_names_not_configured: str = "No names configured for tests"
 report_name_line: str = "Line: {} starts with name: - {} - {}..."
 report_capital_names: str = "Line: {} has uncapitalized name: - {} - {}..."
 report_leftover: str = "Line: {} has leftover: - {} - {}..."

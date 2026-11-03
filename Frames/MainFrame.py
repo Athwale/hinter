@@ -246,7 +246,7 @@ class MainFrame(wx.Frame):
                                                 Strings.menu_item_log_hint)
         self._menu_items.append(tools_menu_item_log)
         tools_menu_item_log_clear = tools_menu.Append(self._id_log_clear, Strings.menu_item_log_clear,
-                                                     Strings.menu_item_log_open_hint)
+                                                      Strings.menu_item_log_open_hint)
         self._menu_items.append(tools_menu_item_log_clear)
         tools_menu.AppendSeparator()
         tools_menu_item_llm_config = tools_menu.Append(wx.ID_SETUP, Strings.menu_item_config_llm,
@@ -2128,6 +2128,7 @@ class MainFrame(wx.Frame):
 
         # Todo spinner stops spinning at the end while loading large document 1000+ a4 pages. Text field is rendering
         #  the text on main thread.
+        # todo Can we parallelize with thread executor one thread for each test on whole text? beware of PIL.
         self._main_text_field.EmptyUndoBuffer()
         self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
         self._set_status_text(self._current_document.get_path().name, 1)
@@ -2199,24 +2200,27 @@ class MainFrame(wx.Frame):
             self._waiting_dialog.Show()
             self._waiting_dialog.start(saving=True)
             self._current_document.set_path(Path(destination))
-            SaveFileThread(self, self._current_document, self._convert_document(), self._main_text_field.GetText(),
+            # UTF-8 is needed because scintilla uses byte offsets for positions.
+            SaveFileThread(self, self._current_document, self._convert_document(),
+                           self._main_text_field.GetText().encode('utf-8'),
                            self._line_distance_selector.GetValue(), tests)
         else:
             # Canceled dialog.
             self._set_status_text(Strings.status_not_saved.format('canceled'), 0)
             return
 
-    def save_document_callback(self, result: bool) -> None:
+    def save_document_callback(self, save_result: bool, test_results: List[Tuple]) -> None:
         """
         Thread callback after saving current document.
-        :param result: True if save was successful.
+        :param save_result: True if save was successful.
+        :param test_results: List of tuples with test results, type determined by report_... from Constants.
         :return: None
         """
         assert self._current_document is not None
         assert self._main_text_field is not None
         assert self._coloring_spinner is not None
 
-        if result:
+        if save_result:
             self._set_status_text(self._current_document.get_path().name, 1)
             self._main_text_field.SetSavePoint()
             self.SetTitle(Strings.app_title.format(self._current_document.get_path().name))
@@ -2224,49 +2228,70 @@ class MainFrame(wx.Frame):
             self._set_status_text(Strings.status_saved.format('Ok'), 0)
             self.post_divider()
             self.post_message(Strings.msg_saved.format(self._current_document.get_path()), Constants.msg_info)
+            self._print_document_test_results(test_results)
             self.enable_editor()
         else:
             self._set_status_text(Strings.status_not_saved.format('error'), 0)
             self._show_error_ok_dialog(Strings.status_not_saved.format('error'))
             self.post_divider()
             self.post_message(Strings.msg_save_fail.format(self._current_document.get_path()), Constants.msg_err)
+
         self._waiting_dialog.Close()
-        # Restart coloring thread to recalculate newest data state.
+        # Restart coloring thread to recalculate the newest data state.
         self._coloring_spinner.Start()
         self._idle_timer.Start(Constants.idle_timer_delay, oneShot=True)
         self._main_text_field.SetFocus()
 
-    def document_test_callback(self, result: defaultdict[str, List[Tuple[str, int]]]) -> None:
+    def _print_document_test_results(self, results: List[Tuple]) -> None:
         """
         Callback for document tests which prints the messages into log box and shows it.
-        :param result: Dictionary of errors.
+        :param results: Dictionary of errors.
         :return: None
         """
+        # todo why in doc1 lines cross \n?
         assert self._log_text_field is not None
         assert self._main_text_field is not None
         assert self._toolbar is not None
 
+        # Clear log if it is too long.
         if self._log_text_field.GetNumberOfLines() > Constants.max_log_length:
-            # Clear log if it is too long.
             self._log_text_field.Clear()
             self.post_message(Strings.report_log_cleared, Constants.msg_info)
 
         counter = 0
         self._main_text_field.MarkerDeleteAll(self._marker_yellow_line)
-        open_log: bool = False
-        for message_type in [Constants.report_name_lines,
-                             Constants.report_names_capitalized,
-                             Constants.report_leftover,
-                             Constants.report_double_words,
-                             Constants.report_similar,
-                             Constants.report_close_words]:
-            if message_type in result:
-                open_log = True
-                for err in result[message_type]:
-                    self.post_message(err[0], Constants.msg_warn)
-                    self._main_text_field.MarkerAdd(err[1] - 1, self._marker_yellow_line)
-                    counter += 1
-        if not open_log:
+
+        for report in results:
+            report_type = report[0]
+            if report_type == Constants.report_no_names:
+                # Special no names configured message
+                self.post_message(Strings.report_names_not_configured_caps, Constants.msg_warn)
+                self.post_message(Strings.report_names_not_configured_lines, Constants.msg_warn)
+                counter += 1
+            elif report_type != Constants.report_close_words:
+                # (type, start position, stub, word or error)
+                line = self._main_text_field.LineFromPosition(report[1]) + 1
+                self._main_text_field.MarkerAdd(line - 1, self._marker_yellow_line)
+
+                if report_type == Constants.report_name_lines:
+                    self.post_message(Strings.report_name_line.format(line, report[3], report[2]), Constants.msg_warn)
+                elif report_type == Constants.report_names_capitalized:
+                    self.post_message(Strings.report_capital_names.format(line, report[2], report[3]),
+                                      Constants.msg_warn)
+                elif report_type == Constants.report_leftover:
+                    self.post_message(Strings.report_leftover.format(line, report[3], report[2]), Constants.msg_warn)
+                elif report_type == Constants.report_double_words:
+                    self.post_message(Strings.report_doubled_words.format(line, report[3], report[2]),
+                                      Constants.msg_warn)
+                elif report_type == Constants.report_similar:
+                    self.post_message(Strings.report_similar.format(line, report[3], report[2]),
+                                      Constants.msg_warn)
+            elif report_type == Constants.report_close_words:
+                self.post_message(Strings.report_word_distance.format(report[1], report[2], report[3]),
+                                  Constants.msg_warn)
+            counter += 1
+
+        if not results:
             self.post_message(Strings.report_ok, Constants.msg_ok)
         else:
             self._toolbar.ToggleTool(wx.ID_UP, True)

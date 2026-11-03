@@ -20,8 +20,8 @@ word_matcher = re.compile(rb"\b([A-Za-z0-9]+)\b|(\r?\n)")
 
 # Good writing tests:
 # Compiling regexes first saves time, and we do not need to iterate and recompile them in each run of re.search
-leftover_regex = re.compile(r'\b(?:the a|a the)\b| as \w+ a ')
-doubled_words_regex = re.compile(r'\b(\w+)(?:\s+\1)+\b')
+leftover_regex = re.compile(r'\b(?:the a|a the)\b| as \w+ a '.encode('utf-8'))
+doubled_words_regex = re.compile(r'\b(\w+)(?:\s+\1)+\b'.encode('utf-8'))
 similar_words = [
     ("shorty", "shortly"),
     ("statue", "statute"),
@@ -86,7 +86,7 @@ similar_words = [
 # This is used to find the two words that are similar if either one of them is found.
 word_to_group = {word: group for group in similar_words for word in group}
 # \b(shorty|shortly|statue|...) Escape each word and connect them with |. Map returns an iterable.
-similar_words_regex = re.compile(r'\b(' + '|'.join(map(re.escape, word_to_group.keys())) + r')\b')
+similar_words_regex = re.compile((r'\b(' + '|'.join(map(re.escape, word_to_group.keys())) + r')\b').encode('utf-8'))
 
 # Other constants:
 llm_default_url: str = 'http://127.0.0.1:8080/v1/chat/completions'
@@ -173,6 +173,7 @@ idle_timer_delay: int = 3000
 # 30s autosave.
 autosave_timer_delay: int = 30000
 
+report_no_names: str = 'nn'
 report_name_lines: str = 'nl'
 report_names_capitalized: str = 'nc'
 report_leftover: str = 'left'

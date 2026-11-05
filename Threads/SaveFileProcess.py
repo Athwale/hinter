@@ -1,34 +1,31 @@
+import multiprocessing
 import re
 from collections import defaultdict
-from threading import Thread
 from typing import List, Tuple, Dict
-
-import wx
 
 from Constants import Constants
 from Containers.Document import Document
 
 
-class SaveFileThread(Thread):
+class SaveFileProcess(multiprocessing.Process):
     """
     Thread for saving the current document to disk.
     """
 
-    def __init__(self, parent, document: Document, converted_text: List, plain_text: bytes,
-                 word_distance: int, run_tests: bool) -> None:
+    def __init__(self, document: Document, converted_text: List, plain_text: bytes,
+                 word_distance: int, run_tests: bool, queue: multiprocessing.SimpleQueue) -> None:
         """
-        Thread constructor.
+        Process constructor.
         The editor is disabled during this operation.
-        :param parent: The frame that called the thread.
         :param document: The document instance to save.
         :param converted_text: Data prepared for saving.
         :param plain_text: Plain text for additional tests.
         :param word_distance: Minimum two repetition word distance.
         :param run_tests: Run or do not run tests.
+        :param queue: The Frame that called the thread.
         :return: None
         """
         super().__init__()
-        self._parent = parent
         self._document = document
         # Using the text field here is not thread safe. Gui methods can not be called form background threads safely.
         self._converted_text = converted_text
@@ -36,6 +33,7 @@ class SaveFileThread(Thread):
         self._word_counts: Dict[bytes, int] = {}
         self._run_tets = run_tests
         self._min_word_distance = word_distance
+        self._queue = queue
         self.start()
 
     def run(self) -> None:
@@ -44,7 +42,6 @@ class SaveFileThread(Thread):
         :return: None
         """
         self._document.set_converted(self._converted_text)
-
         try:
             if self._document.save_document():
                 if self._run_tets:
@@ -59,14 +56,13 @@ class SaveFileThread(Thread):
                     errors.extend(self._check_repetitions())
                     errors.extend(self._check_similar_words())
                     errors.extend(self._check_word_distance())
-                    wx.CallAfter(self._parent.save_document_callback, True, errors)
+                    self._queue.put((Constants.process_id_save, (True, errors)))
                 else:
-                    wx.CallAfter(self._parent.save_document_callback, True, [])
+                    self._queue.put((Constants.process_id_save, (True, [])))
             else:
-                wx.CallAfter(self._parent.save_document_callback, False, [])
+                self._queue.put((Constants.process_id_save, (False, [])))
         except PermissionError as _:
-            wx.CallAfter(self._parent.save_document_callback, False, [])
-            return
+            self._queue.put((Constants.process_id_save, (False, [])))
 
     def _find_stub(self, position: int) -> str:
         """

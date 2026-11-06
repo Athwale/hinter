@@ -127,6 +127,7 @@ err_file_format_metadata: str = "File metadata formatting error"
 err_file_not_found: str = "File not found"
 err_config_file: str = f"Config file permission error"
 err_connection: str = "Connection error"
+err_loading_document: str = "Error loading file"
 
 exception_resource_not_found: str = "Resource file not found"
 

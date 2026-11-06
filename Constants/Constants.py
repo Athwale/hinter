@@ -181,6 +181,11 @@ report_double_words: str = 'rep'
 report_similar: str = 'sim'
 report_close_words: str = 'cw'
 
+process_id_load: int = 25
+process_id_save: int = 35
+process_id_data: int = 45
+process_id_statistics: int = 55
+
 msg_reply: int = 0
 msg_info: int = 1
 msg_warn: int = 2

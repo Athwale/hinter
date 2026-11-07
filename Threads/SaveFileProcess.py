@@ -3,7 +3,7 @@ import re
 from collections import defaultdict
 from typing import List, Tuple, Dict
 
-from Constants import Constants
+from Constants import Constants, Strings
 from Containers.Document import Document
 
 
@@ -70,8 +70,12 @@ class SaveFileProcess(multiprocessing.Process):
         :param position: Position in full text.
         :return: Stub of the line.
         """
-        stub = self._plain_text[position - 25:position + 25].decode('utf-8')
-        return stub.replace('\n', ' ')
+        stub = ''
+        try:
+            stub = self._plain_text[position - 25:position + 25].decode('utf-8')
+            return stub.replace('\n', ' ')
+        except UnicodeDecodeError as e:
+            return Strings.err_utf8_decode.format(str(e))
 
     def _check_word_distance(self) -> List[Tuple[str, str, int, int]]:
         """

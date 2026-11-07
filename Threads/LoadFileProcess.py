@@ -11,11 +11,11 @@ class LoadFileProcess(multiprocessing.Process):
     Load a new document.
     """
 
-    def __init__(self, queue: multiprocessing.Queue, path: Path) -> None:
+    def __init__(self, path: Path, queue: multiprocessing.SimpleQueue) -> None:
         """
-        Thread constructor.
-        :param queue: The Frame that called the thread.
+        Process constructor.
         :param path: Document path.
+        :param queue: The Frame that called the thread.
         """
         super().__init__()
         # Storing parent is thread safe, the methods are called in CallAfter, not directly from the background thread.

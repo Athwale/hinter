@@ -1,12 +1,11 @@
 from pathlib import Path
-from typing import List, Dict, Set
+from typing import List, Set, Tuple
 
 import bs4
 import htmlmin
 from bs4 import Tag, NavigableString, BeautifulSoup
 
 from Constants import Constants, Strings
-from Containers.ListItemPanel import ListItemPanel
 from Exceptions.FormatError import FormatError
 from Resources.Fetch import Fetch
 
@@ -22,9 +21,7 @@ class Document:
         :param path: Path to the document.
         """
         self._path: Path = path
-        self._converted: List = []
-
-        self._word_data: Dict[bytes, ListItemPanel] = {}
+        self._converted: List[Tuple[str, str]] = []
 
         self._errors: List[str] = []
         self._new: bool = True
@@ -34,6 +31,7 @@ class Document:
         self._names: Set[str] = set()
         self._synonyms: List[Set[str]] = []
         self._notes: str = 'Example notes'
+        self._checked_words: Set[str] = set()
 
     def get_ignored_words(self) -> Set[str]:
         """
@@ -41,6 +39,13 @@ class Document:
         :return: Set of ignored words.
         """
         return self._ignored_words
+
+    def get_checked_words(self) -> Set[str]:
+        """
+        Get the list of selected words in the side list loaded from the saved file.
+        :return: Set of selected words.
+        """
+        return self._checked_words
 
     def get_names(self) -> Set[str]:
         """
@@ -70,19 +75,12 @@ class Document:
         """
         return self._errors
 
-    def get_parsed_text(self) -> List:
+    def get_parsed_text(self) -> List[Tuple[str, str]]:
         """
         Return the parsed text prepared for loading into giu.
         :return: The parsed text prepared for loading into gui.
         """
         return self._converted
-
-    def get_word_marking_data(self) -> Dict[bytes, ListItemPanel]:
-        """
-        Return a dictionary of unique words and their side panel item.
-        :return: A dictionary of unique words and their side panel item.
-        """
-        return self._word_data
 
     def get_notes(self) -> str:
         """
@@ -122,6 +120,15 @@ class Document:
         :return: None
         """
         self._ignored_words = words
+        self.set_modified(True)
+
+    def set_checked_words(self, words: Set[str]) -> None:
+        """
+        Set new checked words selected on the side panel.
+        :param words: Set of strings.
+        :return: None
+        """
+        self._checked_words = words
         self.set_modified(True)
 
     def set_names(self, names: Set[str]) -> None:
@@ -267,6 +274,11 @@ class Document:
                         if group.strip():
                             for w in group.split(','):
                                 self._names.add(w.strip().lower())
+                elif parts[0].strip() == 'checked':
+                    for group in parts[1:]:
+                        if group.strip():
+                            for w in group.split(','):
+                                self._checked_words.add(w.strip().lower())
                 else:
                     raise FormatError(Strings.err_file_format_metadata)
         base = soup.find(name="base")
@@ -286,13 +298,15 @@ class Document:
         soup = bs4.BeautifulSoup(raw_html_text, features="html.parser")
         # We use title because LibreOffice ignores it.
         title = soup.find(name="title")
+        # Metadata string format: <title> ignored: test, and ;synonym: auto, car ;synonym: cat, feline ;names: Name, Name1;selection word, word1 </title>
         meta_string: str = f'ignored:'
-        # Format: <title> ignored: test, and ;synonym: auto, car ;synonym: cat, feline ;names: Name, Name1 </title>
         synonym_part = ''
         for group in self._synonyms:
             synonym_part += f'; synonym:{",".join(group)}'
 
-        meta_string += f'{",".join(self._ignored_words)}; names:{",".join(self._names)}{synonym_part}'
+        meta_string += (f'{",".join(self._ignored_words)}; '
+                        f'names:{",".join(self._names)}{synonym_part}; '
+                        f'checked:{",".join(self._checked_words)}')
         title.string = meta_string
 
         # Save notes

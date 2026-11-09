@@ -6,16 +6,15 @@ import wx.html
 from wx import Size
 
 from Constants import Strings, Constants
-from Containers.ListItemPanel import ListItemPanel
 
 
 class WordInfoDialog(wx.Dialog):
 
-    def __init__(self, parent, panels: Dict[bytes, ListItemPanel], lines_by_word: defaultdict[bytes, list[int]]):
+    def __init__(self, parent, word_list: Dict[bytes, int], lines_by_word: defaultdict[bytes, list[int]]):
         """
         Display a dialog with a word list and counts.
         :param parent: Parent frame.
-        :param panels: Dictionary of [bytes, ListItemPanel]
+        :param word_list: Dictionary of [bytes, ListItemPanel]
         :param lines_by_word: Dictionary of words and their lines.
         """
         wx.Dialog.__init__(self, parent, title=Strings.dialog_words_info,
@@ -30,10 +29,10 @@ class WordInfoDialog(wx.Dialog):
         self._close_button.SetDefault()
 
         content = ''
-        for w, p in sorted(panels.items()):
+        for w, c in sorted(word_list.items()):
             # Lines contains duplicates when the word repeats on the same line.
             unique_lines = set(lines_by_word[w])
-            content += f'{w.decode('utf-8')} -> {p.get_word_instance().get_count()},\tlines: {len(unique_lines)}<br>'
+            content += f'{w.decode('utf-8')} -> {c},\tlines: {len(unique_lines)}<br>'
 
         if not content:
             content = Strings.warn_run_indicator_tool

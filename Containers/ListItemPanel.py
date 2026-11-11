@@ -120,7 +120,7 @@ class ListItemPanel(wx.Panel):
             self._word_label.SetForegroundColour(Constants.color_grey)
 
     def __str__(self):
-        return f"Item panel: Checked: {self.is_checked()}, Enabled: {self.is_enabled()}, Word: {self._word_instance}"
+        return f"Item panel: Checked: {self.is_checked()}, Enabled: {self.is_enabled()}, {self._word_instance}"
 
     # Sorts words by count not by alphabet order.
     def __eq__(self, other):

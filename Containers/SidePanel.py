@@ -83,6 +83,15 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
             self._sizer.Detach(ch)
         self.Layout()
 
+    def del_item(self, panel: ListItemPanel) -> None:
+        """
+        Delete child item from the list
+        :param panel: Panel instance.
+        :return: None
+        """
+        self._sizer.Detach(panel)
+        panel.Destroy()
+
     def wipe_list(self) -> None:
         """
         Delete all items from list.

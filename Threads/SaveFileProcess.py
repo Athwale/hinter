@@ -56,13 +56,13 @@ class SaveFileProcess(multiprocessing.Process):
                     errors.extend(self._check_repetitions())
                     errors.extend(self._check_similar_words())
                     errors.extend(self._check_word_distance())
-                    self._queue.put((Constants.process_id_save, (True, errors)))
+                    self._queue.put((Constants.process_id_save, (True, errors, self._run_tets)))
                 else:
-                    self._queue.put((Constants.process_id_save, (True, [])))
+                    self._queue.put((Constants.process_id_save, (True, [], self._run_tets)))
             else:
-                self._queue.put((Constants.process_id_save, (False, [])))
+                self._queue.put((Constants.process_id_save, (False, [], self._run_tets)))
         except PermissionError as _:
-            self._queue.put((Constants.process_id_save, (False, [])))
+            self._queue.put((Constants.process_id_save, (False, [], self._run_tets)))
 
     def _find_stub(self, position: int) -> str:
         """
@@ -70,7 +70,6 @@ class SaveFileProcess(multiprocessing.Process):
         :param position: Position in full text.
         :return: Stub of the line.
         """
-        stub = ''
         try:
             stub = self._plain_text[position - 25:position + 25].decode('utf-8')
             return stub.replace('\n', ' ')

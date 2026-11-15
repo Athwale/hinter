@@ -1,17 +1,20 @@
+from typing import List, Tuple
+
+
 class Word:
 
-    def __init__(self, word: str, spans, count: int):
+    def __init__(self, word: str, spans: List[Tuple[int, int]], count: int):
         """
         Container for word data.
         :param word: The word.
         :param spans: All re spans where the word is in text.
         :param count: How many there are.
         """
-        self._word = word
-        self._spans = spans
-        self._count = count
-        self._indicator = -1
-        self._selected = False
+        self._word: str = word
+        self._spans: List[Tuple[int, int]] = spans
+        self._count: int = count
+        self._indicator: int = -1
+        self._selected: bool = False
 
     def set_selected(self, value: bool) -> None:
         """
@@ -42,14 +45,14 @@ class Word:
         """
         self._word = value
 
-    def get_spans(self):
+    def get_spans(self) -> List[Tuple[int, int]]:
         """
         Get all re spans where the word is in text.
         :return: The spans.
         """
         return self._spans
 
-    def set_spans(self, value):
+    def set_spans(self, value: List[Tuple[int, int]]):
         """
         Set the spans.
         :param value: All re spans where the word is in text.

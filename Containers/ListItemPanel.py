@@ -27,6 +27,7 @@ class ListItemPanel(wx.Panel):
         self._v_sizer = wx.BoxSizer(wx.VERTICAL)
         self.SetBackgroundColour(wx.Colour(255, 255, 255))
 
+        self._static_bmp = wx.StaticBitmap(self, -1, Constants.gray_box)
         self._check_box = wx.CheckBox(self, -1)
         self._check_box.SetValue(state)
         self._word_label = wx.StaticText(self, -1, self._word_instance.get_word(), style=wx.ST_ELLIPSIZE_MIDDLE,
@@ -35,6 +36,7 @@ class ListItemPanel(wx.Panel):
 
         self._h_sizer.Add(self._check_box, 0, wx.ALL, Constants.default_border)
         self._h_sizer.Add(self._word_label, 0, wx.TOP | wx.BOTTOM, Constants.default_border)
+        self._h_sizer.Add(self._static_bmp, 0, wx.CENTER | wx.RIGHT, 20)
         self._h_sizer.Add(wx.StaticLine(self, -1, size=Size(2, 26), style=wx.LI_HORIZONTAL))
         self._h_sizer.Add(self._count, 0, wx.TOP | wx.LEFT | wx.BOTTOM, Constants.default_border)
 
@@ -61,6 +63,23 @@ class ListItemPanel(wx.Panel):
             evt.SetInt(0)
             evt.SetClientObject(self._word_label)
         wx.PostEvent(self.GetEventHandler(), evt)
+
+    def update_color_block(self) -> None:
+        """
+        Update the color block to reflect the indicator the Word instance of this panel has.
+        :return: None
+        """
+        indicator, color, alpha = self._word_instance.get_indicator()
+        if indicator == -1:
+            bitmap = Constants.gray_box
+        else:
+            bitmap = wx.Bitmap.FromRGBA(Constants.color_box_size,
+                                        Constants.color_box_size,
+                                        color.Red(),
+                                        color.Green(),
+                                        color.Blue(),
+                                        alpha)
+        self._static_bmp.SetBitmap(bitmap)
 
     def update_count(self) -> None:
         """

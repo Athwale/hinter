@@ -1,5 +1,7 @@
 from typing import List, Tuple
 
+from wx import Colour
+
 
 class Word:
 
@@ -15,6 +17,8 @@ class Word:
         self._count: int = count
         self._indicator: int = -1
         self._selected: bool = False
+        self._color: Colour = Colour(0, 0, 0)
+        self._alpha: int = -1
 
     def set_selected(self, value: bool) -> None:
         """
@@ -73,35 +77,39 @@ class Word:
         """
         self._count = value
 
-    def get_indicator(self) -> int:
+    def get_indicator(self) -> Tuple[int, Colour, int]:
         """
         Get the indicator value.
-        :return: The indicator value.
+        :return: The (indicator id, Color, color alpha value).
         """
-        return self._indicator
+        return self._indicator, self._color, self._alpha
 
     def has_indicator(self) -> bool:
         """
         Return true if an indicator is set for this word.
         :return: True if an indicator is set for this word.
         """
-        if self.get_indicator() > -1:
+        if self.get_indicator()[0] > -1:
             return True
         return False
 
-    def set_indicator(self, value: int):
+    def set_indicator(self, indicator_id: int, color: Colour, alpha: int):
         """
         Set the indicator value.
-        :param value: The indicator value.
+        :param indicator_id: The indicator value.
+        :param color: wx.Colour
+        :param alpha: Color alpha
         """
-        self._indicator = value
+        self._indicator = indicator_id
+        self._color = color
+        self._alpha = alpha
 
     def clear_indicator(self) -> None:
         """
         Set indicator to -1.
         :return: None
         """
-        self.set_indicator(-1)
+        self.set_indicator(-1, Colour(0, 0, 0), -1)
 
     def __str__(self):
         return (f"Word: {self._word}, count: {self._count}, indicator: "

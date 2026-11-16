@@ -103,6 +103,9 @@ max_log_length: int = 5000000
 
 main_window_size: Size = Size(1000, 800)
 default_border: int = 3
+color_box_size: int = 15
+
+gray_box = wx.Bitmap.FromRGBA(color_box_size, color_box_size, 191, 191, 191, 60)
 
 icon_tool_height: int = 25
 icon_tool_width: int = 25
@@ -142,7 +145,7 @@ config_min_repetitions_default: int = 3
 config_max_repetitions: int = 100
 
 config_min_len: int = 1
-config_min_len_default: int = 3
+config_min_len_default: int = 2
 config_max_len: int = 100
 config_line_distance_min: int = 0
 config_line_distance_max: int = 100

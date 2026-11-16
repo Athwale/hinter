@@ -19,7 +19,7 @@ menu_item_redo: str = "Redo"
 menu_item_redo_hint: str = "Redo"
 menu_item_bold: str = "Bold"
 menu_item_bold_hint: str = "Make text bold"
-menu_item_italic: str = "Italic"
+menu_item_italic: str = "&Italic"
 menu_item_italic_hint: str = "Make text italic"
 menu_item_clear: str = "Clear styles"
 menu_item_clear_hint: str = "Clear styles"
@@ -43,6 +43,9 @@ menu_item_copy_llm: str = "Add selection into prompt"
 menu_item_limits: str = "Set limits from"
 menu_item_colorize: str = "Colorize"
 menu_item_toggle_mark: str = "Toggle line mark"
+menu_item_toggle_word: str = "{} word in list"
+menu_item_word_unlisted: str = "Does not fit list criteria"
+menu_item_depleted_indicators: str = "No free indicators"
 
 menu_tools: str = "&Tools"
 menu_item_word_list: str = "Word list"
@@ -65,6 +68,8 @@ menu_item_clear_yellow_marks: str = "Clear yellow marks"
 menu_item_clear_yellow_marks_hint: str = "Clear yellow marks"
 menu_item_notes: str = "Notes"
 menu_item_notes_hint: str = "Open notes"
+menu_item_tests: str = "Run tests"
+menu_item_tests_hint: str = "Run tests"
 
 menu_about: str = "&About"
 menu_item_about: str = "About..."
@@ -97,6 +102,8 @@ label_verbosity: str = 'Verbosity'
 label_unselect_all_words: str = 'Clear selection'
 label_auto_select_words: str = 'Auto select'
 label_line_distance: str = 'Min word distance'
+label_repetitions: str = 'Found: {}x'
+label_case: str = 'A/a'
 
 button_close: str = "Close"
 button_cancel: str = "Cancel"
@@ -128,6 +135,7 @@ err_file_not_found: str = "File not found"
 err_config_file: str = f"Config file permission error"
 err_connection: str = "Connection error"
 err_loading_document: str = "Error loading file"
+err_utf8_decode: str = "Error decoding utf-8 string: {}"
 
 exception_resource_not_found: str = "Resource file not found"
 

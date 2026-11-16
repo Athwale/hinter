@@ -54,7 +54,9 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         insert_later: List[ListItemPanel] = []
         index = 0
         for item in sorted(items):
+            item: ListItemPanel
             item.update_count()
+            item.update_color_block()
             item.Show(True)
             if not item.get_word_instance().has_indicator():
                 item.set_enabled(False)

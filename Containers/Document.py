@@ -131,6 +131,13 @@ class Document:
         self._checked_words = words
         self.set_modified(True)
 
+    def clear_checked_words(self) -> None:
+        """
+        Clear checked words selected on the side panel and do not set document modified.
+        :return: None
+        """
+        self._checked_words.clear()
+
     def set_names(self, names: Set[str]) -> None:
         """
         Set new names.

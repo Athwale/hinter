@@ -42,10 +42,11 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         panel.Show(False)
         return panel
 
-    def add_items(self, items: List[ListItemPanel]) -> None:
+    def add_items(self, items: List[ListItemPanel], alphabetical: bool) -> None:
         """
         Add new items to the list.
         :param items: Dictionary of items with ids.
+        :param alphabetical: Sort A-Z instead of word count.
         :return: None
         """
         # Add items from most repetitions to least.
@@ -53,7 +54,14 @@ class SidePanel(wx.lib.scrolledpanel.ScrolledPanel):
         # reinserted in order here.
         insert_later: List[ListItemPanel] = []
         index = 0
-        for item in sorted(items):
+
+        key = lambda panel: panel.get_word_instance().get_count()
+        reverse = False
+        if alphabetical:
+            key = lambda panel: panel.get_word_instance().get_word()
+            reverse = True
+
+        for item in sorted(items, key=key, reverse=reverse):
             item: ListItemPanel
             item.update_count()
             item.update_color_block()

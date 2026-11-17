@@ -57,7 +57,6 @@ class NotesEditorDialog(wx.Dialog):
             wx.PostEvent(self._parent.GetEventHandler(), close_evt)
             event.Skip()
 
-    # noinspection PyUnusedLocal
     def _text_changed(self, event: wx.CommandEvent) -> None:
         """
         Handle text changes and save to document.

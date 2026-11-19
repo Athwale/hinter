@@ -32,25 +32,41 @@ class Document:
         self._synonyms: List[Set[str]] = []
         self._notes: str = 'Example notes'
         self._checked_words: Set[str] = set()
+        self._red_lines: Set[str] = set()
+        self._text_position: int = 0
+
+    def get_red_lines(self) -> Set[int]:
+        """
+        Get the set of lines marked red.
+        :return: Get of red marked lines
+        """
+        return {int(i) for i in self._red_lines}
+
+    def get_text_position(self) -> int:
+        """
+        Get the cursor position saved from last time.
+        :return: Get the cursor position saved from last time.
+        """
+        return self._text_position
 
     def get_ignored_words(self) -> Set[str]:
         """
         Get the set of ignored words.
-        :return: Set of ignored words.
+        :return: Get of ignored words.
         """
         return self._ignored_words
 
     def get_checked_words(self) -> Set[str]:
         """
         Get the list of selected words in the side list loaded from the saved file.
-        :return: Set of selected words.
+        :return: Get of selected words.
         """
         return self._checked_words
 
     def get_names(self) -> Set[str]:
         """
         Get the set of names.
-        :return: Set of names.
+        :return: Get of names.
         """
         return self._names
 
@@ -105,6 +121,24 @@ class Document:
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+    def set_red_lines(self, lines: Set[int]) -> None:
+        """
+        Set new red lines set.
+        :param lines: Set of red lines indexes.
+        :return: None
+        """
+        self._red_lines = {str(i) for i in lines}
+        self.set_modified(True)
+
+    def set_text_position(self, position: int) -> None:
+        """
+        Set new text cursor position.
+        :param position: Text position.
+        :return: None
+        """
+        self._text_position = position
+        self.set_modified(True)
+
     def set_notes(self, notes: str) -> None:
         """
         Set new notes.
@@ -112,6 +146,7 @@ class Document:
         :return: None
         """
         self._notes = notes
+        self.set_modified(True)
 
     def set_ignored_words(self, words: Set[str]) -> None:
         """
@@ -223,19 +258,20 @@ class Document:
             if isinstance(ch, Tag) and ch.name == 'p':
                 # These can also be NavigableString and those are leftover \n.
                 for element in ch.children:
+                    text = element.text.translate(Constants.invisible_chars)
                     if isinstance(element, NavigableString):
-                        self._converted.append((Constants.style_default, element.text))
+                        self._converted.append((Constants.style_default, text))
                     elif isinstance(element, Tag):
                         if element.name == "b":
                             style = Constants.style_bold
                             if element.next_element.name == "i":
                                 style = Constants.style_bold_italic
-                            self._converted.append((style, element.text))
+                            self._converted.append((style, text))
                         elif element.name == "i":
                             style = Constants.style_italic
                             if element.next_element.name == "b":
                                 style = Constants.style_bold_italic
-                            self._converted.append((style, element.text))
+                            self._converted.append((style, text))
                         elif element.name == "br":
                             self._converted.append((Constants.style_break, ""))
                         else:
@@ -258,6 +294,14 @@ class Document:
         self._names.clear()
         self._synonyms.clear()
         self._ignored_words.clear()
+
+        meta_libre = soup.findAll('meta', {'name': 'generator'})
+        if meta_libre:
+            # Detect raw LibreOffice html document.
+            if 'LibreOffice' in meta_libre[0]['content']:
+                # We do not have any title metadata string here.
+                return
+
         title_metadata = soup.find('title')
         if title_metadata is not None:
             sections = title_metadata.text.split(';')
@@ -286,6 +330,16 @@ class Document:
                         if group.strip():
                             for w in group.split(','):
                                 self._checked_words.add(w.strip().lower())
+                elif parts[0].strip() == 'red':
+                    for group in parts[1:]:
+                        if group.strip():
+                            for w in group.split(','):
+                                self._red_lines.add(w.strip().lower())
+                elif parts[0].strip() == 'pos':
+                    try:
+                        self._text_position = int(parts[1].strip())
+                    except ValueError as _:
+                        raise FormatError(Strings.err_file_format_metadata)
                 else:
                     raise FormatError(Strings.err_file_format_metadata)
         base = soup.find(name="base")
@@ -313,7 +367,9 @@ class Document:
 
         meta_string += (f'{",".join(self._ignored_words)}; '
                         f'names:{",".join(self._names)}{synonym_part}; '
-                        f'checked:{",".join(self._checked_words)}')
+                        f'checked:{",".join(self._checked_words)}; '
+                        f'red:{",".join(self._red_lines)}; '
+                        f'pos:{self._text_position}')
         title.string = meta_string
 
         # Save notes
@@ -325,20 +381,22 @@ class Document:
         par = soup.new_tag("p")
 
         for chunk in self._converted:
+            # Strip invisible characters
+            sanitized = chunk[1].translate(Constants.invisible_chars)
             if chunk[0] == Constants.style_default:
-                par.append(bs4.NavigableString(chunk[1]))
+                par.append(bs4.NavigableString(sanitized))
             elif chunk[0] == Constants.style_italic:
                 i = soup.new_tag('i')
-                i.string = chunk[1]
+                i.string = sanitized.translate(Constants.invisible_chars)
                 par.append(i)
             elif chunk[0] == Constants.style_bold:
                 b = soup.new_tag('b')
-                b.string = chunk[1]
+                b.string = sanitized.translate(Constants.invisible_chars)
                 par.append(b)
             elif chunk[0] == Constants.style_bold_italic:
                 b = soup.new_tag('b')
                 i = soup.new_tag('i')
-                i.string = chunk[1]
+                i.string = sanitized.translate(Constants.invisible_chars)
                 b.append(i)
                 par.append(b)
         body.append(par)

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple, Set
+from typing import Tuple
 
 import wx
 
@@ -21,8 +21,6 @@ class Config:
         self._position_y: int = 0
         self._width: int = Constants.main_window_size.width
         self._height: int = Constants.main_window_size.height
-        self._last_text_pos: int = 0
-        self._red_marks: Set[int] = {-1}
 
         self._llm_url: str = Constants.llm_default_url
         self._llm_system_prompt: str = Constants.llm_system_prompt
@@ -52,18 +50,18 @@ class Config:
                             file = line.split(":")[1].replace('\n', '').strip()
                             self._last_file = Path(file)
                         if line.startswith('position:'):
-                            self._position_x, self._position_y = line.split(":")[1].replace('\n', '').strip().split(',')
+                            position_x, position_y = line.split(":")[1].replace('\n', '').strip().split(',')
                             try:
-                                self._position_x = int(self._position_x)
-                                self._position_y = int(self._position_y)
+                                self._position_x = int(position_x)
+                                self._position_y = int(position_y)
                             except ValueError as _:
                                 self._position_x = 0
                                 self._position_y = 0
                         if line.startswith('size:'):
-                            self._width, self._height = line.split(":")[1].replace('\n', '').strip().split(',')
+                            width, height = line.split(":")[1].replace('\n', '').strip().split(',')
                             try:
-                                self._width = int(self._width)
-                                self._height = int(self._height)
+                                self._width = int(width)
+                                self._height = int(height)
                             except ValueError as _:
                                 self._width = Constants.main_window_size.width
                                 self._height = Constants.main_window_size.height
@@ -104,22 +102,6 @@ class Config:
                                 self._llm_verbosity = int(line.split(":")[1].replace('\n', '').strip())
                             except ValueError as _:
                                 self._llm_verbosity = Constants.config_llm_verbosity_default
-                        if line.startswith('text_position:'):
-                            try:
-                                self._last_text_pos = int(line.split(":")[1].replace('\n', '').strip())
-                            except ValueError as _:
-                                self._last_text_pos = 0
-                        if line.startswith('red_lines:'):
-                            # red_lines: {33, 11, 4}
-                            try:
-                                line_set = set()
-                                for l in line.split(":")[1].replace('\n', '').replace('}', '').replace('{',
-                                                                                                       '').strip().split(
-                                        ','):
-                                    line_set.add(int(l))
-                                self._red_marks = line_set
-                            except ValueError as _:
-                                self._red_marks = {-1}
         except (PermissionError, OSError) as e:
             raise PermissionError(e)
 
@@ -152,21 +134,6 @@ class Config:
         :return: LLM url.
         """
         return self._llm_url
-
-    def set_marked_lines(self, lines: Set[int]) -> None:
-        """
-        Set new marked lines list.
-        :param lines: List of lines.
-        :return: None
-        """
-        self._red_marks = lines
-
-    def get_marked_lines(self) -> Set[int]:
-        """
-        Get a list of red marked Lines.
-        :return: List of ints.
-        """
-        return self._red_marks
 
     def set_llm_system_prompt(self, prompt: str) -> None:
         """
@@ -213,21 +180,6 @@ class Config:
         :return: LLM number of responses.
         """
         return self._llm_responses
-
-    def set_last_text_position(self, pos: int) -> None:
-        """
-        Set last position in text.
-        :param pos: Position in text.
-        :return: None
-        """
-        self._last_text_pos = pos
-
-    def get_last_text_position(self) -> int:
-        """
-        Get saved text position.
-        :return: Saved text position.
-        """
-        return self._last_text_pos
 
     def set_llm_temperature(self, temperature: float) -> None:
         """
@@ -361,5 +313,3 @@ class Config:
             config.write(f"llm_presence_p: {self._llm_presence_p}\n")
             config.write(f"llm_frequency_p: {self._llm_frequency_p}\n")
             config.write(f"llm_verbosity: {self._llm_verbosity}\n")
-            config.write(f"text_position: {self._last_text_pos}\n")
-            config.write(f"red_lines: {self._red_marks}\n")

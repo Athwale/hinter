@@ -155,15 +155,16 @@ class SaveFileProcess(multiprocessing.Process):
                            match.group().decode('utf-8')))
         return errors
 
-    def _check_similar_words(self) -> List[Tuple[str, int, str, str]]:
+    def _check_similar_words(self) -> List[Tuple[str, int, str, str, str]]:
         """
         Check for words that are similar but do not trigger spellcheck and usually typed wrong because they are close
         on the keyboard.
-        :return: List of reports found (type, start position, stub, word or error)
+        :return: List of reports found (type, start position, stub, word group, word)
         """
-        errors: List[Tuple[str, int, str, str]] = []
+        errors: List[Tuple[str, int, str, str, str]] = []
         for match in Constants.similar_words_regex.finditer(self._plain_text):
-            word = match.group()
-            word_group = Constants.word_to_group[word.decode('utf-8')]
-            errors.append((Constants.report_similar, match.start(), self._find_stub(match.start()), str(word_group)))
+            word = match.group().decode('utf-8')
+            word_group = Constants.word_to_group[word]
+            errors.append((Constants.report_similar, match.start(), self._find_stub(match.start()), str(word_group),
+                           word))
         return errors

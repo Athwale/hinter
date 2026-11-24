@@ -104,6 +104,9 @@ label_auto_select_words: str = 'Auto select'
 label_line_distance: str = 'Min word distance'
 label_repetitions: str = 'Found: {}x'
 label_case: str = 'A/a'
+label_sorting: str = 'Sort A->Z'
+label_side_panel: str = 'Side panel'
+label_notes_exist: str = 'Notes: {}'
 
 button_close: str = "Close"
 button_cancel: str = "Cancel"
@@ -148,7 +151,7 @@ report_name_line: str = "Line: {} starts with name: - {} - {}..."
 report_capital_names: str = "Line: {} has uncapitalized name: - {} - {}..."
 report_leftover: str = "Line: {} has leftover: - {} - {}..."
 report_doubled_words: str = "Line: {} has repeated word: - {} - {}..."
-report_similar: str = "Line: {} has word which may be incorrect: - {} - {}..."
+report_similar: str = "Line: {} has word: '{}' which may be incorrect: - {} - {}..."
 report_count: str = "{} errors"
 report_word_distance: str = "Word: - {} - repeats too close on lines: {}, {}"
 

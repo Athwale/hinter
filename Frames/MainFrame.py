@@ -78,6 +78,16 @@ class MainFrame(wx.Frame):
         self._splitter: wx.SplitterWindow | None = None
         self._coloring_spinner: wx.ActivityIndicator | None = None
         self._ai_spinner: wx.ActivityIndicator | None = None
+        self._notes_indicator: wx.StaticText | None = None
+        self._search_button_cancel: wx.Button | None = None
+
+        # Sub-processes:
+        # SimpleQueue does not use background feeder thread and does not need special exit handling.
+        self._process_result_queue = multiprocessing.SimpleQueue()
+        self._load_file_process: LoadFileProcess | None = None
+        self._save_file_process: SaveFileProcess | None = None
+        self._statistics_process: StatisticsProcess | None = None
+        self._word_data_process: WordDataProcess | None = None
 
         # Used for undo.
         self._style_history: Dict = {}
@@ -402,8 +412,10 @@ class MainFrame(wx.Frame):
                                                                Strings.menu_item_notes_hint)
         self._tools.append(notes_tool)
 
-        self._coloring_spinner = wx.ActivityIndicator(self._toolbar, wx.ID_ANY, size=wx.Size(10, 10))
-        self._toolbar.AddControl(self._coloring_spinner, "")
+        self._notes_indicator = wx.StaticText(self._toolbar, -1, '')
+        assert self._notes_indicator is not None
+        self._notes_indicator.SetForegroundColour(wx.RED)
+        self._toolbar.AddControl(self._notes_indicator)
 
         self.Bind(wx.EVT_MENU, self._apply_indicators_handler, colorize_tool)
 

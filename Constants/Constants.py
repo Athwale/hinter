@@ -116,6 +116,13 @@ style_italic: str = "italic"
 style_bold_italic: str = "italic,bold"
 style_break: str = "break"
 
+invisible_chars = {
+    ord("\u200b"): None,  # Zero-Width Space
+    ord("\u200c"): None,  # Zero-Width Non-Joiner
+    ord("\u200d"): None,  # Zero-Width Joiner
+    ord("\uFEFF"): None,  # Zero-Width No-Break Space / BOM
+}
+
 style_map = {style_default: 0,
              style_bold: 1,
              style_italic: 2,

@@ -166,6 +166,16 @@ class MainFrame(wx.Frame):
         self._disable_editor()
         self._set_status_text(Strings.status_ready, 0)
         self._set_status_text(Strings.status_no_document, 1)
+        self._start_queue_listener()
+
+        # Catch escape key.
+        id_escape = wx.NewIdRef()
+        escape_entry = wx.AcceleratorEntry(wx.ACCEL_NORMAL, wx.WXK_ESCAPE, id_escape)
+        accel_tbl = wx.AcceleratorTable([escape_entry])
+        self.SetAcceleratorTable(accel_tbl)
+
+        # 4. Bind the menu event to that ID
+        self.Bind(wx.EVT_MENU, self._on_escape, id=id_escape)
 
         # Load configuration on startup.
         try:
@@ -220,8 +230,13 @@ class MainFrame(wx.Frame):
         edit_menu.AppendSeparator()
 
         edit_menu_item_bold = edit_menu.Append(wx.ID_BOLD, Strings.menu_item_bold, Strings.menu_item_bold_hint)
+        entry = wx.AcceleratorEntry(wx.ACCEL_CTRL, ord('b'), wx.ID_BOLD)
+        edit_menu_item_bold.SetAccel(entry)
         self._menu_items.append(edit_menu_item_bold)
+
         edit_menu_item_italic = edit_menu.Append(wx.ID_ITALIC, Strings.menu_item_italic, Strings.menu_item_italic_hint)
+        entry = wx.AcceleratorEntry(wx.ACCEL_CTRL, ord('i'), wx.ID_ITALIC)
+        edit_menu_item_italic.SetAccel(entry)
         self._menu_items.append(edit_menu_item_italic)
         edit_menu_item_remove_styles = edit_menu.Append(wx.ID_CLEAR, Strings.menu_item_clear,
                                                         Strings.menu_item_clear_hint)
@@ -254,11 +269,20 @@ class MainFrame(wx.Frame):
                                                   Strings.menu_item_reset_hint)
         self._menu_items.append(tools_menu_item_reset)
         tools_menu.AppendSeparator()
+        tools_menu_item_tests = tools_menu.Append(self._id_tests, Strings.menu_item_tests,
+                                                  Strings.menu_item_tests_hint)
+        entry = wx.AcceleratorEntry(wx.ACCEL_CTRL, ord('p'), self._id_tests)
+        tools_menu_item_tests.SetAccel(entry)
+        self._menu_items.append(tools_menu_item_tests)
         tools_menu_item_log = tools_menu.Append(wx.ID_UP, Strings.menu_item_log_open,
                                                 Strings.menu_item_log_hint)
+        entry = wx.AcceleratorEntry(wx.ACCEL_CTRL, ord(','), wx.ID_UP)
+        tools_menu_item_log.SetAccel(entry)
         self._menu_items.append(tools_menu_item_log)
         tools_menu_item_log_clear = tools_menu.Append(self._id_log_clear, Strings.menu_item_log_clear,
                                                       Strings.menu_item_log_open_hint)
+        entry = wx.AcceleratorEntry(wx.ACCEL_CTRL, ord('.'), self._id_log_clear)
+        tools_menu_item_log_clear.SetAccel(entry)
         self._menu_items.append(tools_menu_item_log_clear)
         tools_menu.AppendSeparator()
         tools_menu_item_llm_config = tools_menu.Append(wx.ID_SETUP, Strings.menu_item_config_llm,
@@ -270,12 +294,16 @@ class MainFrame(wx.Frame):
         tools_menu.AppendSeparator()
         tools_menu_item_mark_line = tools_menu.Append(wx.ID_ADD, Strings.menu_item_mark,
                                                       Strings.menu_item_mark_hint)
+        entry = wx.AcceleratorEntry(wx.ACCEL_CTRL, ord('m'), wx.ID_ADD)
+        tools_menu_item_mark_line.SetAccel(entry)
         self._menu_items.append(tools_menu_item_mark_line)
         tools_menu_item_clear_red_marks = tools_menu.Append(self._id_clear_red_marks, Strings.menu_item_clear_red_marks,
                                                             Strings.menu_item_clear_red_marks_hint)
         self._menu_items.append(tools_menu_item_clear_red_marks)
         tools_menu_item_clear_yellow_marks = tools_menu.Append(self._id_clear_yellow_marks,
                                                                Strings.menu_item_clear_yellow_marks_hint)
+        entry = wx.AcceleratorEntry(wx.ACCEL_CTRL, ord('k'), self._id_clear_yellow_marks)
+        tools_menu_item_clear_yellow_marks.SetAccel(entry)
         self._menu_items.append(tools_menu_item_clear_yellow_marks)
 
         self.Bind(wx.EVT_MENU, lambda _on_log_clear: self._log_text_field.Clear(), id=self._id_log_clear)
@@ -1581,7 +1609,20 @@ class MainFrame(wx.Frame):
             if self._current_document and self._word_counts and colorize_tool.IsToggled():
                 self._display_indicators()
 
-    # noinspection PyUnusedLocal
+    def _on_escape(self, event: wx.CommandEvent) -> None:
+        """
+        Handle the escape button and return focus to the main text field.
+        :param event: Not used.
+        :return:
+        """
+        assert self._main_text_field is not None
+        assert self._search_text_field is not None
+        assert self._search_results is not None
+
+        if self._search_text_field.HasFocus():
+            self._cancel_search()
+        self._main_text_field.SetFocus()
+
     def _on_idle_timer_handler(self, event: wx.CommandEvent) -> None:
         """
         Idle timer handler. Runs after last edit and starts coloring recalculation.

@@ -66,6 +66,8 @@ class MainFrame(wx.Frame):
         self._input_text_field: wx.TextCtrl | None = None
         self._search_button_up: wx.BitmapButton | None = None
         self._search_button_down: wx.BitmapButton | None = None
+        self._search_case: wx.CheckBox | None = None
+        self._panel_sort_a_z: wx.CheckBox | None = None
         self._unselect_words: wx.Button | None = None
         self._auto_select_words: wx.Button | None = None
         self._search_results: wx.StaticText | None = None
@@ -499,7 +501,13 @@ class MainFrame(wx.Frame):
         self._search_button_up = wx.BitmapButton(top_panel, -1, wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_GO_UP)))
         self._search_button_down = wx.BitmapButton(top_panel, -1,
                                                    wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_GO_DOWN)))
-        self._search_results = wx.StaticText(top_panel, -1, label=Strings.label_search_results.format(0, 0))
+        self._search_button_cancel = wx.BitmapButton(search_box.GetStaticBox(), -1,
+                                                     wx.BitmapBundle(wx.ArtProvider.GetBitmap(wx.ART_CLOSE)))
+        # add search cancel button
+        self._search_case = wx.CheckBox(search_box.GetStaticBox(), -1, label=Strings.label_case)
+        self._search_results = wx.StaticText(search_box.GetStaticBox(), -1,
+                                             label=Strings.label_search_results.format(0, 0))
+        self._panel_sort_a_z = wx.CheckBox(panel_box.GetStaticBox(), -1, label=Strings.label_sorting)
 
         self._main_text_field = stc.StyledTextCtrl(top_panel, style=wx.TE_MULTILINE)
         assert self._main_text_field is not None
@@ -578,9 +586,12 @@ class MainFrame(wx.Frame):
         assert self._search_text_field is not None
         assert self._search_button_up is not None
         assert self._search_button_down is not None
+        assert self._search_button_cancel is not None
         assert self._search_results is not None
         assert self._input_text_field is not None
         assert self._ai_spinner is not None
+        assert self._search_case is not None
+        assert self._panel_sort_a_z is not None
 
         # Main text area context menu.
         self._main_text_field.UsePopUp(stc.STC_POPUP_NEVER)
@@ -613,6 +624,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_TEXT_ENTER, self._llm_input_field_send_handler, self._input_text_field)
         self._input_text_field.Bind(wx.EVT_KEY_DOWN, self._llm_input_field_key_handler)
 
+        self.Bind(wx.EVT_CHECKBOX, self._sort_order_handler, self._panel_sort_a_z)
+        self.Bind(wx.EVT_CHECKBOX, self._search_handler, self._search_case)
+
         # Mark current line on keys and mouse.
         self._main_text_field.Bind(stc.EVT_STC_UPDATEUI, self._main_text_field_key_handler)
 
@@ -627,9 +641,11 @@ class MainFrame(wx.Frame):
 
         line_distance_box.Add(self._line_distance_selector, 0, wx.LEFT, Constants.default_border)
 
+        search_box.Add(self._search_case, 0, wx.LEFT | wx.CENTER, Constants.default_border)
         search_box.Add(self._search_text_field, 0, wx.LEFT, Constants.default_border)
-        search_box.Add(self._search_button_up, 0, wx.LEFT, Constants.default_border)
-        search_box.Add(self._search_button_down, 0, wx.LEFT, Constants.default_border)
+        search_box.Add(self._search_button_cancel, 0, wx.LEFT | wx.CENTER, Constants.default_border)
+        search_box.Add(self._search_button_up, 0, wx.LEFT | wx.CENTER, Constants.default_border)
+        search_box.Add(self._search_button_down, 0, wx.LEFT | wx.CENTER, Constants.default_border)
         search_box.Add(self._search_results, 0, wx.LEFT | wx.CENTER, Constants.default_border)
 
         toolbar_horizontal_box.Add(coloring_repetitions_box, 0, Constants.default_border)
@@ -941,6 +957,11 @@ class MainFrame(wx.Frame):
         assert self._search_text_field is not None
         assert self._search_results is not None
         assert self._main_text_field is not None
+        assert self._search_case is not None
+
+        flags = 0
+        if self._search_case.GetValue():
+            flags |= stc.STC_FIND_MATCHCASE
 
         text = self._search_text_field.GetValue()
         if text:
@@ -948,10 +969,11 @@ class MainFrame(wx.Frame):
             found_word = (0, 0)
             self._found_words.clear()
             self._found_last_index = 0
+            # The counter is used to show which occurrence is selected in text. If it was 0, it would count 0-3 not 1-4.
             counter = 1
             while found_word != (-1, -1):
                 found_word = self._main_text_field.FindText(last_found_pos, self._main_text_field.GetTextLength(),
-                                                            text)
+                                                            text, flags=flags)
                 if found_word != (-1, -1):
                     self._found_words.append((found_word, counter))
                     counter += 1
@@ -962,10 +984,7 @@ class MainFrame(wx.Frame):
                 self._main_text_field.SetSelection(self._found_words[0][0][0], self._found_words[0][0][1])
                 self._main_text_field.VerticalCentreCaret()
         else:
-            self._found_last_index = 0
-            self._found_words.clear()
-            self._main_text_field.SetSelection(0, 0)
-            self._search_results.SetLabel(label=Strings.label_search_results.format(0, 0))
+            self._cancel_search()
 
     def _search_enter_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -973,8 +992,22 @@ class MainFrame(wx.Frame):
         :param event: Used to detect direction.
         :return: None
         """
-        assert self._main_text_field is not None
-        assert self._search_results is not None
+
+        def mark_text():
+            """
+            Select the found text in the text field and move the caret.
+            :return:
+            """
+            assert self._main_text_field is not None
+            assert self._search_results is not None
+
+            self._main_text_field.SetSelection(self._found_words[self._found_last_index][0][0],
+                                               self._found_words[self._found_last_index][0][1])
+            self._main_text_field.VerticalCentreCaret()
+            self._search_results.SetLabel(Strings.label_search_results.
+            format(
+                self._found_words[self._found_last_index][1] if self._found_words else 0,
+                len(self._found_words)))
 
         try:
             if self._found_words:
@@ -982,13 +1015,7 @@ class MainFrame(wx.Frame):
                     self._found_last_index -= 1
                 else:
                     self._found_last_index += 1
-                self._main_text_field.SetSelection(self._found_words[self._found_last_index][0][0],
-                                                   self._found_words[self._found_last_index][0][1])
-                self._main_text_field.VerticalCentreCaret()
-                self._search_results.SetLabel(Strings.label_search_results.
-                format(
-                    self._found_words[self._found_last_index][1] if self._found_words else 0,
-                    len(self._found_words)))
+                mark_text()
             else:
                 # Restart search when the text was edited.
                 self._search_handler(event)
@@ -997,6 +1024,7 @@ class MainFrame(wx.Frame):
                 self._found_last_index = len(self._found_words)
             else:
                 self._found_last_index = 0
+            mark_text()
 
     def _search_up_handler(self, event: wx.CommandEvent) -> None:
         """
@@ -1015,7 +1043,14 @@ class MainFrame(wx.Frame):
         """
         self._search_enter_handler(event)
 
-    # noinspection PyUnusedLocal
+    def _search_cancel_handler(self, event: wx.CommandEvent) -> None:
+        """
+        Search button cancel handler.
+        :param event: Not used.
+        :return: None
+        """
+        self._cancel_search()
+
     def _undo_handler(self, event: wx.CommandEvent) -> None:
         """
         Undo last change.

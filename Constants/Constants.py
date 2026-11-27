@@ -178,6 +178,7 @@ config_llm_verbosity_min: int = 1
 config_llm_verbosity_max: int = 3
 
 static_box_font_size: int = 9
+panel_font_size: int = 12
 statistics_timer_delay: int = 10000
 idle_timer_delay: int = 3000
 # 30s autosave.

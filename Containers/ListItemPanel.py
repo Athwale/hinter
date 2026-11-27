@@ -30,9 +30,14 @@ class ListItemPanel(wx.Panel):
         self._static_bmp = wx.StaticBitmap(self, -1, Constants.gray_box)
         self._check_box = wx.CheckBox(self, -1)
         self._check_box.SetValue(state)
+
         self._word_label = wx.StaticText(self, -1, self._word_instance.get_word(), style=wx.ST_ELLIPSIZE_MIDDLE,
                                          size=Size(120, -1))
         self._count = wx.StaticText(self, -1, str(self._word_instance.get_count()), style=wx.ST_ELLIPSIZE_END)
+        font = self._word_label.GetFont()
+        font.SetPointSize(Constants.panel_font_size)
+        self._word_label.SetFont(font)
+        self._count.SetFont(font)
 
         self._h_sizer.Add(self._check_box, 0, wx.ALL, Constants.default_border)
         self._h_sizer.Add(self._word_label, 0, wx.TOP | wx.BOTTOM, Constants.default_border)
